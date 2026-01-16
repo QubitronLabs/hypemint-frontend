@@ -202,12 +202,6 @@ export default function ProfilePage() {
                     <p className="text-2xl font-bold tabular-nums">{user?.tradesCount ?? 0}</p>
                     <p className="text-sm text-muted-foreground">Trades</p>
                 </div>
-                {user?.isVerified && (
-                    <div className="text-center">
-                        <p className="text-2xl">✓</p>
-                        <p className="text-sm text-primary">Verified</p>
-                    </div>
-                )}
             </motion.div>
 
 
