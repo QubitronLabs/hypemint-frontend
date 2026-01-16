@@ -1,0 +1,210 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* 
+ * HypeMint Design System
+ * Dark-first memecoin launchpad theme inspired by pump.fun
+ * Vibrant green accent (#00ff88) for CTAs and positive indicators
+ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  /* Custom HypeMint colors */
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+}
+
+/* Dark theme by default - memecoin aesthetic */
+:root {
+  --radius: 0.625rem;
+  /* Deep dark background like pump.fun */
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  /* Surface colors */
+  --card: #111111;
+  --card-foreground: #fafafa;
+  --popover: #111111;
+  --popover-foreground: #fafafa;
+  /* Primary = Vibrant Green (signature memecoin color) */
+  --primary: #00ff88;
+  --primary-foreground: #0a0a0a;
+  /* Secondary */
+  --secondary: #1a1a1a;
+  --secondary-foreground: #fafafa;
+  /* Muted */
+  --muted: #1a1a1a;
+  --muted-foreground: #888888;
+  /* Accent */
+  --accent: #1c1c1c;
+  --accent-foreground: #fafafa;
+  /* Destructive = Red for sells/losses */
+  --destructive: #ff4444;
+  /* Borders */
+  --border: #222222;
+  --input: #1a1a1a;
+  --ring: #00ff88;
+  /* Charts */
+  --chart-1: #00ff88;
+  --chart-2: #ff4444;
+  --chart-3: #ffcc00;
+  --chart-4: #00ccff;
+  --chart-5: #ff66ff;
+  /* Sidebar */
+  --sidebar: #0d0d0d;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #00ff88;
+  --sidebar-primary-foreground: #0a0a0a;
+  --sidebar-accent: #1a1a1a;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #222222;
+  --sidebar-ring: #00ff88;
+  /* Custom semantic colors */
+  --success: #00ff88;
+  --warning: #ffcc00;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  
+  html {
+    /* Dark mode by default */
+    color-scheme: dark;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  /* Custom scrollbar for dark theme */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #333 transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 9999px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #444;
+  }
+  
+  /* Glow effects for emphasis */
+  .glow-green {
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+  }
+  
+  .glow-red {
+    box-shadow: 0 0 20px rgba(255, 68, 68, 0.3);
+  }
+  
+  /* Text gradient for hero elements */
+  .text-gradient {
+    background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* Subtle card hover effect */
+  .card-hover {
+    transition: all 0.2s ease;
+  }
+  
+  .card-hover:hover {
+    background: #161616;
+    border-color: #333;
+  }
+  
+  /* Price flash animations */
+  .price-up {
+    animation: flash-green 0.5s ease;
+  }
+  
+  .price-down {
+    animation: flash-red 0.5s ease;
+  }
+  
+  @keyframes flash-green {
+    0% { background: rgba(0, 255, 136, 0.3); }
+    100% { background: transparent; }
+  }
+  
+  @keyframes flash-red {
+    0% { background: rgba(255, 68, 68, 0.3); }
+    100% { background: transparent; }
+  }
+  
+  /* Number display optimizations */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+  
+  /* Pulse for live indicators */
+  .pulse-live {
+    animation: pulse-live 2s infinite;
+  }
+  
+  @keyframes pulse-live {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+}
