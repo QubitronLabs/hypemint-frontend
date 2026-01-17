@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { createChart, ColorType, IChartApi, ISeriesApi, LineSeries, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
+import { createChart, ColorType, IChartApi, ISeriesApi, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
 import { cn } from '@/lib/utils';
+import { useTokenPriceUpdates } from '@/hooks/useWebSocket';
 
 interface PriceChartProps {
     tokenId: string;
@@ -21,13 +22,7 @@ interface CandleData {
 }
 
 /**
- * PriceChart - TradingView-style price chart using lightweight-charts
- * 
- * Features:
- * - Candlestick chart with volume overlay
- * - Time range selector
- * - Real-time updates
- * - Responsive sizing
+ * PriceChart - Real-time animated price chart
  */
 export function PriceChart({ tokenId, className }: PriceChartProps) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -36,6 +31,39 @@ export function PriceChart({ tokenId, className }: PriceChartProps) {
     const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
     const [timeRange, setTimeRange] = useState<TimeRange>('1h');
     const [isLoading, setIsLoading] = useState(true);
+
+    // Listen for real-time updates
+    useTokenPriceUpdates(tokenId, (update) => {
+        if (!candleSeriesRef.current || !volumeSeriesRef.current) return;
+
+        // Parse price (which might be in raw format or formatted string)
+        // If it's a huge Wei number > 1e9, assume we need to format it.
+        // But backend broadcasts "price" which is usually derived from executionResult.newPrice (bigint string)
+        // Let's explicitly try to normalize it.
+        let price = parseFloat(update.price);
+
+        // Safety check for raw huge numbers
+        if (update.price.length > 15 && !update.price.includes('.')) {
+            // likely wei integer
+            price = parseFloat(update.price) / 1e18;
+        }
+
+        const time = Math.floor(Date.now() / 1000) as unknown as any; // Cast for LWChart
+
+        // Update current candle or add new one
+        // For simplicity in this demo, we just update the "last" candle 
+        // In reality, we'd check if we need to start a new candle based on interval
+
+        const currentData = {
+            time: time,
+            open: price, // In a real update, we'd want to maintain Open from the start of the minute
+            high: price,
+            low: price,
+            close: price,
+        };
+
+        candleSeriesRef.current.update(currentData);
+    });
 
     // Initialize chart
     useEffect(() => {
@@ -51,45 +79,21 @@ export function PriceChart({ tokenId, className }: PriceChartProps) {
                 horzLines: { color: '#222222' },
             },
             crosshair: {
-                mode: 1, // Normal mode
-                vertLine: {
-                    color: '#00ff88',
-                    width: 1,
-                    style: 2,
-                    labelBackgroundColor: '#00ff88',
-                },
-                horzLine: {
-                    color: '#00ff88',
-                    width: 1,
-                    style: 2,
-                    labelBackgroundColor: '#00ff88',
-                },
+                mode: 1,
+                vertLine: { color: '#00ff88', width: 1, style: 2, labelBackgroundColor: '#00ff88' },
+                horzLine: { color: '#00ff88', width: 1, style: 2, labelBackgroundColor: '#00ff88' },
             },
             rightPriceScale: {
                 borderColor: '#222222',
-                scaleMargins: {
-                    top: 0.1,
-                    bottom: 0.2,
-                },
+                scaleMargins: { top: 0.1, bottom: 0.2 },
             },
             timeScale: {
                 borderColor: '#222222',
                 timeVisible: true,
                 secondsVisible: false,
             },
-            handleScale: {
-                mouseWheel: true,
-                pinch: true,
-            },
-            handleScroll: {
-                mouseWheel: true,
-                pressedMouseMove: true,
-                horzTouchDrag: true,
-                vertTouchDrag: true,
-            },
         });
 
-        // Add candlestick series
         const candleSeries = chart.addSeries(CandlestickSeries, {
             upColor: '#00ff88',
             downColor: '#ff4444',
@@ -99,26 +103,19 @@ export function PriceChart({ tokenId, className }: PriceChartProps) {
             wickDownColor: '#ff4444',
         });
 
-        // Add volume series
         const volumeSeries = chart.addSeries(HistogramSeries, {
-            priceFormat: {
-                type: 'volume',
-            },
+            priceFormat: { type: 'volume' },
             priceScaleId: '',
         });
 
         volumeSeries.priceScale().applyOptions({
-            scaleMargins: {
-                top: 0.8,
-                bottom: 0,
-            },
+            scaleMargins: { top: 0.8, bottom: 0 },
         });
 
         chartRef.current = chart;
         candleSeriesRef.current = candleSeries;
         volumeSeriesRef.current = volumeSeries;
 
-        // Handle resize
         const handleResize = () => {
             if (containerRef.current) {
                 chart.applyOptions({
@@ -137,69 +134,55 @@ export function PriceChart({ tokenId, className }: PriceChartProps) {
         };
     }, []);
 
-    // Load and update data
+    // Load real data from API
     useEffect(() => {
         const loadData = async () => {
             setIsLoading(true);
-
             try {
-                // Generate mock data for demo (replace with API call)
-                const now = Math.floor(Date.now() / 1000);
-                const mockData: CandleData[] = [];
-                let price = 0.00001 + Math.random() * 0.0001;
-
-                const intervals: Record<TimeRange, number> = {
-                    '1m': 60,
-                    '5m': 300,
-                    '15m': 900,
-                    '1h': 3600,
-                    '4h': 14400,
-                    '1D': 86400,
+                // Determine API interval based on UI selection
+                const intervalMap: Record<string, string> = {
+                    '1m': '1m', '5m': '5m', '15m': '15m',
+                    '1h': '1h', '4h': '4h', '1D': '1d'
                 };
+                const apiInterval = intervalMap[timeRange] || '1h';
 
-                const interval = intervals[timeRange];
-                const count = 100;
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/charts/${tokenId}?interval=${apiInterval}&limit=500`);
+                const response = await res.json();
 
-                for (let i = count; i >= 0; i--) {
-                    const time = now - i * interval;
-                    const volatility = 0.05;
-                    const open = price;
-                    const change = (Math.random() - 0.5) * volatility;
-                    price = price * (1 + change);
-                    const close = price;
-                    const high = Math.max(open, close) * (1 + Math.random() * 0.02);
-                    const low = Math.min(open, close) * (1 - Math.random() * 0.02);
-                    const volume = Math.random() * 10000;
+                let chartData = response.data || [];
 
-                    mockData.push({ time, open, high, low, close, volume });
+                if (chartData.length === 0) {
+                    // If no data, maybe show just the current price line or empty
+                    // For now, let's just initialize with empty
+                    console.log("No historical data found");
                 }
 
                 if (candleSeriesRef.current && volumeSeriesRef.current) {
-                    candleSeriesRef.current.setData(
-                        mockData.map((d) => ({
-                            time: d.time as unknown as any,
-                            open: d.open,
-                            high: d.high,
-                            low: d.low,
-                            close: d.close,
-                        }))
-                    );
+                    // Ensure time is unique and sorted (backend should handle this, but safety first)
+                    // Lightweight charts requires ascending order
 
-                    volumeSeriesRef.current.setData(
-                        mockData.map((d) => ({
-                            time: d.time as unknown as any,
-                            value: d.volume,
-                            color: d.close >= d.open ? 'rgba(0, 255, 136, 0.3)' : 'rgba(255, 68, 68, 0.3)',
-                        }))
-                    );
+                    const data = chartData.map((d: any) => ({
+                        time: d.time as unknown as any,
+                        open: d.open,
+                        high: d.high,
+                        low: d.low,
+                        close: d.close,
+                    }));
+                    candleSeriesRef.current.setData(data);
+
+                    const volData = chartData.map((d: any) => ({
+                        time: d.time as unknown as any,
+                        value: d.volume,
+                        color: d.close >= d.open ? 'rgba(0, 255, 136, 0.3)' : 'rgba(255, 68, 68, 0.3)',
+                    }));
+                    volumeSeriesRef.current.setData(volData);
                 }
             } catch (error) {
-                console.error('Failed to load chart data:', error);
+                console.error('Failed to load chart:', error);
             } finally {
                 setIsLoading(false);
             }
         };
-
         loadData();
     }, [tokenId, timeRange]);
 
@@ -207,7 +190,6 @@ export function PriceChart({ tokenId, className }: PriceChartProps) {
 
     return (
         <div className={cn('bg-card border border-border rounded-xl overflow-hidden', className)}>
-            {/* Time Range Selector */}
             <div className="flex items-center gap-1 p-2 border-b border-border bg-muted/30">
                 {timeRanges.map((range) => (
                     <button
@@ -223,13 +205,8 @@ export function PriceChart({ tokenId, className }: PriceChartProps) {
                         {range}
                     </button>
                 ))}
-                <div className="flex-1" />
-                <span className="text-xs text-muted-foreground">
-                    % log auto
-                </span>
             </div>
 
-            {/* Chart Container */}
             <div className="relative" style={{ height: 400 }}>
                 {isLoading && (
                     <div className="absolute inset-0 flex items-center justify-center bg-card/80 z-10">

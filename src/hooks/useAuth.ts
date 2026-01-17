@@ -1,17 +1,23 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import { useDynamicContext, useIsLoggedIn } from '@dynamic-labs/sdk-react-core';
-import { useAuthStore, useJwt, useUser, useIsAuthenticated } from '@/lib/auth';
-import { getAuthMe } from '@/lib/api/auth';
+import {
+    useAuthStore,
+    useJwt,
+    useUser,
+    useIsAuthenticated,
+    useIsUserFetched,
+} from '@/lib/auth';
 
 /**
  * Hook to get auth state and user info
- * 
+ *
  * Combines:
  * - Dynamic.xyz wallet connection state
  * - JWT token from auth store
- * - User data from backend
+ * - User data from backend (cached in store)
+ *
+ * NO API CALLS - uses cached data from auth store
  */
 export function useAuth() {
     const { user: dynamicUser, primaryWallet, handleLogOut } = useDynamicContext();
@@ -20,21 +26,25 @@ export function useAuth() {
     const jwt = useJwt();
     const user = useUser();
     const isAuthenticated = useIsAuthenticated();
+    const isUserFetched = useIsUserFetched();
     const { isLoading } = useAuthStore();
 
     return {
         // Auth state
         isAuthenticated,
         isLoading,
+        isUserFetched,
         jwt,
 
-        // User data
+        // User data (from cache)
         user,
+        hasUsername: !!user?.username,
 
         // Dynamic.xyz data
         dynamicUser,
         primaryWallet,
         walletAddress: primaryWallet?.address,
+        isLoggedIn,
 
         // Actions
         logout: handleLogOut,
@@ -42,21 +52,20 @@ export function useAuth() {
 }
 
 /**
- * Hook to fetch and cache current user from backend
- * Uses JWT in Authorization header
- * Returns just the User object for easier consumption
+ * Hook to get current user from cache
+ * 
+ * DOES NOT make API calls - uses cached data from auth store.
+ * The user is fetched once during DynamicProvider auth sync.
  */
 export function useCurrentUser() {
-    const jwt = useJwt();
+    const user = useUser();
+    const isUserFetched = useIsUserFetched();
+    const { isLoading } = useAuthStore();
 
-    return useQuery({
-        queryKey: ['auth', 'me'],
-        queryFn: async () => {
-            const response = await getAuthMe();
-            return response.user; // Return just the user object
-        },
-        enabled: !!jwt, // Only run when we have a JWT
-        staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-        retry: false, // Don't retry on 401
-    });
+    return {
+        data: user,
+        isLoading: isLoading && !isUserFetched,
+        isFetched: isUserFetched,
+        hasUsername: !!user?.username,
+    };
 }

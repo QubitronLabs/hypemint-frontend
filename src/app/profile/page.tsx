@@ -11,7 +11,6 @@ import {
     Coins,
     ArrowLeftRight,
     Bell,
-    Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -28,13 +27,6 @@ const MOCK_BALANCES = [
     { name: 'Solana', symbol: 'SOL', balance: '0.00', value: '$0' },
 ];
 
-/**
- * Profile Page with JWT Auth
- * 
- * Uses:
- * - useAuth() - Combined auth state
- * - useCurrentUser() - Backend user data via JWT
- */
 export default function ProfilePage() {
     const { isAuthenticated, isLoading, walletAddress, dynamicUser, logout } = useAuth();
     const { data: user, isLoading: userLoading } = useCurrentUser();
@@ -42,7 +34,6 @@ export default function ProfilePage() {
     const [copied, setCopied] = useState(false);
     const [activeTab, setActiveTab] = useState('balances');
 
-    // Display name with multiple fallbacks
     const displayName = user?.displayName
         || user?.username
         || dynamicUser?.firstName
@@ -82,7 +73,7 @@ export default function ProfilePage() {
         );
     }
 
-    // Not connected state
+    // Not connected
     if (!isAuthenticated) {
         return (
             <div className="min-h-[80vh] flex items-center justify-center p-6">
@@ -98,9 +89,6 @@ export default function ProfilePage() {
                     <p className="text-muted-foreground mb-6">
                         Connect your wallet to view your profile, balances, and trading history.
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                        Your JWT token will be used for all API requests
-                    </p>
                 </motion.div>
             </div>
         );
@@ -115,7 +103,6 @@ export default function ProfilePage() {
                 className="flex items-start justify-between mb-8"
             >
                 <div className="flex items-center gap-4">
-                    {/* Avatar */}
                     <Avatar className="w-20 h-20 border-2 border-border">
                         <AvatarImage src={user?.avatarUrl} alt={displayName || shortAddress} />
                         <AvatarFallback className="bg-primary/20 text-2xl">
@@ -123,7 +110,6 @@ export default function ProfilePage() {
                         </AvatarFallback>
                     </Avatar>
 
-                    {/* User Info */}
                     <div>
                         <h1 className="text-2xl font-bold">
                             {displayName || shortAddress}
@@ -153,7 +139,6 @@ export default function ProfilePage() {
                             )}
                         </div>
 
-                        {/* Dynamic.xyz email if available */}
                         {dynamicUser?.email && (
                             <p className="text-xs text-muted-foreground mt-1">
                                 {dynamicUser.email}
@@ -162,11 +147,10 @@ export default function ProfilePage() {
                     </div>
                 </div>
 
-                {/* Actions */}
                 <div className="flex gap-2">
                     <Button variant="outline" size="sm" className="gap-2">
                         <Edit2 className="h-4 w-4" />
-                        edit
+                        Edit
                     </Button>
                     <Button
                         variant="ghost"
@@ -196,15 +180,13 @@ export default function ProfilePage() {
                 </div>
                 <div className="text-center">
                     <p className="text-2xl font-bold tabular-nums">{user?.tokensCreated ?? 0}</p>
-                    <p className="text-sm text-muted-foreground">Coins created</p>
+                    <p className="text-sm text-muted-foreground">Coins</p>
                 </div>
                 <div className="text-center">
                     <p className="text-2xl font-bold tabular-nums">{user?.tradesCount ?? 0}</p>
                     <p className="text-sm text-muted-foreground">Trades</p>
                 </div>
             </motion.div>
-
-
 
             {/* Tabs */}
             <motion.div
@@ -228,7 +210,6 @@ export default function ProfilePage() {
                         </TabsTrigger>
                     </TabsList>
 
-                    {/* Balances Tab */}
                     <TabsContent value="balances" className="mt-6">
                         <div className="bg-card border border-border rounded-xl overflow-hidden">
                             <div className="grid grid-cols-[1fr_auto_auto] gap-4 p-4 border-b border-border text-sm text-muted-foreground">
@@ -269,7 +250,6 @@ export default function ProfilePage() {
                         </div>
                     </TabsContent>
 
-                    {/* Replies Tab */}
                     <TabsContent value="replies" className="mt-6">
                         <div className="bg-card border border-border rounded-xl p-8 text-center">
                             <ArrowLeftRight className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-50" />
@@ -277,7 +257,6 @@ export default function ProfilePage() {
                         </div>
                     </TabsContent>
 
-                    {/* Notifications Tab */}
                     <TabsContent value="notifications" className="mt-6">
                         <div className="bg-card border border-border rounded-xl p-8 text-center">
                             <Bell className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-50" />
@@ -287,7 +266,7 @@ export default function ProfilePage() {
                 </Tabs>
             </motion.div>
 
-            {/* Created Tokens Section */}
+            {/* Created Tokens */}
             {MOCK_TOKENS.length > 0 && (
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}

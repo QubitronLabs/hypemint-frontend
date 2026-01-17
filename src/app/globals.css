@@ -5,7 +5,7 @@
 
 /* 
  * HypeMint Design System
- * Dark-first memecoin launchpad theme inspired by pump.fun
+ * Clean, minimal dark theme inspired by pump.fun
  * Vibrant green accent (#00ff88) for CTAs and positive indicators
  */
 
@@ -48,17 +48,14 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
-  /* Custom HypeMint colors */
   --color-success: var(--success);
   --color-warning: var(--warning);
 }
 
-/* Dark theme by default - memecoin aesthetic */
+/* Clean Dark Theme */
 :root {
   --radius: 0.625rem;
-  /* Deep dark background like pump.fun */
+  /* Deep dark background */
   --background: #0a0a0a;
   --foreground: #fafafa;
   /* Surface colors */
@@ -66,7 +63,7 @@
   --card-foreground: #fafafa;
   --popover: #111111;
   --popover-foreground: #fafafa;
-  /* Primary = Vibrant Green (signature memecoin color) */
+  /* Primary = Vibrant Green */
   --primary: #00ff88;
   --primary-foreground: #0a0a0a;
   /* Secondary */
@@ -78,7 +75,7 @@
   /* Accent */
   --accent: #1c1c1c;
   --accent-foreground: #fafafa;
-  /* Destructive = Red for sells/losses */
+  /* Destructive = Red */
   --destructive: #ff4444;
   /* Borders */
   --border: #222222;
@@ -99,7 +96,7 @@
   --sidebar-accent-foreground: #fafafa;
   --sidebar-border: #222222;
   --sidebar-ring: #00ff88;
-  /* Custom semantic colors */
+  /* Semantic colors */
   --success: #00ff88;
   --warning: #ffcc00;
 }
@@ -108,12 +105,11 @@
   * {
     @apply border-border outline-ring/50;
   }
-  
+
   html {
-    /* Dark mode by default */
     color-scheme: dark;
   }
-  
+
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
@@ -123,88 +119,126 @@
 }
 
 @layer utilities {
-  /* Custom scrollbar for dark theme */
+
+  /* Custom scrollbar */
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: #333 transparent;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: #333;
     border-radius: 9999px;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: #444;
   }
-  
-  /* Glow effects for emphasis */
-  .glow-green {
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
-  
-  .glow-red {
-    box-shadow: 0 0 20px rgba(255, 68, 68, 0.3);
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
-  
-  /* Text gradient for hero elements */
+
+  /* Text gradient */
   .text-gradient {
     background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-  
-  /* Subtle card hover effect */
+
+  /* Subtle card hover */
   .card-hover {
     transition: all 0.2s ease;
   }
-  
+
   .card-hover:hover {
     background: #161616;
-    border-color: #333;
+    border-color: #2a2a2a;
   }
-  
-  /* Price flash animations */
+
+  /* Price animations */
   .price-up {
     animation: flash-green 0.5s ease;
   }
-  
+
   .price-down {
     animation: flash-red 0.5s ease;
   }
-  
+
   @keyframes flash-green {
-    0% { background: rgba(0, 255, 136, 0.3); }
-    100% { background: transparent; }
+    0% {
+      background: rgba(0, 255, 136, 0.2);
+    }
+
+    100% {
+      background: transparent;
+    }
   }
-  
+
   @keyframes flash-red {
-    0% { background: rgba(255, 68, 68, 0.3); }
-    100% { background: transparent; }
+    0% {
+      background: rgba(255, 68, 68, 0.2);
+    }
+
+    100% {
+      background: transparent;
+    }
   }
-  
-  /* Number display optimizations */
+
+  /* Tabular numbers */
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
-  
-  /* Pulse for live indicators */
+
+  /* Pulse for live */
   .pulse-live {
     animation: pulse-live 2s infinite;
   }
-  
+
   @keyframes pulse-live {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  /* Skeleton loading */
+  .skeleton-shimmer {
+    background: linear-gradient(90deg,
+        #1a1a1a 0%,
+        #252525 50%,
+        #1a1a1a 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+
+    100% {
+      background-position: -200% 0;
+    }
   }
 }

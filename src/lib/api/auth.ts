@@ -1,5 +1,9 @@
-import apiClient from './client';
+import apiClient, { deduplicatedGet } from './client';
 import type { User } from '@/types';
+
+// ==============================
+// Types
+// ==============================
 
 interface AuthMeResponse {
     success: boolean;
@@ -36,23 +40,28 @@ interface RegisterResponse {
     };
 }
 
+// ==============================
+// Auth Endpoints
+// ==============================
+
 /**
- * Get current authenticated user
+ * Get current authenticated user (DEDUPLICATED)
  * 
  * Uses JWT from Dynamic.xyz in Authorization header.
- * Returns user profile + Dynamic.xyz account details.
+ * This endpoint is deduplicated to prevent multiple calls.
  */
 export async function getCurrentUser(): Promise<User> {
-    const { data } = await apiClient.get<AuthMeResponse>('/api/v1/auth/me');
-    return data.data.user;
+    const response = await deduplicatedGet<AuthMeResponse>('/api/v1/auth/me');
+    return response.data.user;
 }
 
 /**
  * Get current user with full response (including Dynamic.xyz info)
+ * DEDUPLICATED version
  */
 export async function getAuthMe(): Promise<AuthMeResponse['data']> {
-    const { data } = await apiClient.get<AuthMeResponse>('/api/v1/auth/me');
-    return data.data;
+    const response = await deduplicatedGet<AuthMeResponse>('/api/v1/auth/me');
+    return response.data;
 }
 
 /**
@@ -65,24 +74,33 @@ export async function getAuthMe(): Promise<AuthMeResponse['data']> {
  */
 export async function registerUser(username: string): Promise<User> {
     const { data } = await apiClient.post<RegisterResponse>('/api/v1/auth/register', {
-        username
+        username,
+    });
+    return data.data.user;
+}
+
+/**
+ * Update current user's username
+ */
+export async function updateUsername(username: string): Promise<User> {
+    const { data } = await apiClient.patch<RegisterResponse>('/api/v1/users/me', {
+        username,
     });
     return data.data.user;
 }
 
 /**
  * Check if username is available
- * 
- * Note: This can be done via register and catch 409 error,
- * or implement a dedicated endpoint if needed.
  */
 export async function checkUsernameAvailable(username: string): Promise<boolean> {
     try {
-        // For now, we'll assume available if no error
-        // Backend should have a dedicated endpoint for this
-        return true;
+        const { data } = await apiClient.get<{ available: boolean }>(
+            `/api/v1/auth/check-username/${username}`
+        );
+        return data.available;
     } catch {
-        return false;
+        // If endpoint doesn't exist, assume available
+        return true;
     }
 }
 
@@ -98,7 +116,10 @@ export async function requestNonce(walletAddress: string): Promise<{
     return data.data;
 }
 
-// User endpoints
+// ==============================
+// User Endpoints
+// ==============================
+
 export async function getUser(address: string): Promise<User> {
     const { data } = await apiClient.get(`/api/v1/users/${address}`);
     return data.data?.user || data;
@@ -119,7 +140,10 @@ export async function updateMyProfile(input: {
     return data.data?.user || data;
 }
 
-// Follow endpoints
+// ==============================
+// Follow Endpoints
+// ==============================
+
 export async function followUser(address: string): Promise<void> {
     await apiClient.post(`/api/v1/users/${address}/follow`);
 }
@@ -128,7 +152,11 @@ export async function unfollowUser(address: string): Promise<void> {
     await apiClient.delete(`/api/v1/users/${address}/follow`);
 }
 
-export async function getUserFollowers(address: string, page = 1, pageSize = 20): Promise<{
+export async function getUserFollowers(
+    address: string,
+    page = 1,
+    pageSize = 20
+): Promise<{
     followers: User[];
     pagination: { page: number; pageSize: number; total: number };
 }> {
@@ -138,7 +166,11 @@ export async function getUserFollowers(address: string, page = 1, pageSize = 20)
     return data.data;
 }
 
-export async function getUserFollowing(address: string, page = 1, pageSize = 20): Promise<{
+export async function getUserFollowing(
+    address: string,
+    page = 1,
+    pageSize = 20
+): Promise<{
     following: User[];
     pagination: { page: number; pageSize: number; total: number };
 }> {

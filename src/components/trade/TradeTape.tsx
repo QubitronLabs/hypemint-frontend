@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
 import { TrendingUp, TrendingDown, User } from 'lucide-react';
@@ -25,28 +26,70 @@ interface TradeTapeProps {
  * - Auto-scroll to latest
  */
 export function TradeTape({ tokenId, initialTrades = [], className }: TradeTapeProps) {
-    const [trades, setTrades] = useState<Trade[]>(initialTrades);
+    // Ensure initialTrades is always an array
+    const safeInitialTrades = Array.isArray(initialTrades) ? initialTrades : [];
+    // If trade has nested user, flatten it for consistency with streaming format or handle both
+    const normalizedInitialTrades = safeInitialTrades.map(t => ({
+        ...t,
+        username: t.user?.displayName || t.user?.username || (t.user?.walletAddress ? `${t.user.walletAddress.slice(0, 4)}...${t.user.walletAddress.slice(-4)}` : "Unknown")
+    }));
+
+    const [trades, setTrades] = useState<any[]>(normalizedInitialTrades);
+
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         // Subscribe to trade events
         const unsubscribe = wsService.subscribeToTrades(tokenId, (event: TradeEvent) => {
-            setTrades((prev) => [event.trade, ...prev].slice(0, 50));
+            // Map event payload to display format
+            // Event payload from backend: { tradeId, userId, username, userAvatar, type, amount, price, totalValue, timestamp }
+            const newTrade = {
+                id: event.tradeId,
+                type: event.type,
+                amount: event.amount, // This is in Wei string
+                price: event.price,
+                createdAt: event.timestamp || new Date().toISOString(),
+                username: event.username, // Direct username from improved backend
+                user: {
+                    walletAddress: event.userId, // We don't have wallet addr in event, but we use username
+                    displayName: event.username,
+                    avatarUrl: event.userAvatar
+                }
+            };
+            setTrades((prev) => [newTrade, ...prev].slice(0, 50));
         });
 
         return unsubscribe;
     }, [tokenId]);
 
-    // Format wallet address
-    const formatAddress = (address: string) =>
-        `${address.slice(0, 4)}...${address.slice(-4)}`;
+    // Format amount (assume 18 decimals)
+    const formatAmount = (amount: string | undefined | null) => {
+        if (!amount) return '0';
+        try {
+            // If amount is massive (Wei), divide by 1e18
+            let val = parseFloat(amount);
+            if (amount.length > 10) { // Naive check for Wei strings (usually > 18 chars)
+                // Use BigInt for precision if needed, but for display simplified division is fine
+                // But JS numbers lose precision. 
+                // Better: string manipulation
+                if (amount.includes('.')) {
+                    // It's already decimal?
+                } else {
+                    // It's integer Wei
+                    val = parseFloat(amount) / 1e18;
+                }
+            }
 
-    // Format amount
-    const formatAmount = (amount: string) => {
-        const num = parseFloat(amount);
-        if (num >= 1000000) return `${(num / 1000000).toFixed(2)}M`;
-        if (num >= 1000) return `${(num / 1000).toFixed(2)}K`;
-        return num.toFixed(4);
+            if (isNaN(val)) return '0';
+
+            if (val >= 1000000) return `${(val / 1000000).toFixed(2)}M`;
+            if (val >= 1000) return `${(val / 1000).toFixed(2)}K`;
+            if (val < 0.0001 && val > 0) return '<0.0001';
+
+            return val.toLocaleString(undefined, { maximumFractionDigits: 4 });
+        } catch (e) {
+            return '0';
+        }
     };
 
     return (
@@ -71,7 +114,7 @@ export function TradeTape({ tokenId, initialTrades = [], className }: TradeTapeP
                         ) : (
                             trades.map((trade, index) => (
                                 <motion.div
-                                    key={trade.id}
+                                    key={trade.id || Math.random()}
                                     initial={{ opacity: 0, x: -20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     exit={{ opacity: 0, x: 20 }}
@@ -100,9 +143,7 @@ export function TradeTape({ tokenId, initialTrades = [], className }: TradeTapeP
                                         <div className="flex items-center gap-1">
                                             <User className="h-3 w-3 text-muted-foreground" />
                                             <span className="text-muted-foreground font-mono text-xs">
-                                                {trade.user
-                                                    ? (trade.user.displayName || formatAddress(trade.user.walletAddress))
-                                                    : 'Unknown'}
+                                                {trade.username || trade.user?.displayName || "Unknown"}
                                             </span>
                                         </div>
                                     </div>
@@ -118,7 +159,7 @@ export function TradeTape({ tokenId, initialTrades = [], className }: TradeTapeP
                                             {trade.type === 'buy' ? '+' : '-'}{formatAmount(trade.amount)}
                                         </span>
                                         <span className="text-xs text-muted-foreground w-12 text-right">
-                                            {formatDistanceToNow(new Date(trade.createdAt), { addSuffix: false })}
+                                            {trade.createdAt ? formatDistanceToNow(new Date(trade.createdAt), { addSuffix: false }) : 'Just now'}
                                         </span>
                                     </div>
                                 </motion.div>

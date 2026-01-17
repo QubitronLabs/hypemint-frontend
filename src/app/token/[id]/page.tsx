@@ -1,20 +1,16 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useState } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
     Globe,
     Twitter,
-    MessageCircle,
-    ExternalLink,
     Share2,
     Star,
     Copy,
     Check,
-    Users,
-    Activity,
     TrendingUp,
     TrendingDown,
 } from 'lucide-react';
@@ -23,58 +19,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PriceChart } from '@/components/charts';
-import { TradePanel, TradeTape } from '@/components/trade';
-import { BondingCurveProgress } from '@/components/token';
-import { PriceDisplay } from '@/components/ui/PriceDisplay';
+import { TradePanel, TradeTape, TradingPanel } from '@/components/trade';
+import { BondingCurveProgress, TokenChat } from '@/components/token';
 import { useToken } from '@/hooks/useTokens';
 import { useTokenTrades } from '@/hooks/useTrades';
 import { cn } from '@/lib/utils';
 import type { Token, TokenHolder } from '@/types';
-
-// Mock token for development
-const MOCK_TOKEN: Token = {
-    id: 'gorse-1',
-    name: 'GORSE',
-    symbol: 'GORSE',
-    description: 'The most based memecoin on the internet.',
-    imageUrl: '',
-    websiteUrl: 'https://example.com',
-    twitterUrl: 'https://twitter.com/gorse',
-    telegramUrl: '',
-    discordUrl: '',
-    totalSupply: '1000000000',
-    initialPrice: '0.00001',
-    currentPrice: '0.00000887',
-    marketCap: '8900',
-    volume24h: '18300',
-    priceChange24h: 112.75,
-    chainId: 1,
-    status: 'active',
-    creatorId: 'creator-1',
-    creator: {
-        id: 'creator-1',
-        walletAddress: '7sEbqh...raLE',
-        displayName: '7sEbqh...raLE',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-    },
-    bondingCurveProgress: 43,
-    graduationTarget: '59888',
-    currentBondingAmount: '13588',
-    holdersCount: 156,
-    tradesCount: 885,
-    createdAt: new Date(Date.now() - 20 * 60000).toISOString(),
-    updatedAt: new Date().toISOString(),
-};
-
-// Mock holders
-const MOCK_HOLDERS: TokenHolder[] = [
-    { address: 'Liquidity pool 🔥', balance: '68550000', percentage: 68.55 },
-    { address: '6DjQ...ZxM', balance: '3410000', percentage: 3.41 },
-    { address: '6u05...QRoW', balance: '3070000', percentage: 3.07 },
-    { address: '2GyY...esdx', balance: '2840000', percentage: 2.84 },
-    { address: 'C8ij...Xx8y', balance: '2670000', percentage: 2.67 },
-];
 
 interface TokenDetailPageProps {
     params: Promise<{ id: string }>;
@@ -84,21 +34,18 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
     const { id } = use(params);
     const [copied, setCopied] = useState(false);
 
-    // Fetch token data
-    const { data: token, isLoading } = useToken(id);
+    const { data: token, isLoading, error } = useToken(id);
     const { data: trades } = useTokenTrades(id);
 
-    // Merge API data with mock data to ensure all fields exist
-    const displayToken = token ? { ...MOCK_TOKEN, ...token } : MOCK_TOKEN;
-    const holders = MOCK_HOLDERS;
+    // Placeholder for holders until indexer is ready
+    const holders: TokenHolder[] = [];
 
     const handleCopy = () => {
-        navigator.clipboard.writeText(displayToken.id || id);
+        if (!token) return;
+        navigator.clipboard.writeText(token.id);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
-
-    const pricePositive = (displayToken.priceChange24h ?? 0) >= 0;
 
     if (isLoading) {
         return (
@@ -118,6 +65,22 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
         );
     }
 
+    if (error || !token) {
+        return (
+            <div className="max-w-7xl mx-auto p-6 flex flex-col items-center justify-center min-h-[50vh] text-center">
+                <h1 className="text-3xl font-bold mb-4">Token not found</h1>
+                <p className="text-muted-foreground mb-6">
+                    The token you are looking for does not exist or has been removed.
+                </p>
+                <Link href="/">
+                    <Button>Return to Home</Button>
+                </Link>
+            </div>
+        );
+    }
+
+    const pricePositive = (token.priceChange24h ?? 0) >= 0;
+
     return (
         <div className="max-w-7xl mx-auto p-6">
             <div className="grid lg:grid-cols-[1fr_350px] gap-6">
@@ -131,33 +94,32 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
                     >
                         <div className="flex items-start justify-between">
                             <div className="flex items-center gap-4">
-                                {/* Token Image */}
                                 <div className="w-16 h-16 rounded-xl bg-muted overflow-hidden flex-shrink-0">
-                                    {displayToken.imageUrl ? (
+                                    {token.imageUrl ? (
                                         <Image
-                                            src={displayToken.imageUrl}
-                                            alt={displayToken.name || 'Token'}
+                                            src={token.imageUrl.replace('0.0.0.0', 'localhost')}
+                                            alt={token.name || 'Token'}
                                             width={64}
                                             height={64}
+                                            unoptimized
                                             className="object-cover w-full h-full"
                                         />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-muted-foreground">
-                                            {displayToken.symbol?.slice(0, 2) || '??'}
+                                            {token.symbol?.slice(0, 2) || '??'}
                                         </div>
                                     )}
                                 </div>
 
-                                {/* Token Info */}
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <h1 className="text-xl font-bold">{displayToken.name}</h1>
+                                        <h1 className="text-xl font-bold">{token.name}</h1>
                                         <Badge variant="outline" className="text-xs">
-                                            {displayToken.symbol}
+                                            {token.symbol}
                                         </Badge>
-                                        {displayToken.status === 'active' && (
+                                        {token.status === 'active' && (
                                             <Badge className="bg-primary/20 text-primary text-xs">
-                                                @DEW_pump
+                                                Live
                                             </Badge>
                                         )}
                                     </div>
@@ -166,20 +128,19 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
                                             Created by
                                         </span>
                                         <Link
-                                            href={`/profile/${displayToken.creatorId}`}
+                                            href={`/user/${token.creator?.walletAddress || ''}`}
                                             className="text-xs text-primary hover:underline"
                                         >
-                                            {displayToken.creator?.displayName ||
-                                                `${displayToken.creator?.walletAddress.slice(0, 6)}...`}
+                                            {token.creator?.displayName || token.creator?.username ||
+                                                (token.creator?.walletAddress ? `${token.creator.walletAddress.slice(0, 6)}...` : 'Unknown')}
                                         </Link>
                                         <span className="text-xs text-muted-foreground">
-                                            20m ago
+                                            {token.createdAt ? new Date(token.createdAt).toLocaleDateString() : ''}
                                         </span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Actions */}
                             <div className="flex items-center gap-2">
                                 <Button variant="outline" size="icon">
                                     <Share2 className="h-4 w-4" />
@@ -196,7 +157,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
                                 <span className="text-muted-foreground text-sm">Market Cap</span>
                             </div>
                             <div className="flex items-baseline gap-3 mt-1">
-                                <span className="text-3xl font-bold">${parseFloat(displayToken.marketCap).toLocaleString()}</span>
+                                <span className="text-3xl font-bold">${parseFloat(token.marketCap ?? '0').toLocaleString()}</span>
                                 <span
                                     className={cn(
                                         'text-sm font-medium flex items-center gap-1',
@@ -204,44 +165,44 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
                                     )}
                                 >
                                     {pricePositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                                    {pricePositive ? '+' : ''}{displayToken.priceChange24h.toFixed(2)}% 24hr
+                                    {pricePositive ? '+' : ''}{(token.priceChange24h ?? 0).toFixed(2)}% 24hr
                                 </span>
                             </div>
                         </div>
 
-                        {/* Quick Stats Row */}
+                        {/* Quick Stats */}
                         <div className="grid grid-cols-4 gap-4 mt-6 pt-6 border-t border-border">
                             <div>
                                 <p className="text-xs text-muted-foreground">Vol 24h</p>
                                 <p className="font-semibold tabular-nums">
-                                    ${parseFloat(displayToken.volume24h).toLocaleString()}
+                                    ${parseFloat(token.volume24h ?? '0').toLocaleString()}
                                 </p>
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground">Price</p>
                                 <p className="font-semibold tabular-nums">
-                                    ${parseFloat(displayToken.currentPrice).toFixed(8)}
+                                    ${parseFloat(token.currentPrice ?? '0').toFixed(8)}
                                 </p>
                             </div>
                             <div>
-                                <p className="text-xs text-muted-foreground">5m</p>
-                                <p className="font-semibold tabular-nums text-[#00ff88]">
-                                    +12.45%
+                                <p className="text-xs text-muted-foreground">Holders</p>
+                                <p className="font-semibold tabular-nums">
+                                    {token.holdersCount ?? 0}
                                 </p>
                             </div>
                             <div>
-                                <p className="text-xs text-muted-foreground">6h</p>
-                                <p className="font-semibold tabular-nums text-[#00ff88]">
-                                    +112.75%
+                                <p className="text-xs text-muted-foreground">Trades</p>
+                                <p className="font-semibold tabular-nums">
+                                    {token.tradesCount ?? 0}
                                 </p>
                             </div>
                         </div>
 
                         {/* Social Links */}
                         <div className="flex items-center gap-3 mt-6 pt-6 border-t border-border">
-                            {displayToken.websiteUrl && (
+                            {token.websiteUrl && (
                                 <a
-                                    href={displayToken.websiteUrl}
+                                    href={token.websiteUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
@@ -250,9 +211,9 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
                                     Website
                                 </a>
                             )}
-                            {displayToken.twitterUrl && (
+                            {token.twitterUrl && (
                                 <a
-                                    href={displayToken.twitterUrl}
+                                    href={token.twitterUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
@@ -268,7 +229,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
                                 className="h-6 text-xs gap-1"
                             >
                                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                                {copied ? 'Copied!' : 'View on Terminal'}
+                                {copied ? 'Copied!' : 'Copy Address'}
                             </Button>
                         </div>
                     </motion.div>
@@ -288,7 +249,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2 }}
                     >
-                        <Tabs defaultValue="comments">
+                        <Tabs defaultValue="trades">
                             <TabsList className="w-full bg-card border border-border">
                                 <TabsTrigger value="comments" className="flex-1">
                                     Comments
@@ -298,18 +259,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
                                 </TabsTrigger>
                             </TabsList>
                             <TabsContent value="comments" className="mt-4">
-                                <div className="bg-card border border-border rounded-xl p-6 text-center">
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <input
-                                            type="text"
-                                            placeholder="Add a comment..."
-                                            className="flex-1 bg-muted rounded-lg px-4 py-2 text-sm"
-                                        />
-                                    </div>
-                                    <p className="text-sm text-muted-foreground py-8">
-                                        <span className="animate-pulse">Loading...</span>
-                                    </p>
-                                </div>
+                                <TokenChat tokenId={id} className="min-h-[350px]" />
                             </TabsContent>
                             <TabsContent value="trades" className="mt-4">
                                 <TradeTape tokenId={id} initialTrades={trades || []} />
@@ -320,15 +270,21 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 
                 {/* Sidebar */}
                 <div className="space-y-6">
-                    {/* Trade Panel */}
+                    {/* Trading Panel */}
                     <motion.div
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                     >
-                        <TradePanel token={displayToken} />
+                        <TradingPanel
+                            tokenId={id}
+                            tokenSymbol={token.symbol || 'TOKEN'}
+                            tokenName={token.name || 'Unknown Token'}
+                            currentPrice={token.currentPrice || '0.00001'}
+                            totalSupply={token.totalSupply || '1000000000'}
+                        />
                     </motion.div>
 
-                    {/* Bonding Curve Progress */}
+                    {/* Bonding Curve */}
                     <motion.div
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -336,64 +292,48 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
                         className="bg-card border border-border rounded-xl p-4"
                     >
                         <BondingCurveProgress
-                            progress={displayToken.bondingCurveProgress}
-                            currentAmount={displayToken.currentBondingAmount}
-                            targetAmount={displayToken.graduationTarget}
+                            progress={token.bondingCurveProgress ?? 0}
+                            currentAmount={token.currentBondingAmount || '0'}
+                            targetAmount={token.graduationTarget || '100'}
                         />
                     </motion.div>
 
-                    {/* Token Chat */}
-                    <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.15 }}
-                        className="bg-card border border-border rounded-xl p-4"
-                    >
-                        <div className="flex items-center justify-between mb-3">
-                            <span className="font-semibold text-sm">{displayToken.symbol} chat</span>
-                            <Button size="sm" variant="outline" className="h-7 text-xs">
-                                💬 Join chat
-                            </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                            Chat with others about this token
-                        </p>
-                    </motion.div>
-
-                    {/* Top Holders */}
-                    <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.2 }}
-                        className="bg-card border border-border rounded-xl p-4"
-                    >
-                        <div className="flex items-center justify-between mb-4">
-                            <span className="font-semibold text-sm">Top holders</span>
-                            <button className="text-xs text-primary hover:underline">
-                                Generate bubble map
-                            </button>
-                        </div>
-                        <div className="space-y-2">
-                            {holders.map((holder, index) => (
-                                <div
-                                    key={index}
-                                    className="flex items-center justify-between text-sm"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-muted-foreground">
-                                            {index === 0 ? '🔥' : `${index + 1}.`}
-                                        </span>
-                                        <span className="font-mono text-xs">
-                                            {holder.address}
+                    {/* Top Holders - Hidden if empty */}
+                    {holders.length > 0 && (
+                        <motion.div
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.2 }}
+                            className="bg-card border border-border rounded-xl p-4"
+                        >
+                            <div className="flex items-center justify-between mb-4">
+                                <span className="font-semibold text-sm">Top holders</span>
+                                <button className="text-xs text-primary hover:underline">
+                                    View all
+                                </button>
+                            </div>
+                            <div className="space-y-2">
+                                {holders.map((holder, index) => (
+                                    <div
+                                        key={index}
+                                        className="flex items-center justify-between text-sm"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-muted-foreground">
+                                                {index === 0 ? '🔥' : `${index + 1}.`}
+                                            </span>
+                                            <span className="font-mono text-xs">
+                                                {holder.address}
+                                            </span>
+                                        </div>
+                                        <span className="tabular-nums font-medium">
+                                            {holder.percentage.toFixed(2)}%
                                         </span>
                                     </div>
-                                    <span className="tabular-nums font-medium">
-                                        {holder.percentage.toFixed(2)}%
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    </motion.div>
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
                 </div>
             </div>
         </div>

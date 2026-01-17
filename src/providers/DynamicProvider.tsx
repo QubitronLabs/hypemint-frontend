@@ -1,10 +1,15 @@
 'use client';
 
-import { DynamicContextProvider, useDynamicContext, useIsLoggedIn, getAuthToken } from '@dynamic-labs/sdk-react-core';
+import {
+    DynamicContextProvider,
+    useDynamicContext,
+    useIsLoggedIn,
+    getAuthToken,
+} from '@dynamic-labs/sdk-react-core';
 import { EthereumWalletConnectors } from '@dynamic-labs/ethereum';
 import { SolanaWalletConnectors } from '@dynamic-labs/solana';
-import { type ReactNode, useEffect, useCallback } from 'react';
-import { useAuthStore } from '@/lib/auth';
+import { type ReactNode, useEffect, useRef, useCallback } from 'react';
+import { useAuthStore, shouldFetchUser } from '@/lib/auth';
 import { getCurrentUser } from '@/lib/api/auth';
 
 interface DynamicProviderProps {
@@ -16,14 +21,41 @@ interface DynamicProviderProps {
  * Must be inside DynamicContextProvider to access hooks
  */
 function AuthSync({ children }: { children: ReactNode }) {
-    const { user, primaryWallet, handleLogOut } = useDynamicContext();
+    const { user, primaryWallet } = useDynamicContext();
     const isLoggedIn = useIsLoggedIn();
-    const { setJwt, setUser, setDynamicUser, setLoading, logout } = useAuthStore();
+    const {
+        setJwt,
+        setUser,
+        setDynamicUser,
+        setLoading,
+        setUserFetched,
+        logout,
+        isUserFetched,
+    } = useAuthStore();
+
+    // Track if we're currently syncing to prevent duplicate calls
+    const isSyncingRef = useRef(false);
+    const lastWalletRef = useRef<string | null>(null);
 
     // Handle auth token changes from Dynamic.xyz
     const syncAuth = useCallback(async () => {
+        // Prevent concurrent sync calls
+        if (isSyncingRef.current) return;
+
+        const currentWallet = primaryWallet?.address || null;
+
+        // If wallet hasn't changed and user is already fetched, skip
+        if (currentWallet === lastWalletRef.current && isUserFetched) {
+            return;
+        }
+
         if (isLoggedIn && primaryWallet) {
-            console.log('[Auth] Dynamic.xyz connected - fetching JWT');
+            // Check if we should fetch (respects cooldown)
+            if (!shouldFetchUser() && isUserFetched) {
+                return;
+            }
+
+            isSyncingRef.current = true;
             setLoading(true);
 
             try {
@@ -31,8 +63,7 @@ function AuthSync({ children }: { children: ReactNode }) {
                 const authToken = await getAuthToken();
 
                 if (authToken) {
-                    console.log('[Auth] Dynamic.xyz JWT obtained');
-                    // Store the JWT in our auth store
+                    console.log('[Auth] JWT obtained successfully');
                     setJwt(authToken);
                 }
 
@@ -51,22 +82,39 @@ function AuthSync({ children }: { children: ReactNode }) {
                     try {
                         const backendUser = await getCurrentUser();
                         setUser(backendUser);
-                        console.log('[Auth] Backend user fetched:', backendUser);
-                    } catch (err) {
-                        console.warn('[Auth] Backend user fetch failed (user may not exist yet):', err);
+                        lastWalletRef.current = currentWallet;
+                        console.log('[Auth] User fetched:', backendUser.username || '(no username)');
+                    } catch (err: any) {
                         // User might not exist in backend yet - that's OK
+                        // Set as fetched to prevent retry loop
+                        setUserFetched(true);
+                        lastWalletRef.current = currentWallet;
+                        console.log('[Auth] No backend user yet (new user)');
                     }
                 }
             } catch (error) {
                 console.error('[Auth] Auth sync failed:', error);
             } finally {
                 setLoading(false);
+                isSyncingRef.current = false;
             }
-        } else if (!isLoggedIn) {
+        } else if (!isLoggedIn && lastWalletRef.current !== null) {
             // User logged out
+            lastWalletRef.current = null;
             logout();
         }
-    }, [isLoggedIn, primaryWallet, user, setJwt, setUser, setDynamicUser, setLoading, logout]);
+    }, [
+        isLoggedIn,
+        primaryWallet,
+        user,
+        isUserFetched,
+        setJwt,
+        setUser,
+        setDynamicUser,
+        setLoading,
+        setUserFetched,
+        logout,
+    ]);
 
     useEffect(() => {
         syncAuth();
@@ -77,12 +125,13 @@ function AuthSync({ children }: { children: ReactNode }) {
 
 /**
  * Dynamic.xyz Wallet Provider with JWT Auth
- * 
+ *
  * Features:
  * - Supports Solana (default) + EVM chains
  * - Extracts JWT token after wallet sign-in using getAuthToken()
- * - Syncs auth state with backend
+ * - Syncs auth state with backend (ONCE per session)
  * - Stores JWT in Zustand store for API requests
+ * - Prevents multiple redundant API calls
  */
 export function DynamicProvider({ children }: DynamicProviderProps) {
     const environmentId = process.env.NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID;

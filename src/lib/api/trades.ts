@@ -17,13 +17,15 @@ export async function getTradeQuote(
         type,
         amount,
     });
-    return data;
+    // Handle wrapped response
+    return data.data ?? data;
 }
 
 // Create pending trade
 export async function createTrade(input: CreateTradeInput): Promise<Trade> {
     const { data } = await apiClient.post('/api/v1/trades/', input);
-    return data;
+    // Handle wrapped response
+    return data.data ?? data;
 }
 
 // Confirm trade after blockchain confirmation
@@ -32,11 +34,15 @@ export async function confirmTrade(
     input: ConfirmTradeInput
 ): Promise<Trade> {
     const { data } = await apiClient.post(`/api/v1/trades/${tradeId}/confirm`, input);
-    return data;
+    // Handle wrapped response
+    return data.data ?? data;
 }
 
 // Get trades for a token
 export async function getTokenTrades(tokenId: string): Promise<Trade[]> {
     const { data } = await apiClient.get(`/api/v1/trades/token/${tokenId}`);
-    return data;
+    // Handle wrapped response - data might be { success, data: [...] } or just [...]
+    const trades = data.data ?? data;
+    // Ensure we always return an array
+    return Array.isArray(trades) ? trades : [];
 }

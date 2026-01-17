@@ -14,52 +14,47 @@ interface TokenCardProps {
 }
 
 /**
- * TokenCard - Displays token info in a compact card format
- * 
- * Inspired by pump.fun's token grid with:
- * - Token image with fallback
- * - Name, symbol, creator info
- * - Market cap and price change
- * - Hover animations
+ * TokenCard - Clean, minimal token display
  */
 export function TokenCard({ token, className }: TokenCardProps) {
-    const priceChangePositive = token.priceChange24h >= 0;
+    // Add null safety for priceChange24h
+    const priceChange = token.priceChange24h ?? 0;
+    const priceChangePositive = priceChange >= 0;
 
     const formattedMarketCap = useMemo(() => {
-        const mcap = parseFloat(token.marketCap);
+        const mcap = parseFloat(token.marketCap || '0') || 0;
+        if (isNaN(mcap) || mcap === 0) return '$0';
         if (mcap >= 1e9) return `$${(mcap / 1e9).toFixed(2)}B`;
         if (mcap >= 1e6) return `$${(mcap / 1e6).toFixed(2)}M`;
-        if (mcap >= 1e3) return `$${(mcap / 1e3).toFixed(2)}K`;
-        return `$${mcap.toFixed(2)}`;
+        if (mcap >= 1e3) return `$${(mcap / 1e3).toFixed(1)}K`;
+        return `$${mcap.toFixed(0)}`;
     }, [token.marketCap]);
 
     const formattedPriceChange = useMemo(() => {
-        const change = Math.abs(token.priceChange24h);
+        if (priceChange === 0) return '0.00%';
+        const change = Math.abs(priceChange);
+        if (isNaN(change)) return '0.00%';
         return `${priceChangePositive ? '+' : '-'}${change.toFixed(2)}%`;
-    }, [token.priceChange24h, priceChangePositive]);
+    }, [priceChange, priceChangePositive]);
 
     return (
         <Link href={`/token/${token.id}`}>
             <motion.div
-                whileHover={{ scale: 1.02, y: -2 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
                 className={cn(
-                    'group relative bg-card border border-border rounded-xl p-4 card-hover cursor-pointer',
-                    'transition-all duration-200',
+                    'bg-card border border-border rounded-xl p-4 card-hover cursor-pointer',
                     className
                 )}
             >
-                {/* Header: Image + Name */}
+                {/* Header */}
                 <div className="flex items-start gap-3">
-                    {/* Token Image */}
-                    <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                         {token.imageUrl ? (
-                            <Image
-                                src={token.imageUrl}
+                            <img
+                                src={token.imageUrl.replace('0.0.0.0', 'localhost')}
                                 alt={token.name}
-                                fill
-                                className="object-cover"
-                                sizes="48px"
+                                className="object-cover w-full h-full"
                             />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-lg font-bold text-muted-foreground">
@@ -68,7 +63,6 @@ export function TokenCard({ token, className }: TokenCardProps) {
                         )}
                     </div>
 
-                    {/* Token Info */}
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                             <h3 className="font-semibold text-foreground truncate">
@@ -79,7 +73,6 @@ export function TokenCard({ token, className }: TokenCardProps) {
                             </span>
                         </div>
 
-                        {/* Creator */}
                         {token.creator && (
                             <p className="text-xs text-muted-foreground truncate mt-0.5">
                                 by {token.creator.displayName || token.creator.username ||
@@ -89,9 +82,8 @@ export function TokenCard({ token, className }: TokenCardProps) {
                     </div>
                 </div>
 
-                {/* Stats Row */}
+                {/* Stats */}
                 <div className="flex items-center justify-between mt-4">
-                    {/* Market Cap */}
                     <div>
                         <p className="text-xs text-muted-foreground">market cap</p>
                         <p className="text-sm font-semibold text-primary tabular-nums">
@@ -99,7 +91,6 @@ export function TokenCard({ token, className }: TokenCardProps) {
                         </p>
                     </div>
 
-                    {/* 24h Change */}
                     <div className="text-right">
                         <p className="text-xs text-muted-foreground">24h</p>
                         <p
@@ -132,7 +123,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
                     </div>
                 </div>
 
-                {/* Bonding Curve Progress (if not graduated) */}
+                {/* Bonding Curve */}
                 {token.status === 'active' && token.bondingCurveProgress < 100 && (
                     <div className="mt-3">
                         <div className="flex justify-between text-xs mb-1">

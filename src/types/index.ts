@@ -144,7 +144,17 @@ export interface PriceUpdate {
 
 export interface TradeEvent {
   tokenId: string;
-  trade: Trade;
+  trade?: Trade;
+  // Flattened fields from backend event
+  tradeId?: string;
+  userId?: string;
+  username?: string;
+  userAvatar?: string;
+  type?: TradeType;
+  amount?: string;
+  price?: string;
+  totalValue?: string;
+  timestamp?: string;
 }
 
 // Chain configuration

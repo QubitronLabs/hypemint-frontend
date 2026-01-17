@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
-import { QueryProvider, DynamicProvider, UsernamePromptProvider } from "@/providers";
+import { QueryProvider, DynamicProvider, UsernamePromptProvider, WagmiProvider } from "@/providers";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import "./globals.css";
@@ -33,8 +33,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background`}
       >
         <QueryProvider>
-          <DynamicProvider>
-            <UsernamePromptProvider>
+          <WagmiProvider>
+            <DynamicProvider>
+              <UsernamePromptProvider>
               {/* Sidebar Navigation */}
               <Sidebar />
 
@@ -58,7 +59,8 @@ export default function RootLayout({
                 }}
               />
             </UsernamePromptProvider>
-          </DynamicProvider>
+            </DynamicProvider>
+          </WagmiProvider>
         </QueryProvider>
       </body>
     </html>

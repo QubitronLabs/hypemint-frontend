@@ -1,29 +1,23 @@
+import { io, Socket } from 'socket.io-client';
 import type { PriceUpdate, TradeEvent } from '@/types';
 
-type MessageHandler = (data: unknown) => void;
-
-interface WebSocketMessage {
-    type: string;
-    payload: unknown;
-}
+type MessageHandler = (data: any) => void;
 
 class WebSocketService {
-    private ws: WebSocket | null = null;
+    private socket: Socket | null = null;
     private url: string;
-    private reconnectAttempts = 0;
-    private maxReconnectAttempts = 5;
-    private reconnectDelay = 1000;
     private handlers: Map<string, Set<MessageHandler>> = new Map();
-    private subscriptions: Set<string> = new Set();
+    private rooms: Set<string> = new Set();
     private isConnecting = false;
 
-    constructor(url?: string) {
-        this.url = url || process.env.NEXT_PUBLIC_WS_URL || 'ws://192.168.0.25:3000/ws';
+    constructor() {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+        this.url = apiUrl.replace(':4000', ':4001');
     }
 
     connect(): Promise<void> {
         return new Promise((resolve, reject) => {
-            if (this.ws?.readyState === WebSocket.OPEN) {
+            if (this.socket?.connected) {
                 resolve();
                 return;
             }
@@ -36,41 +30,42 @@ class WebSocketService {
             this.isConnecting = true;
 
             try {
-                this.ws = new WebSocket(this.url);
+                this.socket = io(this.url, {
+                    transports: ['websocket', 'polling'],
+                    reconnection: true,
+                    reconnectionAttempts: 5,
+                    reconnectionDelay: 1000,
+                });
 
-                this.ws.onopen = () => {
-                    console.log('[WS] Connected');
-                    this.reconnectAttempts = 0;
+                this.socket.on('connect', () => {
+                    console.log('[Socket.IO] Connected');
                     this.isConnecting = false;
 
-                    // Resubscribe to previous subscriptions
-                    this.subscriptions.forEach((subscription) => {
-                        this.send({ type: 'subscribe', payload: { channel: subscription } });
+                    // Rejoin rooms
+                    this.rooms.forEach(room => {
+                        this.socket?.emit('join:token', room);
                     });
 
                     resolve();
-                };
+                });
 
-                this.ws.onclose = () => {
-                    console.log('[WS] Disconnected');
+                this.socket.on('disconnect', () => {
+                    console.log('[Socket.IO] Disconnected');
                     this.isConnecting = false;
-                    this.attemptReconnect();
-                };
+                });
 
-                this.ws.onerror = (error) => {
-                    console.error('[WS] Error:', error);
+                this.socket.on('connect_error', (error) => {
+                    console.error('[Socket.IO] Error:', error);
                     this.isConnecting = false;
                     reject(error);
-                };
+                });
 
-                this.ws.onmessage = (event) => {
-                    try {
-                        const message: WebSocketMessage = JSON.parse(event.data);
-                        this.handleMessage(message);
-                    } catch (error) {
-                        console.error('[WS] Failed to parse message:', error);
-                    }
-                };
+                // Set up event listeners for all registered types
+                this.socket.on('comment', (data) => this.handleMessage('comment', data));
+                this.socket.on('trade', (data) => this.handleMessage('trade', data));
+                this.socket.on('price_update', (data) => this.handleMessage('price_update', data));
+                this.socket.on('joined', (data) => console.log('[Socket.IO] Joined room:', data));
+
             } catch (error) {
                 this.isConnecting = false;
                 reject(error);
@@ -78,60 +73,52 @@ class WebSocketService {
         });
     }
 
-    private handleMessage(message: WebSocketMessage) {
-        const handlers = this.handlers.get(message.type);
-        if (handlers) {
-            handlers.forEach((handler) => handler(message.payload));
+    private handleMessage(type: string, payload: any) {
+        // Handle generic type
+        const genericHandlers = this.handlers.get(type);
+        if (genericHandlers) {
+            genericHandlers.forEach(handler => handler(payload));
+        }
+
+        // Handle specific type with ID (e.g., trade:tokenId)
+        if (payload?.tokenId) {
+            const specificHandlers = this.handlers.get(`${type}:${payload.tokenId}`);
+            if (specificHandlers) {
+                specificHandlers.forEach(handler => handler(payload));
+            }
         }
     }
 
-    private attemptReconnect() {
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.log('[WS] Max reconnect attempts reached');
-            return;
-        }
-
-        this.reconnectAttempts++;
-        const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-
-        console.log(`[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
-
-        setTimeout(() => {
-            this.connect().catch(console.error);
-        }, delay);
-    }
-
-    private send(message: WebSocketMessage) {
-        if (this.ws?.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify(message));
+    // Subscribe to a token room
+    subscribeToTokenRoom(tokenId: string) {
+        if (!this.rooms.has(tokenId)) {
+            this.rooms.add(tokenId);
+            if (this.socket?.connected) {
+                this.socket.emit('join:token', tokenId);
+            }
         }
     }
 
-    // Subscribe to a channel
-    subscribe(channel: string) {
-        this.subscriptions.add(channel);
-        if (this.ws?.readyState === WebSocket.OPEN) {
-            this.send({ type: 'subscribe', payload: { channel } });
-        }
-    }
-
-    // Unsubscribe from a channel
-    unsubscribe(channel: string) {
-        this.subscriptions.delete(channel);
-        if (this.ws?.readyState === WebSocket.OPEN) {
-            this.send({ type: 'unsubscribe', payload: { channel } });
+    unsubscribeFromTokenRoom(tokenId: string) {
+        this.rooms.delete(tokenId);
+        if (this.socket?.connected) {
+            this.socket.emit('leave:token', tokenId);
         }
     }
 
     // Subscribe to token price updates
     subscribeToToken(tokenId: string, handler: (data: PriceUpdate) => void) {
-        const eventType = `price:${tokenId}`;
+        const eventType = `price_update:${tokenId}`;
         this.on(eventType, handler as MessageHandler);
-        this.subscribe(`token:${tokenId}`);
+        this.subscribeToTokenRoom(tokenId);
+
+        if (!this.socket) {
+            this.connect();
+        }
 
         return () => {
             this.off(eventType, handler as MessageHandler);
-            this.unsubscribe(`token:${tokenId}`);
+            // We don't automatically leave the room because other components might need it
         };
     }
 
@@ -139,11 +126,14 @@ class WebSocketService {
     subscribeToTrades(tokenId: string, handler: (data: TradeEvent) => void) {
         const eventType = `trade:${tokenId}`;
         this.on(eventType, handler as MessageHandler);
-        this.subscribe(`trades:${tokenId}`);
+        this.subscribeToTokenRoom(tokenId);
+
+        if (!this.socket) {
+            this.connect();
+        }
 
         return () => {
             this.off(eventType, handler as MessageHandler);
-            this.unsubscribe(`trades:${tokenId}`);
         };
     }
 
@@ -162,12 +152,12 @@ class WebSocketService {
 
     // Disconnect
     disconnect() {
-        if (this.ws) {
-            this.ws.close();
-            this.ws = null;
+        if (this.socket) {
+            this.socket.disconnect();
+            this.socket = null;
         }
         this.handlers.clear();
-        this.subscriptions.clear();
+        this.rooms.clear();
     }
 }
 
