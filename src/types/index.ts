@@ -31,6 +31,7 @@ export interface Token {
   telegramUrl?: string;
   discordUrl?: string;
   totalSupply: string;
+  circulatingSupply?: string;
   initialPrice: string;
   currentPrice: string;
   marketCap: string;
@@ -41,11 +42,13 @@ export interface Token {
   creatorId: string;
   creator?: User;
   contractAddress?: string;
+  bondingCurveAddress?: string;
   bondingCurveProgress: number;
   graduationTarget: string;
   currentBondingAmount: string;
   holdersCount: number;
   tradesCount: number;
+  hypeBoostEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
 }

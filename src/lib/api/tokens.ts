@@ -112,3 +112,73 @@ export async function createToken(input: CreateTokenInput): Promise<Token> {
     const { data } = await apiClient.post<ApiResponse<{ token: Token; bondingCurve: any }>>('/api/v1/tokens/', input);
     return data.data.token;
 }
+
+// Check if token symbol is available
+export async function checkTokenSymbol(symbol: string, chainId?: number): Promise<{
+    available: boolean;
+    reason: string | null;
+    symbol: string;
+}> {
+    try {
+        const params = chainId ? { chainId: String(chainId) } : {};
+        const { data } = await apiClient.get<ApiResponse<{ available: boolean; reason: string | null; symbol: string }>>(
+            `/api/v1/tokens/check-symbol/${symbol.toUpperCase()}`,
+            { params }
+        );
+        return data.data;
+    } catch (error) {
+        console.error('Failed to check symbol:', error);
+        return { available: true, reason: null, symbol: symbol.toUpperCase() };
+    }
+}
+
+// Search tokens by name or symbol
+export async function searchTokens(query: string, options?: { chainId?: number; limit?: number }): Promise<Token[]> {
+    if (!query || query.length < 2) return [];
+
+    try {
+        const { data } = await apiClient.get<ApiResponse<Token[]>>('/api/v1/tokens/search', {
+            params: {
+                q: query,
+                chainId: options?.chainId ? String(options.chainId) : undefined,
+                limit: options?.limit ? String(options.limit) : undefined,
+            }
+        });
+        return data.data ?? [];
+    } catch (error) {
+        console.error('Failed to search tokens:', error);
+        return [];
+    }
+}
+
+// Get live tokens (actively trading)
+export async function getLiveTokens(options?: { chainId?: number; limit?: number }): Promise<Token[]> {
+    try {
+        const { data } = await apiClient.get<ApiResponse<Token[]>>('/api/v1/tokens/live', {
+            params: {
+                chainId: options?.chainId ? String(options.chainId) : undefined,
+                limit: options?.limit ? String(options.limit) : undefined,
+            }
+        });
+        return data.data ?? [];
+    } catch (error) {
+        console.error('Failed to get live tokens:', error);
+        return [];
+    }
+}
+
+// Get graduated tokens
+export async function getGraduatedTokens(options?: { chainId?: number; limit?: number }): Promise<Token[]> {
+    try {
+        const { data } = await apiClient.get<ApiResponse<Token[]>>('/api/v1/tokens/graduated', {
+            params: {
+                chainId: options?.chainId ? String(options.chainId) : undefined,
+                limit: options?.limit ? String(options.limit) : undefined,
+            }
+        });
+        return data.data ?? [];
+    } catch (error) {
+        console.error('Failed to get graduated tokens:', error);
+        return [];
+    }
+}

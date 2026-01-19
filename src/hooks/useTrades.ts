@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getTradeQuote, createTrade, confirmTrade, getTokenTrades } from '@/lib/api/trades';
+import { getTradeQuote, createTrade, confirmTrade, getTokenTrades, getUserTrades } from '@/lib/api/trades';
 import { tokenKeys } from './useTokens';
 import type { TradeType, CreateTradeInput, ConfirmTradeInput, Trade } from '@/types';
 
@@ -12,6 +12,7 @@ export const tradeKeys = {
     quote: (tokenId: string, type: TradeType, amount: string) =>
         [...tradeKeys.quotes(), { tokenId, type, amount }] as const,
     byToken: (tokenId: string) => [...tradeKeys.all, 'token', tokenId] as const,
+    user: () => [...tradeKeys.all, 'user'] as const,
 };
 
 // Hook to get trade quote (debounced in component)
@@ -82,5 +83,14 @@ export function useConfirmTrade() {
             queryClient.invalidateQueries({ queryKey: tokenKeys.detail(trade.tokenId) });
             queryClient.invalidateQueries({ queryKey: tokenKeys.lists() });
         },
+    });
+}
+
+// Hook to get current user's trades
+export function useUserTrades() {
+    return useQuery({
+        queryKey: tradeKeys.user(),
+        queryFn: () => getUserTrades(),
+        staleTime: 30 * 1000, // 30 seconds
     });
 }

@@ -46,3 +46,16 @@ export async function getTokenTrades(tokenId: string): Promise<Trade[]> {
     // Ensure we always return an array
     return Array.isArray(trades) ? trades : [];
 }
+
+// Get trades for the current user
+export async function getUserTrades(): Promise<Trade[]> {
+    try {
+        const { data } = await apiClient.get('/api/v1/trades/me');
+        const trades = data.data ?? data;
+        return Array.isArray(trades) ? trades : [];
+    } catch (error) {
+        // If endpoint doesn't exist, return empty array
+        console.warn('getUserTrades: endpoint not available');
+        return [];
+    }
+}

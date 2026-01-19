@@ -1,6 +1,6 @@
 /**
  * User API Client
- * 
+ *
  * Extended user API functions that are NOT already in auth.ts
  */
 
@@ -70,4 +70,24 @@ export async function getUserCreatedTokens(
         tokens: response.data.data.tokens || [],
         total: response.data.data.pagination?.total || 0,
     };
+}
+
+/**
+ * Check if username is available (detailed response)
+ * Note: auth.ts has checkUsernameAvailable which returns boolean
+ * This one returns more details including the reason
+ */
+export async function checkUsernameAvailabilityDetailed(username: string): Promise<{
+    available: boolean;
+    reason: string | null;
+}> {
+    try {
+        const response = await apiClient.get<{ success: boolean; data: { available: boolean; reason: string | null } }>(
+            `/api/v1/users/check-username/${username.toLowerCase().trim()}`
+        );
+        return response.data.data;
+    } catch (error) {
+        console.error('Failed to check username:', error);
+        return { available: true, reason: null };
+    }
 }

@@ -11,8 +11,9 @@ class WebSocketService {
     private isConnecting = false;
 
     constructor() {
+        // Use the same port as API (4000) - backend handles both HTTP and WebSocket
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-        this.url = apiUrl.replace(':4000', ':4001');
+        this.url = apiUrl;
     }
 
     connect(): Promise<void> {

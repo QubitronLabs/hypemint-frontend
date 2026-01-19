@@ -12,8 +12,9 @@ import {
   useAccount,
   useBalance,
   usePublicClient,
+  useSwitchChain,
 } from "wagmi";
-import { parseEther, type Address, type Hash } from "viem";
+import { parseEther, decodeEventLog, type Address, type Hash } from "viem";
 import {
   HYPE_FACTORY_ABI,
   HYPE_BONDING_CURVE_ABI,
@@ -75,13 +76,17 @@ export function useCreationFee() {
   });
 }
 
+// TokenCreated event topic (keccak256 hash of event signature)
+const TOKEN_CREATED_TOPIC = "0x4836be210e0cef1e63931ae5137b536c1191d9dc411069cf651c05c584c6fcae";
+
 // Hook: Create a new token
 export function useCreateToken() {
-  const { address } = useAccount();
+  const { address, chainId } = useAccount();
   const publicClient = usePublicClient();
   const [txHash, setTxHash] = useState<Hash | undefined>();
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const { switchChainAsync } = useSwitchChain();
 
   const { writeContractAsync } = useWriteContract();
 
@@ -103,8 +108,27 @@ export function useCreateToken() {
       setError(null);
 
       try {
+        // Ensure we're on the correct chain
+        if (chainId !== ACTIVE_CHAIN_ID) {
+          console.log(`Switching from chain ${chainId} to ${ACTIVE_CHAIN_ID}`);
+          try {
+            await switchChainAsync({ chainId: ACTIVE_CHAIN_ID });
+          } catch (switchError) {
+            console.error("Failed to switch chain:", switchError);
+            setError(new Error(`Please switch to Polygon Amoy network (Chain ID: ${ACTIVE_CHAIN_ID})`));
+            return null;
+          }
+        }
+
         const factoryAddress = getContractAddress("factory");
         const fee = creationFee || DEFAULT_CREATION_FEE;
+
+        console.log("Creating token with params:", {
+          factoryAddress,
+          fee: fee.toString(),
+          params,
+          chainId: ACTIVE_CHAIN_ID,
+        });
 
         // Write the transaction
         const hash = await writeContractAsync({
@@ -122,49 +146,90 @@ export function useCreateToken() {
           chainId: ACTIVE_CHAIN_ID,
         });
 
+        console.log("Transaction submitted:", hash);
         setTxHash(hash);
 
         // Wait for receipt and get the created token addresses
         if (publicClient) {
           const receipt = await publicClient.waitForTransactionReceipt({
             hash,
+            confirmations: 1,
           });
 
-          // Parse the TokenCreated event from the logs
-          // Event signature: TokenCreated(address indexed tokenAddress, address indexed bondingCurveAddress, address indexed creator, ...)
+          console.log("Transaction confirmed:", receipt);
+
+          // Find the TokenCreated event from factory contract
+          const factoryLower = factoryAddress.toLowerCase();
           const tokenCreatedLog = receipt.logs.find((log) => {
-            // TokenCreated event topic
-            return log.topics[0] === "0x..." // We'll match by structure instead
+            return (
+              log.address.toLowerCase() === factoryLower &&
+              log.topics[0] === TOKEN_CREATED_TOPIC
+            );
           });
 
-          // For now, return a placeholder - in production, parse the actual event
-          // The token and bonding curve addresses are in topics[1] and topics[2]
-          if (receipt.logs.length >= 1) {
-            const log = receipt.logs[0];
+          if (tokenCreatedLog && tokenCreatedLog.topics.length >= 4) {
+            // topics[1] = tokenAddress (indexed)
+            // topics[2] = bondingCurveAddress (indexed)
+            // topics[3] = creator (indexed)
+            const tokenAddress = ("0x" + tokenCreatedLog.topics[1]?.slice(26)) as Address;
+            const bondingCurveAddress = ("0x" + tokenCreatedLog.topics[2]?.slice(26)) as Address;
+
+            console.log("Token created:", { tokenAddress, bondingCurveAddress });
+
             return {
-              tokenAddress: (log.topics[1]?.slice(0, 42) ||
-                "0x0") as Address,
-              bondingCurveAddress: (log.topics[2]?.slice(0, 42) ||
-                "0x0") as Address,
+              tokenAddress,
+              bondingCurveAddress,
               txHash: hash,
             };
           }
+
+          // Fallback: try to find any log with indexed addresses
+          for (const log of receipt.logs) {
+            if (log.topics.length >= 3 && log.address.toLowerCase() === factoryLower) {
+              const tokenAddress = ("0x" + log.topics[1]?.slice(26)) as Address;
+              const bondingCurveAddress = ("0x" + log.topics[2]?.slice(26)) as Address;
+
+              if (tokenAddress !== "0x0000000000000000000000000000000000000000") {
+                return {
+                  tokenAddress,
+                  bondingCurveAddress,
+                  txHash: hash,
+                };
+              }
+            }
+          }
         }
 
+        // If we can't parse logs, still return success with tx hash
         return {
           tokenAddress: "0x0" as Address,
           bondingCurveAddress: "0x0" as Address,
           txHash: hash,
         };
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to create token:", err);
-        setError(err instanceof Error ? err : new Error("Failed to create token"));
+
+        // Parse better error messages
+        let errorMessage = "Failed to create token";
+        if (err?.message?.includes("User rejected")) {
+          errorMessage = "Transaction was rejected by user";
+        } else if (err?.message?.includes("insufficient funds")) {
+          errorMessage = "Insufficient funds for transaction";
+        } else if (err?.message?.includes("InsufficientCreationFee")) {
+          errorMessage = "Insufficient creation fee. Please send at least 0.01 POL";
+        } else if (err?.shortMessage) {
+          errorMessage = err.shortMessage;
+        } else if (err?.message) {
+          errorMessage = err.message;
+        }
+
+        setError(new Error(errorMessage));
         return null;
       } finally {
         setIsCreating(false);
       }
     },
-    [address, writeContractAsync, creationFee, publicClient]
+    [address, chainId, writeContractAsync, creationFee, publicClient, switchChainAsync]
   );
 
   return {

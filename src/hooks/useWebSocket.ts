@@ -255,3 +255,95 @@ export function useTrendingUpdates(
         }
     }, [isConnected, subscribe, unsubscribe]);
 }
+
+/**
+ * Hook for new token creation updates (real-time feed)
+ */
+export function useNewTokenFeed(
+    onNewToken: (token: {
+        tokenId: string;
+        name: string;
+        symbol: string;
+        imageUrl?: string;
+        creatorId: string;
+        creatorUsername?: string;
+        chainId: number;
+        timestamp: number;
+    }) => void
+) {
+    const { subscribe, unsubscribe, isConnected } = useWebSocket({
+        onMessage: (message) => {
+            if (message.channel === 'global:tokens' && message.event === 'token_created') {
+                onNewToken(message.data as Parameters<typeof onNewToken>[0]);
+            }
+        },
+    });
+
+    useEffect(() => {
+        if (isConnected) {
+            subscribe('global:tokens');
+            return () => unsubscribe('global:tokens');
+        }
+    }, [isConnected, subscribe, unsubscribe]);
+}
+
+/**
+ * Hook for token graduation updates
+ */
+export function useTokenGraduations(
+    onGraduation: (data: {
+        tokenId: string;
+        name: string;
+        symbol: string;
+        finalMarketCap: string;
+        timestamp: number;
+    }) => void
+) {
+    const { subscribe, unsubscribe, isConnected } = useWebSocket({
+        onMessage: (message) => {
+            if (message.channel === 'global:tokens' && message.event === 'token_graduated') {
+                onGraduation(message.data as Parameters<typeof onGraduation>[0]);
+            }
+        },
+    });
+
+    useEffect(() => {
+        if (isConnected) {
+            subscribe('global:tokens');
+            return () => unsubscribe('global:tokens');
+        }
+    }, [isConnected, subscribe, unsubscribe]);
+}
+
+/**
+ * Hook for global trade feed (all trades across all tokens)
+ */
+export function useGlobalTradeFeed(
+    onTrade: (trade: {
+        tradeId: string;
+        tokenId: string;
+        tokenSymbol: string;
+        userId: string;
+        username?: string;
+        type: 'buy' | 'sell';
+        amount: string;
+        price: string;
+        totalValue: string;
+        timestamp: number;
+    }) => void
+) {
+    const { subscribe, unsubscribe, isConnected } = useWebSocket({
+        onMessage: (message) => {
+            if (message.channel === 'global:trades' && message.event === 'trade_executed') {
+                onTrade(message.data as Parameters<typeof onTrade>[0]);
+            }
+        },
+    });
+
+    useEffect(() => {
+        if (isConnected) {
+            subscribe('global:trades');
+            return () => unsubscribe('global:trades');
+        }
+    }, [isConnected, subscribe, unsubscribe]);
+}
