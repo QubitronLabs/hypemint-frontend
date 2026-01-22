@@ -26,13 +26,20 @@ interface UseWebSocketReturn {
 
 // Derive WebSocket URL from API URL for production compatibility
 function getWsUrl(): string {
+  // If NEXT_PUBLIC_WS_URL is set, use it (ensure it has /ws path)
   if (process.env.NEXT_PUBLIC_WS_URL) {
-    return process.env.NEXT_PUBLIC_WS_URL;
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL;
+    // Ensure the URL ends with /ws
+    if (!wsUrl.endsWith('/ws')) {
+      return wsUrl.replace(/\/?$/, '/ws');
+    }
+    return wsUrl;
   }
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   // Convert http(s) to ws(s)
   const wsProtocol = apiUrl.startsWith("https") ? "wss" : "ws";
-  const wsHost = apiUrl.replace(/^https?:\/\//, "");
+  // Remove trailing slash if present and strip protocol
+  const wsHost = apiUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
   return `${wsProtocol}://${wsHost}/ws`;
 }
 

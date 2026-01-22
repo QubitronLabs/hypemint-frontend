@@ -274,7 +274,7 @@ export function TokenCreationForm() {
         });
 
         // Store metadata in backend with contract addresses
-        let backendTokenId; // fallback to contract address
+        let backendTokenId = result.tokenAddress; // fallback to contract address
         try {
           const apiResult = await createTokenApi.mutateAsync({
             name,
@@ -296,12 +296,25 @@ export function TokenCreationForm() {
           } else if ((apiResult as any)?.token?.id) {
             // Handle wrapped response { token, bondingCurve }
             backendTokenId = (apiResult as any).token.id;
+          } else if ((apiResult as any)?.data?.id) {
+            // Handle { data: { id } } response format
+            backendTokenId = (apiResult as any).data.id;
+          } else if ((apiResult as any)?.data?.token?.id) {
+            // Handle { data: { token: { id } } } response format
+            backendTokenId = (apiResult as any).data.token.id;
           }
         } catch (apiError) {
           console.warn("Failed to store token metadata:", apiError);
+          // If API fails, navigate to token by contract address
         }
 
-        router.push(`/token/${backendTokenId}`);
+        // Only redirect if we have a valid token ID
+        if (backendTokenId) {
+          router.push(`/token/${backendTokenId}`);
+        } else {
+          toast.warning("Token created but couldn't get ID. Check the homepage.");
+          router.push('/');
+        }
       }
     } catch (error) {
       console.error("Failed to create token:", error);

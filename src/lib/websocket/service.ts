@@ -13,7 +13,8 @@ class WebSocketService {
     constructor() {
         // Use the same port as API (4000) - backend handles both HTTP and WebSocket
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-        this.url = apiUrl;
+        // Ensure no trailing slash for Socket.IO
+        this.url = apiUrl.replace(/\/$/, '');
     }
 
     connect(): Promise<void> {
@@ -32,6 +33,7 @@ class WebSocketService {
 
             try {
                 this.socket = io(this.url, {
+                    path: '/socket.io/',
                     transports: ['websocket', 'polling'],
                     reconnection: true,
                     reconnectionAttempts: 5,
