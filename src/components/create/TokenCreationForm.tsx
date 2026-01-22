@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useAccount } from 'wagmi';
-import { formatEther } from 'viem';
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import { useAccount } from "wagmi";
+import { formatEther } from "viem";
 import {
   Upload,
   Globe,
@@ -26,25 +26,29 @@ import {
   X,
   CheckCircle2,
   XCircle,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
-import { useAuth } from '@/hooks';
-import { useCreateTokenOnChain, useCreationFee, useNativeBalance } from '@/hooks';
-import { useCreateToken } from '@/hooks/useTokens';
-import { getTxUrl } from '@/lib/wagmi';
-import { toast } from 'sonner';
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks";
+import {
+  useCreateTokenOnChain,
+  useCreationFee,
+  useNativeBalance,
+} from "@/hooks";
+import { useCreateToken } from "@/hooks/useTokens";
+import { getTxUrl } from "@/lib/wagmi";
+import { toast } from "sonner";
 
 // API base URL
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 // Step configuration - simplified to 3 steps
 const STEPS = [
-  { id: 1, title: 'Token Info', description: 'Name, symbol & image' },
-  { id: 2, title: 'Details', description: 'Description & links' },
-  { id: 3, title: 'Launch', description: 'Review & deploy' },
+  { id: 1, title: "Token Info", description: "Name, symbol & image" },
+  { id: 2, title: "Details", description: "Description & links" },
+  { id: 3, title: "Launch", description: "Review & deploy" },
 ];
 
 // Debounce hook
@@ -71,7 +75,13 @@ export function TokenCreationForm() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Contract hooks
-  const { createToken: createTokenOnChain, isCreating, isConfirming, txHash, error: contractError } = useCreateTokenOnChain();
+  const {
+    createToken: createTokenOnChain,
+    isCreating,
+    isConfirming,
+    txHash,
+    error: contractError,
+  } = useCreateTokenOnChain();
   const { data: creationFee } = useCreationFee();
   const { data: balance } = useNativeBalance();
 
@@ -82,15 +92,15 @@ export function TokenCreationForm() {
   const [currentStep, setCurrentStep] = useState(1);
 
   // Form state
-  const [name, setName] = useState('');
-  const [symbol, setSymbol] = useState('');
-  const [description, setDescription] = useState('');
+  const [name, setName] = useState("");
+  const [symbol, setSymbol] = useState("");
+  const [description, setDescription] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string>('');
-  const [websiteUrl, setWebsiteUrl] = useState('');
-  const [twitterUrl, setTwitterUrl] = useState('');
-  const [telegramUrl, setTelegramUrl] = useState('');
+  const [imageUrl, setImageUrl] = useState<string>("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [twitterUrl, setTwitterUrl] = useState("");
+  const [telegramUrl, setTelegramUrl] = useState("");
 
   // HypeBoost
   const [hypeBoostEnabled, setHypeBoostEnabled] = useState(true);
@@ -120,7 +130,9 @@ export function TokenCreationForm() {
 
       setIsCheckingSymbol(true);
       try {
-        const response = await fetch(`${API_URL}/api/v1/tokens/check-symbol/${debouncedSymbol.toUpperCase()}`);
+        const response = await fetch(
+          `${API_URL}/api/v1/tokens/check-symbol/${debouncedSymbol.toUpperCase()}`,
+        );
         const result = await response.json();
 
         if (result.success) {
@@ -128,7 +140,7 @@ export function TokenCreationForm() {
           setSymbolError(result.data.available ? null : result.data.reason);
         }
       } catch (error) {
-        console.error('Failed to check symbol:', error);
+        console.error("Failed to check symbol:", error);
       } finally {
         setIsCheckingSymbol(false);
       }
@@ -138,7 +150,11 @@ export function TokenCreationForm() {
   }, [debouncedSymbol]);
 
   // Validation
-  const isStep1Valid = name.length >= 2 && symbol.length >= 2 && symbol.length <= 10 && symbolAvailable !== false;
+  const isStep1Valid =
+    name.length >= 2 &&
+    symbol.length >= 2 &&
+    symbol.length <= 10 &&
+    symbolAvailable !== false;
   const isStep2Valid = true;
   const isStep3Valid = true;
   const isAllValid = isStep1Valid && isStep2Valid && isStep3Valid;
@@ -149,9 +165,9 @@ export function TokenCreationForm() {
 
   // Handle image upload
   const handleImageUpload = (file: File) => {
-    if (file && file.type.startsWith('image/')) {
+    if (file && file.type.startsWith("image/")) {
       if (file.size > 5 * 1024 * 1024) {
-        toast.error('Image must be less than 5MB');
+        toast.error("Image must be less than 5MB");
         return;
       }
       setImageFile(file);
@@ -188,7 +204,7 @@ export function TokenCreationForm() {
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
-    setImageUrl('');
+    setImageUrl("");
   };
 
   // Upload image to backend
@@ -198,10 +214,10 @@ export function TokenCreationForm() {
     setIsUploading(true);
     try {
       const formData = new FormData();
-      formData.append('file', imageFile);
+      formData.append("file", imageFile);
 
       const response = await fetch(`${API_URL}/api/v1/uploads/image`, {
-        method: 'POST',
+        method: "POST",
         body: formData,
       });
 
@@ -210,12 +226,12 @@ export function TokenCreationForm() {
         setImageUrl(result.data.url);
         return result.data.url;
       } else {
-        toast.error('Failed to upload image');
+        toast.error("Failed to upload image");
         return null;
       }
     } catch (error) {
-      console.error('Image upload error:', error);
-      toast.error('Failed to upload image');
+      console.error("Image upload error:", error);
+      toast.error("Failed to upload image");
       return null;
     } finally {
       setIsUploading(false);
@@ -237,29 +253,30 @@ export function TokenCreationForm() {
       }
 
       // Create token on blockchain
-      toast.info('Creating token on blockchain...', { id: 'create-token' });
+      toast.info("Creating token on blockchain...", { id: "create-token" });
 
       const result = await createTokenOnChain({
         name,
         symbol: symbol.toUpperCase(),
-        imageURI: finalImageUrl || '',
-        description: description || '',
+        imageURI: finalImageUrl || "",
+        description: description || "",
         hypeBoostEnabled,
       });
 
       if (result) {
-        toast.success('Token created successfully!', {
-          id: 'create-token',
+        toast.success("Token created successfully!", {
+          id: "create-token",
           description: `Transaction: ${result.txHash.slice(0, 10)}...`,
           action: {
-            label: 'View',
-            onClick: () => window.open(getTxUrl(result.txHash), '_blank'),
+            label: "View",
+            onClick: () => window.open(getTxUrl(result.txHash), "_blank"),
           },
         });
 
-        // Store metadata in backend
+        // Store metadata in backend with contract addresses
+        let backendTokenId; // fallback to contract address
         try {
-          await createTokenApi.mutateAsync({
+          const apiResult = await createTokenApi.mutateAsync({
             name,
             symbol: symbol.toUpperCase(),
             description,
@@ -267,21 +284,27 @@ export function TokenCreationForm() {
             websiteUrl: websiteUrl || undefined,
             twitterUrl: twitterUrl || undefined,
             telegramUrl: telegramUrl || undefined,
-            totalSupply: '1000000000',
-            initialPrice: '0.00001',
+            totalSupply: "1000000000",
+            initialPrice: "0.00001",
             chainId: 80002, // Polygon Amoy testnet
+            contractAddress: result.tokenAddress,
+            bondingCurveAddress: result.bondingCurveAddress,
           });
+          // Use the backend token ID for navigation
+          if (apiResult?.id) {
+            backendTokenId = apiResult.id;
+          }
         } catch (apiError) {
-          console.warn('Failed to store token metadata:', apiError);
+          console.warn("Failed to store token metadata:", apiError);
         }
 
-        router.push(`/token/${result.tokenAddress}`);
+        router.push(`/token/${backendTokenId}`);
       }
     } catch (error) {
-      console.error('Failed to create token:', error);
-      toast.error('Failed to create token', {
-        id: 'create-token',
-        description: error instanceof Error ? error.message : 'Unknown error',
+      console.error("Failed to create token:", error);
+      toast.error("Failed to create token", {
+        id: "create-token",
+        description: error instanceof Error ? error.message : "Unknown error",
       });
     }
   };
@@ -297,9 +320,12 @@ export function TokenCreationForm() {
 
   const canProceed = () => {
     switch (currentStep) {
-      case 1: return isStep1Valid;
-      case 2: return isStep2Valid;
-      default: return false;
+      case 1:
+        return isStep1Valid;
+      case 2:
+        return isStep2Valid;
+      default:
+        return false;
     }
   };
 
@@ -369,19 +395,29 @@ export function TokenCreationForm() {
                         ? "bg-primary text-primary-foreground"
                         : isCompleted
                           ? "bg-green-500/20 text-green-500 cursor-pointer hover:bg-green-500/30"
-                          : "bg-muted text-muted-foreground"
+                          : "bg-muted text-muted-foreground",
                     )}
                   >
                     <span className="w-6 h-6 rounded-full bg-current/20 flex items-center justify-center text-sm font-medium">
-                      {isCompleted ? <Check className="h-3.5 w-3.5" /> : step.id}
+                      {isCompleted ? (
+                        <Check className="h-3.5 w-3.5" />
+                      ) : (
+                        step.id
+                      )}
                     </span>
-                    <span className="hidden sm:inline text-sm font-medium">{step.title}</span>
+                    <span className="hidden sm:inline text-sm font-medium">
+                      {step.title}
+                    </span>
                   </button>
                   {index < STEPS.length - 1 && (
-                    <ChevronRight className={cn(
-                      "h-4 w-4 mx-1",
-                      currentStep > step.id ? "text-green-500" : "text-muted-foreground"
-                    )} />
+                    <ChevronRight
+                      className={cn(
+                        "h-4 w-4 mx-1",
+                        currentStep > step.id
+                          ? "text-green-500"
+                          : "text-muted-foreground",
+                      )}
+                    />
                   )}
                 </div>
               );
@@ -410,7 +446,9 @@ export function TokenCreationForm() {
                   {/* Left: Form Fields */}
                   <div className="space-y-4">
                     <div>
-                      <label className="text-sm font-medium mb-2 block">Token Name *</label>
+                      <label className="text-sm font-medium mb-2 block">
+                        Token Name *
+                      </label>
                       <Input
                         placeholder="e.g., Pepe Classic"
                         value={name}
@@ -424,16 +462,26 @@ export function TokenCreationForm() {
                     </div>
 
                     <div>
-                      <label className="text-sm font-medium mb-2 block">Symbol *</label>
+                      <label className="text-sm font-medium mb-2 block">
+                        Symbol *
+                      </label>
                       <div className="relative">
                         <Input
                           placeholder="e.g., PEPE"
                           value={symbol}
-                          onChange={(e) => setSymbol(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                          onChange={(e) =>
+                            setSymbol(
+                              e.target.value
+                                .toUpperCase()
+                                .replace(/[^A-Z0-9]/g, ""),
+                            )
+                          }
                           className={cn(
                             "h-12 text-lg font-mono bg-background/50 pr-10",
-                            symbolAvailable === false && "border-red-500 focus:border-red-500",
-                            symbolAvailable === true && "border-green-500 focus:border-green-500"
+                            symbolAvailable === false &&
+                              "border-red-500 focus:border-red-500",
+                            symbolAvailable === true &&
+                              "border-green-500 focus:border-green-500",
                           )}
                           maxLength={10}
                         />
@@ -448,13 +496,19 @@ export function TokenCreationForm() {
                         </div>
                       </div>
                       {symbolError && (
-                        <p className="text-xs text-red-500 mt-1">{symbolError}</p>
+                        <p className="text-xs text-red-500 mt-1">
+                          {symbolError}
+                        </p>
                       )}
                       {symbolAvailable === true && (
-                        <p className="text-xs text-green-500 mt-1">Symbol is available!</p>
+                        <p className="text-xs text-green-500 mt-1">
+                          Symbol is available!
+                        </p>
                       )}
                       {!symbolError && symbolAvailable === null && (
-                        <p className="text-xs text-muted-foreground mt-1">2-10 characters</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          2-10 characters
+                        </p>
                       )}
                     </div>
 
@@ -465,25 +519,31 @@ export function TokenCreationForm() {
                         "p-4 rounded-xl border-2 cursor-pointer transition-all",
                         hypeBoostEnabled
                           ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50"
+                          : "border-border hover:border-primary/50",
                       )}
                     >
                       <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "w-10 h-10 rounded-lg flex items-center justify-center",
-                          hypeBoostEnabled ? "bg-primary text-white" : "bg-muted"
-                        )}>
+                        <div
+                          className={cn(
+                            "w-10 h-10 rounded-lg flex items-center justify-center",
+                            hypeBoostEnabled
+                              ? "bg-primary text-white"
+                              : "bg-muted",
+                          )}
+                        >
                           <Shield className="h-5 w-5" />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
                             <span className="font-medium">HypeBoost</span>
-                            <span className={cn(
-                              "text-xs px-2 py-1 rounded-full",
-                              hypeBoostEnabled
-                                ? "bg-primary text-white"
-                                : "bg-muted text-muted-foreground"
-                            )}>
+                            <span
+                              className={cn(
+                                "text-xs px-2 py-1 rounded-full",
+                                hypeBoostEnabled
+                                  ? "bg-primary text-white"
+                                  : "bg-muted text-muted-foreground",
+                              )}
+                            >
                               {hypeBoostEnabled ? "ON" : "OFF"}
                             </span>
                           </div>
@@ -497,19 +557,23 @@ export function TokenCreationForm() {
 
                   {/* Right: Image Upload */}
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Token Image</label>
+                    <label className="text-sm font-medium mb-2 block">
+                      Token Image
+                    </label>
                     <div
                       onDragOver={handleDragOver}
                       onDragLeave={handleDragLeave}
                       onDrop={handleDrop}
-                      onClick={() => !imagePreview && fileInputRef.current?.click()}
+                      onClick={() =>
+                        !imagePreview && fileInputRef.current?.click()
+                      }
                       className={cn(
                         "relative h-64 border-2 border-dashed rounded-xl transition-all flex flex-col items-center justify-center",
                         isDragging
                           ? "border-primary bg-primary/10"
                           : imagePreview
                             ? "border-green-500/50 cursor-default"
-                            : "border-border hover:border-primary/50 cursor-pointer"
+                            : "border-border hover:border-primary/50 cursor-pointer",
                       )}
                     >
                       {imagePreview ? (
@@ -520,7 +584,10 @@ export function TokenCreationForm() {
                             className="absolute inset-0 w-full h-full object-cover rounded-xl"
                           />
                           <button
-                            onClick={(e) => { e.stopPropagation(); removeImage(); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeImage();
+                            }}
                             className="absolute top-2 right-2 w-8 h-8 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-colors"
                           >
                             <X className="h-4 w-4 text-white" />
@@ -528,12 +595,18 @@ export function TokenCreationForm() {
                         </>
                       ) : (
                         <>
-                          <Upload className={cn(
-                            "h-10 w-10 mb-3",
-                            isDragging ? "text-primary" : "text-muted-foreground"
-                          )} />
+                          <Upload
+                            className={cn(
+                              "h-10 w-10 mb-3",
+                              isDragging
+                                ? "text-primary"
+                                : "text-muted-foreground",
+                            )}
+                          />
                           <p className="text-sm font-medium">
-                            {isDragging ? "Drop image here" : "Click or drag to upload"}
+                            {isDragging
+                              ? "Drop image here"
+                              : "Click or drag to upload"}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
                             PNG, JPG, GIF up to 5MB
@@ -563,7 +636,9 @@ export function TokenCreationForm() {
                 className="space-y-6"
               >
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Description</label>
+                  <label className="text-sm font-medium mb-2 block">
+                    Description
+                  </label>
                   <Textarea
                     placeholder="Tell the world about your token..."
                     value={description}
@@ -612,7 +687,8 @@ export function TokenCreationForm() {
                     <span className="text-sm font-medium">Tip</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Tokens with complete profiles get 3x more visibility. Add social links to build trust!
+                    Tokens with complete profiles get 3x more visibility. Add
+                    social links to build trust!
                   </p>
                 </div>
               </motion.div>
@@ -632,18 +708,28 @@ export function TokenCreationForm() {
                   <div className="flex items-start gap-4">
                     <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center overflow-hidden flex-shrink-0">
                       {imagePreview ? (
-                        <img src={imagePreview} alt="" className="w-full h-full object-cover" />
+                        <img
+                          src={imagePreview}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <span className="text-xl font-bold text-muted-foreground">
-                          {symbol.slice(0, 2) || '??'}
+                          {symbol.slice(0, 2) || "??"}
                         </span>
                       )}
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-xl font-bold">{name || 'Token Name'}</h3>
-                      <p className="text-muted-foreground">${symbol || 'SYMBOL'}</p>
+                      <h3 className="text-xl font-bold">
+                        {name || "Token Name"}
+                      </h3>
+                      <p className="text-muted-foreground">
+                        ${symbol || "SYMBOL"}
+                      </p>
                       {description && (
-                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{description}</p>
+                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                          {description}
+                        </p>
                       )}
                     </div>
                     {hypeBoostEnabled && (
@@ -658,24 +744,39 @@ export function TokenCreationForm() {
                 {/* Token Details */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-background/30 rounded-lg p-3">
-                    <p className="text-xs text-muted-foreground">Total Supply</p>
+                    <p className="text-xs text-muted-foreground">
+                      Total Supply
+                    </p>
                     <p className="font-mono font-medium">1,000,000,000</p>
                   </div>
                   <div className="bg-background/30 rounded-lg p-3">
-                    <p className="text-xs text-muted-foreground">Bonding Curve</p>
+                    <p className="text-xs text-muted-foreground">
+                      Bonding Curve
+                    </p>
                     <p className="font-medium">Linear</p>
                   </div>
                   <div className="bg-background/30 rounded-lg p-3">
-                    <p className="text-xs text-muted-foreground">Creation Fee</p>
-                    <p className="font-mono font-medium">{formatEther(fee)} POL</p>
+                    <p className="text-xs text-muted-foreground">
+                      Creation Fee
+                    </p>
+                    <p className="font-mono font-medium">
+                      {formatEther(fee)} POL
+                    </p>
                   </div>
                   <div className="bg-background/30 rounded-lg p-3">
-                    <p className="text-xs text-muted-foreground">Your Balance</p>
-                    <p className={cn(
-                      "font-mono font-medium",
-                      hasEnoughBalance ? "text-green-500" : "text-red-500"
-                    )}>
-                      {balance?.value ? parseFloat(formatEther(balance.value)).toFixed(4) : '0'} POL
+                    <p className="text-xs text-muted-foreground">
+                      Your Balance
+                    </p>
+                    <p
+                      className={cn(
+                        "font-mono font-medium",
+                        hasEnoughBalance ? "text-green-500" : "text-red-500",
+                      )}
+                    >
+                      {balance?.value
+                        ? parseFloat(formatEther(balance.value)).toFixed(4)
+                        : "0"}{" "}
+                      POL
                     </p>
                   </div>
                 </div>
@@ -685,10 +786,13 @@ export function TokenCreationForm() {
                   <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
                     <div className="flex items-center gap-2 text-red-500">
                       <AlertCircle className="h-4 w-4" />
-                      <span className="text-sm font-medium">Insufficient balance</span>
+                      <span className="text-sm font-medium">
+                        Insufficient balance
+                      </span>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
-                      You need at least {formatEther(fee)} POL to create a token.
+                      You need at least {formatEther(fee)} POL to create a
+                      token.
                     </p>
                   </div>
                 )}
@@ -699,7 +803,9 @@ export function TokenCreationForm() {
                       <AlertCircle className="h-4 w-4" />
                       <span className="text-sm font-medium">Error</span>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">{contractError.message}</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {contractError.message}
+                    </p>
                   </div>
                 )}
 
@@ -707,7 +813,9 @@ export function TokenCreationForm() {
                   <div className="p-4 bg-primary/10 border border-primary/20 rounded-xl">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium">Transaction Submitted</p>
+                        <p className="text-sm font-medium">
+                          Transaction Submitted
+                        </p>
                         <p className="text-xs text-muted-foreground font-mono mt-1">
                           {txHash.slice(0, 20)}...{txHash.slice(-8)}
                         </p>
@@ -751,7 +859,13 @@ export function TokenCreationForm() {
             ) : (
               <Button
                 onClick={handleSubmit}
-                disabled={!isAllValid || !hasEnoughBalance || isCreating || isConfirming || isUploading}
+                disabled={
+                  !isAllValid ||
+                  !hasEnoughBalance ||
+                  isCreating ||
+                  isConfirming ||
+                  isUploading
+                }
                 className="gap-2 bg-gradient-to-r from-green-500 to-emerald-500 hover:opacity-90 min-w-[160px]"
               >
                 {isUploading ? (

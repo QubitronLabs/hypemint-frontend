@@ -1,8 +1,13 @@
 // Token types based on API spec
-export type TokenStatus = 'pending' | 'active' | 'graduated' | 'failed' | 'delisted';
-export type TradeType = 'buy' | 'sell';
-export type OrderBy = 'createdAt' | 'marketCap' | 'volume24h';
-export type OrderDir = 'asc' | 'desc';
+export type TokenStatus =
+  | "pending"
+  | "active"
+  | "graduated"
+  | "failed"
+  | "delisted";
+export type TradeType = "buy" | "sell";
+export type OrderBy = "createdAt" | "marketCap" | "volume24h";
+export type OrderDir = "asc" | "desc";
 
 export interface User {
   id: string;
@@ -74,6 +79,8 @@ export interface CreateTokenInput {
   totalSupply: string;
   initialPrice: string;
   chainId: number;
+  contractAddress?: string; // On-chain contract address
+  bondingCurveAddress?: string; // On-chain bonding curve address
 }
 
 export interface Trade {
@@ -91,7 +98,7 @@ export interface Trade {
   txHash?: string;
   blockNumber?: number;
   gasUsed?: string;
-  status: 'pending' | 'confirmed' | 'failed' | 'cancelled';
+  status: "pending" | "confirmed" | "failed" | "cancelled";
   createdAt: string;
   confirmedAt?: string;
 }
@@ -176,30 +183,30 @@ export interface ChainConfig {
 export const SUPPORTED_CHAINS: ChainConfig[] = [
   {
     id: 1,
-    name: 'Ethereum',
-    icon: '/chains/ethereum.svg',
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    explorerUrl: 'https://etherscan.io',
+    name: "Ethereum",
+    icon: "/chains/ethereum.svg",
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    explorerUrl: "https://etherscan.io",
   },
   {
     id: 56,
-    name: 'BNB Chain',
-    icon: '/chains/bnb.svg',
-    nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
-    explorerUrl: 'https://bscscan.com',
+    name: "BNB Chain",
+    icon: "/chains/bnb.svg",
+    nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
+    explorerUrl: "https://bscscan.com",
   },
   {
     id: 8453,
-    name: 'Base',
-    icon: '/chains/base.svg',
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    explorerUrl: 'https://basescan.org',
+    name: "Base",
+    icon: "/chains/base.svg",
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    explorerUrl: "https://basescan.org",
   },
   {
     id: 42161,
-    name: 'Arbitrum',
-    icon: '/chains/arbitrum.svg',
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-    explorerUrl: 'https://arbiscan.io',
+    name: "Arbitrum",
+    icon: "/chains/arbitrum.svg",
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    explorerUrl: "https://arbiscan.io",
   },
 ];

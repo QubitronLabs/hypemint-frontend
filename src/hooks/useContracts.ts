@@ -77,7 +77,8 @@ export function useCreationFee() {
 }
 
 // TokenCreated event topic (keccak256 hash of event signature)
-const TOKEN_CREATED_TOPIC = "0x4836be210e0cef1e63931ae5137b536c1191d9dc411069cf651c05c584c6fcae";
+const TOKEN_CREATED_TOPIC =
+  "0x4836be210e0cef1e63931ae5137b536c1191d9dc411069cf651c05c584c6fcae";
 
 // Hook: Create a new token
 export function useCreateToken() {
@@ -115,7 +116,11 @@ export function useCreateToken() {
             await switchChainAsync({ chainId: ACTIVE_CHAIN_ID });
           } catch (switchError) {
             console.error("Failed to switch chain:", switchError);
-            setError(new Error(`Please switch to Polygon Amoy network (Chain ID: ${ACTIVE_CHAIN_ID})`));
+            setError(
+              new Error(
+                `Please switch to Polygon Amoy network (Chain ID: ${ACTIVE_CHAIN_ID})`,
+              ),
+            );
             return null;
           }
         }
@@ -130,7 +135,7 @@ export function useCreateToken() {
           chainId: ACTIVE_CHAIN_ID,
         });
 
-        // Write the transaction
+        // Write the transaction with proper gas settings for Polygon Amoy
         const hash = await writeContractAsync({
           address: factoryAddress,
           abi: HYPE_FACTORY_ABI,
@@ -144,6 +149,9 @@ export function useCreateToken() {
           ],
           value: fee,
           chainId: ACTIVE_CHAIN_ID,
+          // Set higher gas price for Polygon Amoy testnet (minimum 25 gwei)
+          maxFeePerGas: BigInt(50000000000), // 50 gwei
+          maxPriorityFeePerGas: BigInt(30000000000), // 30 gwei
         });
 
         console.log("Transaction submitted:", hash);
@@ -171,10 +179,15 @@ export function useCreateToken() {
             // topics[1] = tokenAddress (indexed)
             // topics[2] = bondingCurveAddress (indexed)
             // topics[3] = creator (indexed)
-            const tokenAddress = ("0x" + tokenCreatedLog.topics[1]?.slice(26)) as Address;
-            const bondingCurveAddress = ("0x" + tokenCreatedLog.topics[2]?.slice(26)) as Address;
+            const tokenAddress = ("0x" +
+              tokenCreatedLog.topics[1]?.slice(26)) as Address;
+            const bondingCurveAddress = ("0x" +
+              tokenCreatedLog.topics[2]?.slice(26)) as Address;
 
-            console.log("Token created:", { tokenAddress, bondingCurveAddress });
+            console.log("Token created:", {
+              tokenAddress,
+              bondingCurveAddress,
+            });
 
             return {
               tokenAddress,
@@ -185,11 +198,17 @@ export function useCreateToken() {
 
           // Fallback: try to find any log with indexed addresses
           for (const log of receipt.logs) {
-            if (log.topics.length >= 3 && log.address.toLowerCase() === factoryLower) {
+            if (
+              log.topics.length >= 3 &&
+              log.address.toLowerCase() === factoryLower
+            ) {
               const tokenAddress = ("0x" + log.topics[1]?.slice(26)) as Address;
-              const bondingCurveAddress = ("0x" + log.topics[2]?.slice(26)) as Address;
+              const bondingCurveAddress = ("0x" +
+                log.topics[2]?.slice(26)) as Address;
 
-              if (tokenAddress !== "0x0000000000000000000000000000000000000000") {
+              if (
+                tokenAddress !== "0x0000000000000000000000000000000000000000"
+              ) {
                 return {
                   tokenAddress,
                   bondingCurveAddress,
@@ -216,7 +235,8 @@ export function useCreateToken() {
         } else if (err?.message?.includes("insufficient funds")) {
           errorMessage = "Insufficient funds for transaction";
         } else if (err?.message?.includes("InsufficientCreationFee")) {
-          errorMessage = "Insufficient creation fee. Please send at least 0.01 POL";
+          errorMessage =
+            "Insufficient creation fee. Please send at least 0.01 POL";
         } else if (err?.shortMessage) {
           errorMessage = err.shortMessage;
         } else if (err?.message) {
@@ -229,7 +249,14 @@ export function useCreateToken() {
         setIsCreating(false);
       }
     },
-    [address, chainId, writeContractAsync, creationFee, publicClient, switchChainAsync]
+    [
+      address,
+      chainId,
+      writeContractAsync,
+      creationFee,
+      publicClient,
+      switchChainAsync,
+    ],
   );
 
   return {
@@ -310,7 +337,7 @@ export function useBondingCurveState(bondingCurveAddress: Address | undefined) {
 // Hook: Calculate buy quote
 export function useBuyQuote(
   bondingCurveAddress: Address | undefined,
-  maticAmount: string
+  maticAmount: string,
 ) {
   const amountWei = maticAmount ? parseEther(maticAmount) : BigInt(0);
 
@@ -329,7 +356,7 @@ export function useBuyQuote(
 // Hook: Calculate sell quote
 export function useSellQuote(
   bondingCurveAddress: Address | undefined,
-  tokenAmount: string
+  tokenAmount: string,
 ) {
   const amountWei = tokenAmount ? parseEther(tokenAmount) : BigInt(0);
 
@@ -383,19 +410,24 @@ export function useBuyTokens() {
           args: [minTokens],
           value: maticWei,
           chainId: ACTIVE_CHAIN_ID,
+          // Set higher gas price for Polygon Amoy testnet (minimum 25 gwei)
+          maxFeePerGas: BigInt(50000000000), // 50 gwei
+          maxPriorityFeePerGas: BigInt(30000000000), // 30 gwei
         });
 
         setTxHash(hash);
         return hash;
       } catch (err) {
         console.error("Failed to buy tokens:", err);
-        setError(err instanceof Error ? err : new Error("Failed to buy tokens"));
+        setError(
+          err instanceof Error ? err : new Error("Failed to buy tokens"),
+        );
         return null;
       } finally {
         setIsBuying(false);
       }
     },
-    [address, writeContractAsync]
+    [address, writeContractAsync],
   );
 
   return {
@@ -449,19 +481,24 @@ export function useSellTokens() {
           functionName: "sell",
           args: [tokenWei, minMatic],
           chainId: ACTIVE_CHAIN_ID,
+          // Set higher gas price for Polygon Amoy testnet (minimum 25 gwei)
+          maxFeePerGas: BigInt(50000000000), // 50 gwei
+          maxPriorityFeePerGas: BigInt(30000000000), // 30 gwei
         });
 
         setTxHash(hash);
         return hash;
       } catch (err) {
         console.error("Failed to sell tokens:", err);
-        setError(err instanceof Error ? err : new Error("Failed to sell tokens"));
+        setError(
+          err instanceof Error ? err : new Error("Failed to sell tokens"),
+        );
         return null;
       } finally {
         setIsSelling(false);
       }
     },
-    [address, writeContractAsync]
+    [address, writeContractAsync],
   );
 
   return {
@@ -481,7 +518,7 @@ export function useSellTokens() {
 // Hook: Get token balance
 export function useTokenBalance(
   tokenAddress: Address | undefined,
-  userAddress?: Address
+  userAddress?: Address,
 ) {
   const { address: connectedAddress } = useAccount();
   const targetAddress = userAddress || connectedAddress;
@@ -515,7 +552,7 @@ export function useApproveToken() {
     async (
       tokenAddress: Address,
       spenderAddress: Address,
-      amount: bigint
+      amount: bigint,
     ): Promise<Hash | null> => {
       setIsApproving(true);
       setError(null);
@@ -539,7 +576,7 @@ export function useApproveToken() {
         setIsApproving(false);
       }
     },
-    [writeContractAsync]
+    [writeContractAsync],
   );
 
   return {
@@ -559,7 +596,7 @@ export function useApproveToken() {
 // Hook: Check token allowance
 export function useTokenAllowance(
   tokenAddress: Address | undefined,
-  spenderAddress: Address | undefined
+  spenderAddress: Address | undefined,
 ) {
   const { address: ownerAddress } = useAccount();
 
@@ -567,7 +604,10 @@ export function useTokenAllowance(
     address: tokenAddress,
     abi: HYPE_TOKEN_ABI,
     functionName: "allowance",
-    args: ownerAddress && spenderAddress ? [ownerAddress, spenderAddress] : undefined,
+    args:
+      ownerAddress && spenderAddress
+        ? [ownerAddress, spenderAddress]
+        : undefined,
     chainId: ACTIVE_CHAIN_ID,
     query: {
       enabled: !!tokenAddress && !!ownerAddress && !!spenderAddress,

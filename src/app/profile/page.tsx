@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { useState } from "react";
+import { motion } from "framer-motion";
 import {
   ExternalLink,
   Edit2,
@@ -13,32 +13,34 @@ import {
   Bell,
   Rocket,
   PieChart,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
-import { CreatorDashboard } from '@/components/dashboard';
-import { Portfolio } from '@/components/portfolio';
-import { useAuth, useCurrentUser } from '@/hooks';
-import { getAddressUrl } from '@/lib/wagmi';
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { CreatorDashboard } from "@/components/dashboard";
+import { Portfolio } from "@/components/portfolio";
+import { useAuth, useCurrentUser } from "@/hooks";
+import { getAddressUrl } from "@/lib/wagmi";
 
 export default function ProfilePage() {
-  const { isAuthenticated, isLoading, walletAddress, dynamicUser, logout } = useAuth();
+  const { isAuthenticated, isLoading, walletAddress, dynamicUser, logout } =
+    useAuth();
   const { data: user, isLoading: userLoading } = useCurrentUser();
 
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState('portfolio');
+  const [activeTab, setActiveTab] = useState("portfolio");
 
-  const displayName = user?.displayName
-    || user?.username
-    || dynamicUser?.firstName
-    || (dynamicUser?.email?.split('@')[0])
-    || null;
+  const displayName =
+    user?.displayName ||
+    user?.username ||
+    dynamicUser?.firstName ||
+    dynamicUser?.email?.split("@")[0] ||
+    null;
 
   const shortAddress = walletAddress
     ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
-    : 'Not connected';
+    : "Not connected";
 
   const handleCopy = () => {
     if (walletAddress) {
@@ -83,7 +85,8 @@ export default function ProfilePage() {
           </div>
           <h1 className="text-xl font-bold mb-2">Connect Your Wallet</h1>
           <p className="text-muted-foreground mb-6">
-            Connect your wallet to view your profile, portfolio, and creator dashboard.
+            Connect your wallet to view your profile, portfolio, and creator
+            dashboard.
           </p>
         </motion.div>
       </div>
@@ -96,66 +99,82 @@ export default function ProfilePage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
         className="flex items-start justify-between mb-8"
       >
-        <div className="flex items-center gap-4">
-          <Avatar className="w-20 h-20 border-2 border-border">
-            <AvatarImage src={user?.avatarUrl} alt={displayName || shortAddress} />
-            <AvatarFallback className="bg-primary/20 text-2xl">
-              {displayName?.slice(0, 2) || '🐸'}
-            </AvatarFallback>
-          </Avatar>
+        <div className="flex items-center gap-5">
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            transition={{ type: "spring", stiffness: 400 }}
+          >
+            <Avatar className="w-24 h-24 border-4 border-border/50 shadow-xl ring-4 ring-primary/10">
+              <AvatarImage
+                src={user?.avatarUrl}
+                alt={displayName || shortAddress}
+              />
+              <AvatarFallback className="bg-gradient-to-br from-primary/20 to-purple-500/20 text-3xl">
+                {displayName?.slice(0, 2) || "🐸"}
+              </AvatarFallback>
+            </Avatar>
+          </motion.div>
 
           <div>
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-3xl font-bold">
               {displayName || shortAddress}
             </h1>
-            <div className="flex items-center gap-2 mt-1">
-              <button
+            <div className="flex items-center gap-3 mt-2">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={handleCopy}
-                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground bg-muted/50 px-3 py-1.5 rounded-lg transition-colors"
               >
                 {copied ? (
-                  <Check className="h-3 w-3 text-primary" />
+                  <Check className="h-3.5 w-3.5 text-green-500" />
                 ) : (
-                  <Copy className="h-3 w-3" />
+                  <Copy className="h-3.5 w-3.5" />
                 )}
                 {shortAddress}
-              </button>
+              </motion.button>
               {walletAddress && (
                 <a
                   href={getAddressUrl(walletAddress)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
                   View on Explorer
-                  <ExternalLink className="h-3 w-3" />
+                  <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               )}
             </div>
 
             {dynamicUser?.email && (
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
                 {dynamicUser.email}
               </p>
             )}
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-2">
-            <Edit2 className="h-4 w-4" />
-            Edit
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={logout}
-            className="text-destructive hover:text-destructive"
-          >
-            Logout
-          </Button>
+        <div className="flex gap-3">
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button variant="outline" size="sm" className="gap-2 rounded-xl">
+              <Edit2 className="h-4 w-4" />
+              Edit
+            </Button>
+          </motion.div>
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={logout}
+              className="text-destructive hover:text-destructive rounded-xl"
+            >
+              Logout
+            </Button>
+          </motion.div>
         </div>
       </motion.div>
 
@@ -163,44 +182,54 @@ export default function ProfilePage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="flex items-center gap-8 mb-8"
+        transition={{ delay: 0.1, type: "spring", stiffness: 300, damping: 25 }}
+        className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
       >
-        <div className="text-center">
-          <p className="text-2xl font-bold tabular-nums">{user?.followersCount ?? 0}</p>
-          <p className="text-sm text-muted-foreground">Followers</p>
-        </div>
-        <div className="text-center">
-          <p className="text-2xl font-bold tabular-nums">{user?.followingCount ?? 0}</p>
-          <p className="text-sm text-muted-foreground">Following</p>
-        </div>
-        <div className="text-center">
-          <p className="text-2xl font-bold tabular-nums">{user?.tokensCreated ?? 0}</p>
-          <p className="text-sm text-muted-foreground">Coins Created</p>
-        </div>
-        <div className="text-center">
-          <p className="text-2xl font-bold tabular-nums">{user?.tradesCount ?? 0}</p>
-          <p className="text-sm text-muted-foreground">Total Trades</p>
-        </div>
+        {[
+          { label: "Followers", value: user?.followersCount ?? 0 },
+          { label: "Following", value: user?.followingCount ?? 0 },
+          { label: "Coins Created", value: user?.tokensCreated ?? 0 },
+          { label: "Total Trades", value: user?.tradesCount ?? 0 },
+        ].map((stat, i) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 + i * 0.05 }}
+            className="bg-card/60 backdrop-blur-sm border border-border/50 rounded-2xl p-5 text-center hover:border-primary/20 transition-colors"
+          >
+            <p className="text-3xl font-bold tabular-nums">{stat.value}</p>
+            <p className="text-sm text-muted-foreground mt-1">{stat.label}</p>
+          </motion.div>
+        ))}
       </motion.div>
 
       {/* Main Tabs */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
+        transition={{ delay: 0.2, type: "spring", stiffness: 300, damping: 25 }}
       >
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="bg-card border border-border mb-6">
-            <TabsTrigger value="portfolio" className="gap-2">
+          <TabsList className="bg-card/60 backdrop-blur-sm border border-border/50 rounded-xl mb-6 p-1">
+            <TabsTrigger
+              value="portfolio"
+              className="gap-2 rounded-lg data-[state=active]:shadow-sm"
+            >
               <PieChart className="h-4 w-4" />
               Portfolio
             </TabsTrigger>
-            <TabsTrigger value="creator" className="gap-2">
+            <TabsTrigger
+              value="creator"
+              className="gap-2 rounded-lg data-[state=active]:shadow-sm"
+            >
               <Rocket className="h-4 w-4" />
               Creator Dashboard
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="gap-2">
+            <TabsTrigger
+              value="notifications"
+              className="gap-2 rounded-lg data-[state=active]:shadow-sm"
+            >
               <Bell className="h-4 w-4" />
               Notifications
             </TabsTrigger>
@@ -215,13 +244,23 @@ export default function ProfilePage() {
           </TabsContent>
 
           <TabsContent value="notifications">
-            <div className="bg-card border border-border rounded-xl p-12 text-center">
-              <Bell className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-xl font-semibold mb-2">No Notifications</h3>
-              <p className="text-muted-foreground">
-                You'll receive notifications for trades, graduations, and more.
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-card/60 backdrop-blur-sm border border-border/50 rounded-2xl p-16 text-center"
+            >
+              <motion.div
+                animate={{ y: [0, -5, 0] }}
+                transition={{ repeat: Infinity, duration: 3 }}
+              >
+                <Bell className="h-20 w-20 mx-auto mb-6 text-muted-foreground/30" />
+              </motion.div>
+              <h3 className="text-2xl font-bold mb-3">No Notifications</h3>
+              <p className="text-muted-foreground max-w-sm mx-auto">
+                You'll receive notifications for trades, token graduations, and
+                more.
               </p>
-            </div>
+            </motion.div>
           </TabsContent>
         </Tabs>
       </motion.div>
