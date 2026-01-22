@@ -274,7 +274,7 @@ export function TokenCreationForm() {
         });
 
         // Store metadata in backend with contract addresses
-        let backendTokenId = result.tokenAddress; // fallback to contract address
+        let backendTokenId: string = result.tokenAddress; // fallback to contract address
         try {
           const apiResult = await createTokenApi.mutateAsync({
             name,
@@ -312,8 +312,10 @@ export function TokenCreationForm() {
         if (backendTokenId) {
           router.push(`/token/${backendTokenId}`);
         } else {
-          toast.warning("Token created but couldn't get ID. Check the homepage.");
-          router.push('/');
+          toast.warning(
+            "Token created but couldn't get ID. Check the homepage.",
+          );
+          router.push("/");
         }
       }
     } catch (error) {
