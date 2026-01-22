@@ -290,9 +290,12 @@ export function TokenCreationForm() {
             contractAddress: result.tokenAddress,
             bondingCurveAddress: result.bondingCurveAddress,
           });
-          // Use the backend token ID for navigation
+          // Use the backend token ID for navigation (API returns token object)
           if (apiResult?.id) {
             backendTokenId = apiResult.id;
+          } else if ((apiResult as any)?.token?.id) {
+            // Handle wrapped response { token, bondingCurve }
+            backendTokenId = (apiResult as any).token.id;
           }
         } catch (apiError) {
           console.warn("Failed to store token metadata:", apiError);
