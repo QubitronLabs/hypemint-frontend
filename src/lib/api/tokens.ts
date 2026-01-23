@@ -247,3 +247,89 @@ export async function getMyTokens(): Promise<Token[]> {
     return [];
   }
 }
+
+// Sync token with blockchain
+export async function syncTokenWithBlockchain(tokenId: string): Promise<{
+  synced: boolean;
+  message?: string;
+  bondingCurveState?: {
+    reserveBalance: string;
+    currentSupply: string;
+    currentPrice: string;
+    graduated: boolean;
+    graduationThreshold: string;
+  };
+  holdersCount?: number;
+  marketCap?: string;
+}> {
+  try {
+    const { data } = await apiClient.post<
+      ApiResponse<{
+        synced: boolean;
+        message?: string;
+        bondingCurveState?: any;
+        holdersCount?: number;
+        marketCap?: string;
+      }>
+    >(`/api/v1/tokens/${tokenId}/sync`);
+    return data.data;
+  } catch (error) {
+    console.error("Failed to sync token:", error);
+    return { synced: false, message: "Failed to sync with blockchain" };
+  }
+}
+
+// Get on-chain token balance for a wallet
+export async function getWalletTokenBalance(
+  tokenId: string,
+  walletAddress: string,
+): Promise<{
+  balance: string;
+  balanceFormatted: number;
+  message?: string;
+}> {
+  try {
+    const { data } = await apiClient.get<
+      ApiResponse<{
+        balance: string;
+        balanceFormatted: number;
+        message?: string;
+      }>
+    >(`/api/v1/tokens/${tokenId}/balance`, {
+      params: { walletAddress },
+    });
+    return data.data;
+  } catch (error) {
+    console.error("Failed to get wallet balance:", error);
+    return { balance: "0", balanceFormatted: 0 };
+  }
+}
+
+// Token holder type
+export interface TokenHolder {
+  address: string;
+  balance: string;
+  balanceFormatted: number;
+  percentage: number;
+}
+
+// Get token holders from blockchain
+export async function getTokenHolders(tokenId: string): Promise<{
+  holders: TokenHolder[];
+  totalHolders: number;
+  message?: string;
+}> {
+  try {
+    const { data } = await apiClient.get<
+      ApiResponse<{
+        holders: TokenHolder[];
+        totalHolders: number;
+        message?: string;
+      }>
+    >(`/api/v1/tokens/${tokenId}/holders`);
+    return data.data;
+  } catch (error) {
+    console.error("Failed to get token holders:", error);
+    return { holders: [], totalHolders: 0 };
+  }
+}

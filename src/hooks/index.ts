@@ -7,6 +7,7 @@ export * from "./useWatchlist";
 export * from "./useAlerts";
 export * from "./useOrders";
 export * from "./useLeaderboard";
+export * from "./useBlockchainSync";
 export {
   useNativeBalance,
   useCreationFee,

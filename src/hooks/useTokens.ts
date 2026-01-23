@@ -8,6 +8,9 @@ import {
   getToken,
   createToken,
   getMyTokens,
+  syncTokenWithBlockchain,
+  getWalletTokenBalance,
+  getTokenHolders,
 } from "@/lib/api/tokens";
 import type { TokenListParams, CreateTokenInput } from "@/types";
 
@@ -23,6 +26,9 @@ export const tokenKeys = {
   details: () => [...tokenKeys.all, "detail"] as const,
   detail: (id: string) => [...tokenKeys.details(), id] as const,
   myTokens: () => [...tokenKeys.all, "my-tokens"] as const,
+  balance: (tokenId: string, walletAddress: string) =>
+    [...tokenKeys.all, "balance", tokenId, walletAddress] as const,
+  holders: (tokenId: string) => [...tokenKeys.all, "holders", tokenId] as const,
 };
 
 // Hook to fetch paginated token list
@@ -84,5 +90,44 @@ export function useMyTokens() {
     queryKey: tokenKeys.myTokens(),
     queryFn: () => getMyTokens(),
     staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+// Hook to sync token with blockchain
+export function useSyncToken() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (tokenId: string) => syncTokenWithBlockchain(tokenId),
+    onSuccess: (data, tokenId) => {
+      if (data.synced) {
+        // Invalidate token detail to refresh with new data
+        queryClient.invalidateQueries({ queryKey: tokenKeys.detail(tokenId) });
+      }
+    },
+  });
+}
+
+// Hook to fetch on-chain token balance for a wallet
+export function useWalletTokenBalance(
+  tokenId: string | undefined,
+  walletAddress: string | undefined,
+) {
+  return useQuery({
+    queryKey: tokenKeys.balance(tokenId || "", walletAddress || ""),
+    queryFn: () => getWalletTokenBalance(tokenId!, walletAddress!),
+    enabled: !!tokenId && !!walletAddress,
+    staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+// Hook to fetch token holders from blockchain
+export function useTokenHolders(tokenId: string | undefined) {
+  return useQuery({
+    queryKey: tokenKeys.holders(tokenId || ""),
+    queryFn: () => getTokenHolders(tokenId!),
+    enabled: !!tokenId,
+    staleTime: 60 * 1000, // 1 minute - holders don't change that frequently
+    refetchOnWindowFocus: false,
   });
 }

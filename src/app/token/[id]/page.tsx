@@ -26,6 +26,8 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -39,9 +41,10 @@ import {
   OnChainTradingPanel,
 } from "@/components/trade";
 import { BondingCurveProgress, TokenChat } from "@/components/token";
-import { useToken, tokenKeys } from "@/hooks/useTokens";
+import { useToken, tokenKeys, useTokenHolders } from "@/hooks/useTokens";
 import { useTokenTrades, tradeKeys } from "@/hooks/useTrades";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { useManualSync } from "@/hooks/useBlockchainSync";
 import {
   cn,
   formatMarketCap,
@@ -50,7 +53,7 @@ import {
   fromWei,
 } from "@/lib/utils";
 import type { Address } from "viem";
-import type { Token, TokenHolder } from "@/types";
+import type { Token } from "@/types";
 
 interface TokenDetailPageProps {
   params: Promise<{ id: string }>;
@@ -64,7 +67,12 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 
   const { data: token, isLoading, error } = useToken(id);
   const { data: trades } = useTokenTrades(id);
+  const { data: holdersData, isLoading: holdersLoading } = useTokenHolders(id);
+  const { sync: syncWithBlockchain, isSyncing } = useManualSync(id);
   const queryClient = useQueryClient();
+
+  // Get holders from blockchain data
+  const holders = holdersData?.holders || [];
 
   // Real-time updates via WebSocket
   const handleWebSocketMessage = useCallback(
@@ -117,9 +125,6 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
       };
     }
   }, [isConnected, id, subscribe, unsubscribe]);
-
-  // Placeholder for holders until indexer is ready
-  const holders: TokenHolder[] = [];
 
   // Format contract address for display
   const formatAddress = (address: string) => {
@@ -269,6 +274,17 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
               </div>
 
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => syncWithBlockchain()}
+                  disabled={isSyncing}
+                  title="Sync with blockchain"
+                >
+                  <RefreshCw
+                    className={cn("h-4 w-4", isSyncing && "animate-spin")}
+                  />
+                </Button>
                 <Button variant="outline" size="icon" onClick={handleShare}>
                   <Share2 className="h-4 w-4" />
                 </Button>
@@ -479,7 +495,10 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
                 </TabsTrigger>
                 <TabsTrigger value="holders" className="flex-1 gap-1.5">
                   <Users className="h-3.5 w-3.5" />
-                  Holders
+                  Holders{" "}
+                  {holdersData?.totalHolders
+                    ? `(${holdersData.totalHolders})`
+                    : ""}
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="trades" className="mt-4">
@@ -490,11 +509,21 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
               </TabsContent>
               <TabsContent value="holders" className="mt-4">
                 <div className="bg-card border border-border rounded-xl p-6">
-                  {holders.length > 0 ? (
+                  {holdersLoading ? (
+                    <div className="text-center py-12">
+                      <Loader2 className="h-12 w-12 mx-auto text-primary animate-spin mb-4" />
+                      <p className="text-muted-foreground">
+                        Loading holders from blockchain...
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Scanning Transfer events
+                      </p>
+                    </div>
+                  ) : holders.length > 0 ? (
                     <div className="space-y-3">
                       {holders.map((holder, index) => (
                         <div
-                          key={index}
+                          key={holder.address}
                           className="flex items-center justify-between py-2 border-b border-border/50 last:border-0"
                         >
                           <div className="flex items-center gap-3">
@@ -520,9 +549,12 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
                                 {formatAddress(holder.address)}
                               </Link>
                               <p className="text-xs text-muted-foreground">
-                                {parseFloat(
-                                  holder.balance || "0",
-                                ).toLocaleString()}{" "}
+                                {holder.balanceFormatted.toLocaleString(
+                                  undefined,
+                                  {
+                                    maximumFractionDigits: 2,
+                                  },
+                                )}{" "}
                                 tokens
                               </p>
                             </div>
