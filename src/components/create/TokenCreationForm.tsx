@@ -12,20 +12,17 @@ import {
   MessageCircle,
   Loader2,
   AlertCircle,
-  Check,
-  ChevronRight,
-  ChevronLeft,
   Rocket,
-  Sparkles,
-  Image as ImageIcon,
-  Eye,
-  Coins,
-  Zap,
-  Shield,
-  ExternalLink,
   X,
   CheckCircle2,
   XCircle,
+  ExternalLink,
+  Zap,
+  TrendingUp,
+  Users,
+  Coins,
+  Clock,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,15 +38,153 @@ import { useCreateToken } from "@/hooks/useTokens";
 import { getTxUrl } from "@/lib/wagmi";
 import { toast } from "sonner";
 
+// Real-time Preview Card Component
+interface TokenPreviewProps {
+  name: string;
+  symbol: string;
+  description: string;
+  imagePreview: string | null;
+  hypeBoostEnabled: boolean;
+  websiteUrl: string;
+  twitterUrl: string;
+  telegramUrl: string;
+}
+
+function TokenPreviewCard({
+  name,
+  symbol,
+  description,
+  imagePreview,
+  hypeBoostEnabled,
+  websiteUrl,
+  twitterUrl,
+  telegramUrl,
+}: TokenPreviewProps) {
+  const hasSocialLinks = websiteUrl || twitterUrl || telegramUrl;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="sticky top-24 bg-card border border-border rounded-2xl overflow-hidden"
+    >
+      {/* Preview Header */}
+      <div className="bg-gradient-to-r from-primary/10 to-purple-500/10 px-4 py-3 border-b border-border">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium">Live Preview</span>
+        </div>
+      </div>
+
+      {/* Token Card Preview */}
+      <div className="p-4">
+        <div className="bg-background border border-border rounded-xl p-4 hover:border-primary/50 transition-all">
+          {/* Token Header */}
+          <div className="flex items-start gap-3 mb-3">
+            <div className="relative">
+              {imagePreview ? (
+                <img
+                  src={imagePreview}
+                  alt={name || "Token"}
+                  className="w-12 h-12 rounded-xl object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
+                  <Coins className="h-6 w-6 text-muted-foreground" />
+                </div>
+              )}
+              {hypeBoostEnabled && (
+                <div className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                  <Zap className="h-3 w-3 text-white" />
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold truncate">{name || "Token Name"}</h3>
+              <p className="text-sm text-muted-foreground font-mono">
+                ${symbol || "SYMBOL"}
+              </p>
+            </div>
+          </div>
+
+          {/* Description */}
+          <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+            {description || "Your token description will appear here..."}
+          </p>
+
+          {/* Simulated Stats */}
+          <div className="grid grid-cols-3 gap-2 text-center mb-3">
+            <div className="bg-muted/50 rounded-lg p-2">
+              <p className="text-xs text-muted-foreground">Price</p>
+              <p className="text-sm font-mono font-medium text-green-500">
+                $0.0001
+              </p>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-2">
+              <p className="text-xs text-muted-foreground">Market Cap</p>
+              <p className="text-sm font-mono font-medium">$100K</p>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-2">
+              <p className="text-xs text-muted-foreground">Holders</p>
+              <p className="text-sm font-mono font-medium">1</p>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="mb-3">
+            <div className="flex justify-between text-xs text-muted-foreground mb-1">
+              <span>Bonding Progress</span>
+              <span>0%</span>
+            </div>
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-primary to-purple-500 w-0 transition-all" />
+            </div>
+          </div>
+
+          {/* Social Links Preview */}
+          {hasSocialLinks && (
+            <div className="flex items-center gap-2 pt-2 border-t border-border">
+              {websiteUrl && (
+                <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center">
+                  <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                </div>
+              )}
+              {twitterUrl && (
+                <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center">
+                  <Twitter className="h-3.5 w-3.5 text-muted-foreground" />
+                </div>
+              )}
+              {telegramUrl && (
+                <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center">
+                  <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Additional Info */}
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            <span>Token will be live immediately after creation</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Users className="h-3.5 w-3.5" />
+            <span>Anyone can trade on the bonding curve</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <TrendingUp className="h-3.5 w-3.5" />
+            <span>Price increases with each purchase</span>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 // API base URL
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-
-// Step configuration - simplified to 3 steps
-const STEPS = [
-  { id: 1, title: "Token Info", description: "Name, symbol & image" },
-  { id: 2, title: "Details", description: "Description & links" },
-  { id: 3, title: "Launch", description: "Review & deploy" },
-];
 
 // Debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -88,9 +223,6 @@ export function TokenCreationForm() {
   // Backend API hook
   const createTokenApi = useCreateToken();
 
-  // Step state
-  const [currentStep, setCurrentStep] = useState(1);
-
   // Form state
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
@@ -102,7 +234,7 @@ export function TokenCreationForm() {
   const [twitterUrl, setTwitterUrl] = useState("");
   const [telegramUrl, setTelegramUrl] = useState("");
 
-  // HypeBoost
+  // HypeBoost toggle
   const [hypeBoostEnabled, setHypeBoostEnabled] = useState(true);
 
   // Upload state
@@ -150,14 +282,11 @@ export function TokenCreationForm() {
   }, [debouncedSymbol]);
 
   // Validation
-  const isStep1Valid =
+  const isFormValid =
     name.length >= 2 &&
     symbol.length >= 2 &&
     symbol.length <= 10 &&
     symbolAvailable !== false;
-  const isStep2Valid = true;
-  const isStep3Valid = true;
-  const isAllValid = isStep1Valid && isStep2Valid && isStep3Valid;
 
   // Check balance
   const fee = creationFee || BigInt("10000000000000000");
@@ -240,7 +369,7 @@ export function TokenCreationForm() {
 
   // Submit
   const handleSubmit = async () => {
-    if (!isAllValid || !isConnected) return;
+    if (!isFormValid || !isConnected) return;
 
     try {
       // Upload image if needed
@@ -273,8 +402,8 @@ export function TokenCreationForm() {
           },
         });
 
-        // Store metadata in backend with contract addresses
-        let backendTokenId: string = result.tokenAddress; // fallback to contract address
+        // Store metadata in backend
+        let backendTokenId: string = result.tokenAddress;
         try {
           const apiResult = await createTokenApi.mutateAsync({
             name,
@@ -286,35 +415,28 @@ export function TokenCreationForm() {
             telegramUrl: telegramUrl || undefined,
             totalSupply: "1000000000",
             initialPrice: "0.00001",
-            chainId: 80002, // Polygon Amoy testnet
+            chainId: 80002,
             contractAddress: result.tokenAddress,
             bondingCurveAddress: result.bondingCurveAddress,
           });
-          // Use the backend token ID for navigation (API returns token object)
+
           if (apiResult?.id) {
             backendTokenId = apiResult.id;
           } else if ((apiResult as any)?.token?.id) {
-            // Handle wrapped response { token, bondingCurve }
             backendTokenId = (apiResult as any).token.id;
           } else if ((apiResult as any)?.data?.id) {
-            // Handle { data: { id } } response format
             backendTokenId = (apiResult as any).data.id;
           } else if ((apiResult as any)?.data?.token?.id) {
-            // Handle { data: { token: { id } } } response format
             backendTokenId = (apiResult as any).data.token.id;
           }
         } catch (apiError) {
           console.warn("Failed to store token metadata:", apiError);
-          // If API fails, navigate to token by contract address
         }
 
-        // Only redirect if we have a valid token ID
         if (backendTokenId) {
           router.push(`/token/${backendTokenId}`);
         } else {
-          toast.warning(
-            "Token created but couldn't get ID. Check the homepage.",
-          );
+          toast.warning("Token created but couldn't get ID. Check homepage.");
           router.push("/");
         }
       }
@@ -324,26 +446,6 @@ export function TokenCreationForm() {
         id: "create-token",
         description: error instanceof Error ? error.message : "Unknown error",
       });
-    }
-  };
-
-  // Navigation
-  const nextStep = () => {
-    if (currentStep < 3) setCurrentStep(currentStep + 1);
-  };
-
-  const prevStep = () => {
-    if (currentStep > 1) setCurrentStep(currentStep - 1);
-  };
-
-  const canProceed = () => {
-    switch (currentStep) {
-      case 1:
-        return isStep1Valid;
-      case 2:
-        return isStep2Valid;
-      default:
-        return false;
     }
   };
 
@@ -364,7 +466,7 @@ export function TokenCreationForm() {
           <Rocket className="h-10 w-10 text-primary" />
         </div>
         <h1 className="text-2xl font-bold mb-2">Connect to Create</h1>
-        <p className="text-muted-foreground text-center max-w-md mb-6">
+        <p className="text-muted-foreground text-center max-w-md">
           Connect your wallet to launch your token on HypeMint
         </p>
       </div>
@@ -373,544 +475,365 @@ export function TokenCreationForm() {
 
   return (
     <div className="min-h-screen py-8 px-4">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
         >
-          <h1 className="text-3xl font-bold mb-2">
-            <span className="bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
-              Create Your Token
-            </span>
-          </h1>
+          <h1 className="text-3xl font-bold mb-2">Create Token</h1>
           <p className="text-muted-foreground">
             Launch on Polygon in under a minute
           </p>
         </motion.div>
 
-        {/* Progress Steps */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="mb-8"
-        >
-          <div className="flex items-center justify-center gap-2">
-            {STEPS.map((step, index) => {
-              const isActive = currentStep === step.id;
-              const isCompleted = currentStep > step.id;
-
-              return (
-                <div key={step.id} className="flex items-center">
-                  <button
-                    onClick={() => isCompleted && setCurrentStep(step.id)}
-                    disabled={!isCompleted}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2 rounded-full transition-all",
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : isCompleted
-                          ? "bg-green-500/20 text-green-500 cursor-pointer hover:bg-green-500/30"
-                          : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    <span className="w-6 h-6 rounded-full bg-current/20 flex items-center justify-center text-sm font-medium">
-                      {isCompleted ? (
-                        <Check className="h-3.5 w-3.5" />
-                      ) : (
-                        step.id
-                      )}
-                    </span>
-                    <span className="hidden sm:inline text-sm font-medium">
-                      {step.title}
-                    </span>
-                  </button>
-                  {index < STEPS.length - 1 && (
-                    <ChevronRight
-                      className={cn(
-                        "h-4 w-4 mx-1",
-                        currentStep > step.id
-                          ? "text-green-500"
-                          : "text-muted-foreground",
-                      )}
-                    />
-                  )}
+        {/* Two Column Layout */}
+        <div className="grid lg:grid-cols-5 gap-6">
+          {/* Left Column - Form */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="lg:col-span-3 bg-card border border-border rounded-2xl p-6 space-y-6"
+          >
+            {/* Token Basics */}
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Left Column */}
+              <div className="space-y-4">
+                {/* Name */}
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">
+                    Token Name <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    placeholder="e.g., Pepe Classic"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="h-11 bg-background"
+                    maxLength={50}
+                  />
                 </div>
-              );
-            })}
-          </div>
-        </motion.div>
 
-        {/* Form Content */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 md:p-8"
-        >
-          <AnimatePresence mode="wait">
-            {/* Step 1: Token Info */}
-            {currentStep === 1 && (
-              <motion.div
-                key="step1"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
-              >
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Left: Form Fields */}
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">
-                        Token Name *
-                      </label>
-                      <Input
-                        placeholder="e.g., Pepe Classic"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="h-12 text-lg bg-background/50"
-                        maxLength={50}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {name.length}/50 characters
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">
-                        Symbol *
-                      </label>
-                      <div className="relative">
-                        <Input
-                          placeholder="e.g., PEPE"
-                          value={symbol}
-                          onChange={(e) =>
-                            setSymbol(
-                              e.target.value
-                                .toUpperCase()
-                                .replace(/[^A-Z0-9]/g, ""),
-                            )
-                          }
-                          className={cn(
-                            "h-12 text-lg font-mono bg-background/50 pr-10",
-                            symbolAvailable === false &&
-                              "border-red-500 focus:border-red-500",
-                            symbolAvailable === true &&
-                              "border-green-500 focus:border-green-500",
-                          )}
-                          maxLength={10}
-                        />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                          {isCheckingSymbol ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                          ) : symbolAvailable === true ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-500" />
-                          ) : symbolAvailable === false ? (
-                            <XCircle className="h-4 w-4 text-red-500" />
-                          ) : null}
-                        </div>
-                      </div>
-                      {symbolError && (
-                        <p className="text-xs text-red-500 mt-1">
-                          {symbolError}
-                        </p>
-                      )}
-                      {symbolAvailable === true && (
-                        <p className="text-xs text-green-500 mt-1">
-                          Symbol is available!
-                        </p>
-                      )}
-                      {!symbolError && symbolAvailable === null && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          2-10 characters
-                        </p>
-                      )}
-                    </div>
-
-                    {/* HypeBoost Toggle */}
-                    <div
-                      onClick={() => setHypeBoostEnabled(!hypeBoostEnabled)}
-                      className={cn(
-                        "p-4 rounded-xl border-2 cursor-pointer transition-all",
-                        hypeBoostEnabled
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50",
-                      )}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={cn(
-                            "w-10 h-10 rounded-lg flex items-center justify-center",
-                            hypeBoostEnabled
-                              ? "bg-primary text-white"
-                              : "bg-muted",
-                          )}
-                        >
-                          <Shield className="h-5 w-5" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">HypeBoost</span>
-                            <span
-                              className={cn(
-                                "text-xs px-2 py-1 rounded-full",
-                                hypeBoostEnabled
-                                  ? "bg-primary text-white"
-                                  : "bg-muted text-muted-foreground",
-                              )}
-                            >
-                              {hypeBoostEnabled ? "ON" : "OFF"}
-                            </span>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Anti-bot protection & fair launch
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right: Image Upload */}
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Token Image
-                    </label>
-                    <div
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      onDrop={handleDrop}
-                      onClick={() =>
-                        !imagePreview && fileInputRef.current?.click()
+                {/* Symbol */}
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">
+                    Symbol <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Input
+                      placeholder="e.g., PEPE"
+                      value={symbol}
+                      onChange={(e) =>
+                        setSymbol(
+                          e.target.value
+                            .toUpperCase()
+                            .replace(/[^A-Z0-9]/g, ""),
+                        )
                       }
                       className={cn(
-                        "relative h-64 border-2 border-dashed rounded-xl transition-all flex flex-col items-center justify-center",
-                        isDragging
-                          ? "border-primary bg-primary/10"
-                          : imagePreview
-                            ? "border-green-500/50 cursor-default"
-                            : "border-border hover:border-primary/50 cursor-pointer",
+                        "h-11 font-mono bg-background pr-10",
+                        symbolAvailable === false && "border-red-500",
+                        symbolAvailable === true && "border-green-500",
                       )}
-                    >
-                      {imagePreview ? (
-                        <>
-                          <img
-                            src={imagePreview}
-                            alt="Token"
-                            className="absolute inset-0 w-full h-full object-cover rounded-xl"
-                          />
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeImage();
-                            }}
-                            className="absolute top-2 right-2 w-8 h-8 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-colors"
-                          >
-                            <X className="h-4 w-4 text-white" />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <Upload
-                            className={cn(
-                              "h-10 w-10 mb-3",
-                              isDragging
-                                ? "text-primary"
-                                : "text-muted-foreground",
-                            )}
-                          />
-                          <p className="text-sm font-medium">
-                            {isDragging
-                              ? "Drop image here"
-                              : "Click or drag to upload"}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            PNG, JPG, GIF up to 5MB
-                          </p>
-                        </>
-                      )}
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
+                      maxLength={10}
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      {isCheckingSymbol ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      ) : symbolAvailable === true ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      ) : symbolAvailable === false ? (
+                        <XCircle className="h-4 w-4 text-red-500" />
+                      ) : null}
                     </div>
                   </div>
+                  {symbolError && (
+                    <p className="text-xs text-red-500 mt-1">{symbolError}</p>
+                  )}
                 </div>
-              </motion.div>
-            )}
 
-            {/* Step 2: Details */}
-            {currentStep === 2 && (
-              <motion.div
-                key="step2"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
-              >
+                {/* Description */}
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
+                  <label className="text-sm font-medium mb-1.5 block">
                     Description
                   </label>
                   <Textarea
                     placeholder="Tell the world about your token..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="min-h-[120px] bg-background/50 resize-none"
+                    className="min-h-[80px] bg-background resize-none"
                     maxLength={500}
                   />
-                  <p className="text-xs text-muted-foreground mt-1 text-right">
-                    {description.length}/500
-                  </p>
                 </div>
+              </div>
 
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="relative">
-                    <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Website URL"
-                      value={websiteUrl}
-                      onChange={(e) => setWebsiteUrl(e.target.value)}
-                      className="pl-10 h-11 bg-background/50"
-                    />
-                  </div>
-                  <div className="relative">
-                    <Twitter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Twitter URL"
-                      value={twitterUrl}
-                      onChange={(e) => setTwitterUrl(e.target.value)}
-                      className="pl-10 h-11 bg-background/50"
-                    />
-                  </div>
-                  <div className="relative sm:col-span-2">
-                    <MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Telegram URL"
-                      value={telegramUrl}
-                      onChange={(e) => setTelegramUrl(e.target.value)}
-                      className="pl-10 h-11 bg-background/50"
-                    />
-                  </div>
-                </div>
-
-                <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">Tip</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Tokens with complete profiles get 3x more visibility. Add
-                    social links to build trust!
-                  </p>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Step 3: Launch */}
-            {currentStep === 3 && (
-              <motion.div
-                key="step3"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
-              >
-                {/* Preview Card */}
-                <div className="bg-background/50 rounded-xl p-5 border border-border/50">
-                  <div className="flex items-start gap-4">
-                    <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center overflow-hidden flex-shrink-0">
-                      {imagePreview ? (
-                        <img
-                          src={imagePreview}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-xl font-bold text-muted-foreground">
-                          {symbol.slice(0, 2) || "??"}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold">
-                        {name || "Token Name"}
-                      </h3>
-                      <p className="text-muted-foreground">
-                        ${symbol || "SYMBOL"}
-                      </p>
-                      {description && (
-                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                          {description}
-                        </p>
-                      )}
-                    </div>
-                    {hypeBoostEnabled && (
-                      <div className="flex items-center gap-1 text-xs text-primary bg-primary/10 px-2 py-1 rounded-full">
-                        <Zap className="h-3 w-3" />
-                        <span>Boosted</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Token Details */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-background/30 rounded-lg p-3">
-                    <p className="text-xs text-muted-foreground">
-                      Total Supply
-                    </p>
-                    <p className="font-mono font-medium">1,000,000,000</p>
-                  </div>
-                  <div className="bg-background/30 rounded-lg p-3">
-                    <p className="text-xs text-muted-foreground">
-                      Bonding Curve
-                    </p>
-                    <p className="font-medium">Linear</p>
-                  </div>
-                  <div className="bg-background/30 rounded-lg p-3">
-                    <p className="text-xs text-muted-foreground">
-                      Creation Fee
-                    </p>
-                    <p className="font-mono font-medium">
-                      {formatEther(fee)} POL
-                    </p>
-                  </div>
-                  <div className="bg-background/30 rounded-lg p-3">
-                    <p className="text-xs text-muted-foreground">
-                      Your Balance
-                    </p>
-                    <p
-                      className={cn(
-                        "font-mono font-medium",
-                        hasEnoughBalance ? "text-green-500" : "text-red-500",
-                      )}
-                    >
-                      {balance?.value
-                        ? parseFloat(formatEther(balance.value)).toFixed(4)
-                        : "0"}{" "}
-                      POL
-                    </p>
-                  </div>
-                </div>
-
-                {/* Warnings */}
-                {!hasEnoughBalance && (
-                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-                    <div className="flex items-center gap-2 text-red-500">
-                      <AlertCircle className="h-4 w-4" />
-                      <span className="text-sm font-medium">
-                        Insufficient balance
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      You need at least {formatEther(fee)} POL to create a
-                      token.
-                    </p>
-                  </div>
-                )}
-
-                {contractError && (
-                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-                    <div className="flex items-center gap-2 text-red-500">
-                      <AlertCircle className="h-4 w-4" />
-                      <span className="text-sm font-medium">Error</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {contractError.message}
-                    </p>
-                  </div>
-                )}
-
-                {txHash && (
-                  <div className="p-4 bg-primary/10 border border-primary/20 rounded-xl">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">
-                          Transaction Submitted
-                        </p>
-                        <p className="text-xs text-muted-foreground font-mono mt-1">
-                          {txHash.slice(0, 20)}...{txHash.slice(-8)}
-                        </p>
-                      </div>
-                      <a
-                        href={getTxUrl(txHash)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline flex items-center gap-1 text-sm"
+              {/* Right Column - Image Upload */}
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">
+                  Token Image
+                </label>
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => !imagePreview && fileInputRef.current?.click()}
+                  className={cn(
+                    "relative h-48 border-2 border-dashed rounded-xl transition-all flex flex-col items-center justify-center",
+                    isDragging
+                      ? "border-primary bg-primary/10"
+                      : imagePreview
+                        ? "border-green-500/50 cursor-default"
+                        : "border-border hover:border-primary/50 cursor-pointer",
+                  )}
+                >
+                  {imagePreview ? (
+                    <>
+                      <img
+                        src={imagePreview}
+                        alt="Token"
+                        className="absolute inset-0 w-full h-full object-cover rounded-xl"
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeImage();
+                        }}
+                        className="absolute top-2 right-2 w-8 h-8 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center"
                       >
-                        View <ExternalLink className="h-3 w-3" />
-                      </a>
-                    </div>
+                        <X className="h-4 w-4 text-white" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Upload
+                        className={cn(
+                          "h-8 w-8 mb-2",
+                          isDragging ? "text-primary" : "text-muted-foreground",
+                        )}
+                      />
+                      <p className="text-sm font-medium">
+                        {isDragging
+                          ? "Drop image here"
+                          : "Click or drag to upload"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        PNG, JPG, GIF up to 5MB
+                      </p>
+                    </>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </div>
+
+                {/* HypeBoost Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setHypeBoostEnabled(!hypeBoostEnabled)}
+                  className={cn(
+                    "w-full mt-4 p-3 rounded-xl border-2 transition-all flex items-center gap-3",
+                    hypeBoostEnabled
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/50",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center",
+                      hypeBoostEnabled ? "bg-primary text-white" : "bg-muted",
+                    )}
+                  >
+                    <Zap className="h-4 w-4" />
                   </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                  <div className="flex-1 text-left">
+                    <span className="font-medium text-sm">HypeBoost</span>
+                    <p className="text-xs text-muted-foreground">
+                      Anti-bot protection
+                    </p>
+                  </div>
+                  <span
+                    className={cn(
+                      "text-xs px-2 py-1 rounded-full font-medium",
+                      hypeBoostEnabled
+                        ? "bg-primary text-white"
+                        : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {hypeBoostEnabled ? "ON" : "OFF"}
+                  </span>
+                </button>
+              </div>
+            </div>
 
-          {/* Navigation */}
-          <div className="flex justify-between mt-8 pt-6 border-t border-border/30">
+            {/* Social Links */}
+            <div>
+              <label className="text-sm font-medium mb-3 block">
+                Social Links{" "}
+                <span className="text-muted-foreground text-xs">
+                  (optional)
+                </span>
+              </label>
+              <div className="grid sm:grid-cols-3 gap-3">
+                <div className="relative">
+                  <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Website"
+                    value={websiteUrl}
+                    onChange={(e) => setWebsiteUrl(e.target.value)}
+                    className="pl-9 h-10 bg-background text-sm"
+                  />
+                </div>
+                <div className="relative">
+                  <Twitter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Twitter"
+                    value={twitterUrl}
+                    onChange={(e) => setTwitterUrl(e.target.value)}
+                    className="pl-9 h-10 bg-background text-sm"
+                  />
+                </div>
+                <div className="relative">
+                  <MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Telegram"
+                    value={telegramUrl}
+                    onChange={(e) => setTelegramUrl(e.target.value)}
+                    className="pl-9 h-10 bg-background text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Launch Info */}
+            <div className="bg-muted/50 rounded-xl p-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Total Supply</p>
+                  <p className="font-mono font-medium">1,000,000,000</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Bonding Curve</p>
+                  <p className="font-medium">Linear</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Creation Fee</p>
+                  <p className="font-mono font-medium">
+                    {formatEther(fee)} POL
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Your Balance</p>
+                  <p
+                    className={cn(
+                      "font-mono font-medium",
+                      hasEnoughBalance ? "text-green-500" : "text-red-500",
+                    )}
+                  >
+                    {balance?.value
+                      ? parseFloat(formatEther(balance.value)).toFixed(4)
+                      : "0"}{" "}
+                    POL
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Errors */}
+            {!hasEnoughBalance && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-500">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <span className="text-sm">
+                  Insufficient balance. Need at least {formatEther(fee)} POL.
+                </span>
+              </div>
+            )}
+
+            {contractError && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-500">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <span className="text-sm">{contractError.message}</span>
+              </div>
+            )}
+
+            {txHash && (
+              <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Transaction Submitted</p>
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {txHash.slice(0, 20)}...{txHash.slice(-8)}
+                  </p>
+                </div>
+                <a
+                  href={getTxUrl(txHash)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline flex items-center gap-1 text-sm"
+                >
+                  View <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            )}
+
+            {/* Submit Button */}
             <Button
-              variant="outline"
-              onClick={prevStep}
-              disabled={currentStep === 1}
-              className="gap-2"
+              onClick={handleSubmit}
+              disabled={
+                !isFormValid ||
+                !hasEnoughBalance ||
+                isCreating ||
+                isConfirming ||
+                isUploading
+              }
+              className="w-full h-12 text-base font-semibold gap-2 bg-gradient-to-r from-primary to-purple-600 hover:opacity-90"
             >
-              <ChevronLeft className="h-4 w-4" />
-              Back
+              {isUploading ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Uploading Image...
+                </>
+              ) : isCreating ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Confirm in Wallet
+                </>
+              ) : isConfirming ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Confirming Transaction...
+                </>
+              ) : (
+                <>
+                  <Rocket className="h-5 w-5" />
+                  Launch Token
+                </>
+              )}
             </Button>
+          </motion.div>
 
-            {currentStep < 3 ? (
-              <Button
-                onClick={nextStep}
-                disabled={!canProceed()}
-                className="gap-2 bg-gradient-to-r from-primary to-purple-600 hover:opacity-90"
-              >
-                Continue
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                onClick={handleSubmit}
-                disabled={
-                  !isAllValid ||
-                  !hasEnoughBalance ||
-                  isCreating ||
-                  isConfirming ||
-                  isUploading
-                }
-                className="gap-2 bg-gradient-to-r from-green-500 to-emerald-500 hover:opacity-90 min-w-[160px]"
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Uploading...
-                  </>
-                ) : isCreating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Confirm in Wallet
-                  </>
-                ) : isConfirming ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Confirming...
-                  </>
-                ) : (
-                  <>
-                    <Rocket className="h-4 w-4" />
-                    Launch Token
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-        </motion.div>
+          {/* Right Column - Preview Card */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+            className="lg:col-span-2 hidden lg:block"
+          >
+            <TokenPreviewCard
+              name={name}
+              symbol={symbol}
+              description={description}
+              imagePreview={imagePreview}
+              hypeBoostEnabled={hypeBoostEnabled}
+              websiteUrl={websiteUrl}
+              twitterUrl={twitterUrl}
+              telegramUrl={telegramUrl}
+            />
+          </motion.div>
+        </div>
       </div>
     </div>
   );

@@ -159,18 +159,18 @@ export default function ProfilePage() {
         </div>
 
         <div className="flex gap-3">
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          {/* <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Button variant="outline" size="sm" className="gap-2 rounded-xl">
               <Edit2 className="h-4 w-4" />
               Edit
             </Button>
-          </motion.div>
+          </motion.div> */}
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Button
               variant="ghost"
               size="sm"
               onClick={logout}
-              className="text-destructive hover:text-destructive rounded-xl"
+              className="text-destructive hover:text-destructive cursor-pointer bg-destructive/10 rounded-xl"
             >
               Logout
             </Button>

@@ -2,10 +2,10 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, Users, Activity } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, fromWei, formatNumber } from "@/lib/utils";
+import { TokenImage } from "@/components/ui/token-image";
 import type { Token } from "@/types";
 
 interface TokenCardProps {
@@ -22,12 +22,10 @@ export function TokenCard({ token, className }: TokenCardProps) {
   const priceChangePositive = priceChange >= 0;
 
   const formattedMarketCap = useMemo(() => {
-    const mcap = parseFloat(token.marketCap || "0") || 0;
+    // Convert from Wei if needed, then format
+    const mcap = fromWei(token.marketCap);
     if (isNaN(mcap) || mcap === 0) return "$0";
-    if (mcap >= 1e9) return `$${(mcap / 1e9).toFixed(2)}B`;
-    if (mcap >= 1e6) return `$${(mcap / 1e6).toFixed(2)}M`;
-    if (mcap >= 1e3) return `$${(mcap / 1e3).toFixed(1)}K`;
-    return `$${mcap.toFixed(0)}`;
+    return `$${formatNumber(mcap)}`;
   }, [token.marketCap]);
 
   const formattedPriceChange = useMemo(() => {
@@ -59,19 +57,13 @@ export function TokenCard({ token, className }: TokenCardProps) {
       >
         {/* Header */}
         <div className="flex items-start gap-3">
-          <div className="w-12 h-12 rounded-xl overflow-hidden bg-muted/50 flex-shrink-0 ring-1 ring-border/50">
-            {token.imageUrl ? (
-              <img
-                src={token.imageUrl.replace("0.0.0.0", "localhost")}
-                alt={token.name}
-                className="object-cover w-full h-full"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-lg font-bold text-muted-foreground bg-gradient-to-br from-primary/10 to-primary/5">
-                {token.symbol.slice(0, 2)}
-              </div>
-            )}
-          </div>
+          <TokenImage
+            src={token.imageUrl}
+            alt={token.name}
+            symbol={token.symbol}
+            size={48}
+            className="ring-1 ring-border/50 flex-shrink-0"
+          />
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">

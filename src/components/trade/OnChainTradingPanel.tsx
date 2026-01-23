@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
 /**
  * On-Chain Trading Panel Component
  * Real blockchain trading interface using Wagmi/Viem
  */
 
-import { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useAccount } from 'wagmi';
-import { formatEther, parseEther, type Address } from 'viem';
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useAccount } from "wagmi";
+import { formatEther, parseEther, type Address } from "viem";
 import {
   ArrowUpCircle,
   ArrowDownCircle,
@@ -20,10 +20,10 @@ import {
   CheckCircle2,
   ExternalLink,
   Zap,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import {
   useBuyTokens,
   useSellTokens,
@@ -33,9 +33,10 @@ import {
   useNativeBalance,
   useApproveToken,
   useTokenAllowance,
-} from '@/hooks';
-import { getTxUrl } from '@/lib/wagmi';
-import { toast } from 'sonner';
+} from "@/hooks";
+import { getTxUrl } from "@/lib/wagmi";
+import { recordOnChainTrade } from "@/lib/api/trades";
+import { toast } from "sonner";
 
 interface OnChainTradingPanelProps {
   tokenAddress: Address;
@@ -46,16 +47,16 @@ interface OnChainTradingPanelProps {
   className?: string;
 }
 
-type TradeType = 'buy' | 'sell';
+type TradeType = "buy" | "sell";
 
 // Format number with commas
 function formatNumber(num: number | string): string {
-  const n = typeof num === 'string' ? parseFloat(num) : num;
-  if (isNaN(n)) return '0';
-  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
-  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
-  if (n >= 1e3) return (n / 1e3).toFixed(2) + 'K';
-  if (n < 0.0001 && n > 0) return '<0.0001';
+  const n = typeof num === "string" ? parseFloat(num) : num;
+  if (isNaN(n)) return "0";
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
+  if (n < 0.0001 && n > 0) return "<0.0001";
   return n.toFixed(4);
 }
 
@@ -68,8 +69,8 @@ export function OnChainTradingPanel({
   className,
 }: OnChainTradingPanelProps) {
   const { address, isConnected } = useAccount();
-  const [tradeType, setTradeType] = useState<TradeType>('buy');
-  const [amount, setAmount] = useState('');
+  const [tradeType, setTradeType] = useState<TradeType>("buy");
+  const [amount, setAmount] = useState("");
   const [slippage, setSlippage] = useState(5); // 5% default
 
   // Balances
@@ -79,15 +80,18 @@ export function OnChainTradingPanel({
   // Quotes
   const { data: buyQuote, isLoading: isBuyQuoteLoading } = useBuyQuote(
     bondingCurveAddress,
-    tradeType === 'buy' ? amount : ''
+    tradeType === "buy" ? amount : "",
   );
   const { data: sellQuote, isLoading: isSellQuoteLoading } = useSellQuote(
     bondingCurveAddress,
-    tradeType === 'sell' ? amount : ''
+    tradeType === "sell" ? amount : "",
   );
 
   // Allowance check for selling
-  const { data: allowance } = useTokenAllowance(tokenAddress, bondingCurveAddress);
+  const { data: allowance } = useTokenAllowance(
+    tokenAddress,
+    bondingCurveAddress,
+  );
 
   // Trade hooks
   const {
@@ -121,13 +125,14 @@ export function OnChainTradingPanel({
 
   // Computed values
   const isLoading = isBuying || isSelling || isApproving;
-  const isConfirming = isBuyConfirming || isSellConfirming || isApproveConfirming;
+  const isConfirming =
+    isBuyConfirming || isSellConfirming || isApproveConfirming;
   const txHash = buyTxHash || sellTxHash;
   const error = buyError || sellError || approveError;
 
   // Check if needs approval for sell
   const needsApproval = useMemo(() => {
-    if (tradeType !== 'sell' || !amount) return false;
+    if (tradeType !== "sell" || !amount) return false;
     try {
       const amountWei = parseEther(amount);
       return allowance !== undefined && allowance < amountWei;
@@ -141,8 +146,12 @@ export function OnChainTradingPanel({
     const parsedAmount = parseFloat(amount) || 0;
     const price = parseFloat(currentPrice) || 0.00001;
 
-    if (tradeType === 'buy' && buyQuote) {
-      const [tokenAmount, protocolFee, creatorFee] = buyQuote as [bigint, bigint, bigint];
+    if (tradeType === "buy" && buyQuote) {
+      const [tokenAmount, protocolFee, creatorFee] = buyQuote as [
+        bigint,
+        bigint,
+        bigint,
+      ];
       const tokensOut = parseFloat(formatEther(tokenAmount));
       const totalFees = parseFloat(formatEther(protocolFee + creatorFee));
       const effectivePrice = parsedAmount / tokensOut;
@@ -157,8 +166,12 @@ export function OnChainTradingPanel({
       };
     }
 
-    if (tradeType === 'sell' && sellQuote) {
-      const [maticAmount, protocolFee, creatorFee] = sellQuote as [bigint, bigint, bigint];
+    if (tradeType === "sell" && sellQuote) {
+      const [maticAmount, protocolFee, creatorFee] = sellQuote as [
+        bigint,
+        bigint,
+        bigint,
+      ];
       const maticOut = parseFloat(formatEther(maticAmount));
       const totalFees = parseFloat(formatEther(protocolFee + creatorFee));
       const effectivePrice = maticOut / parsedAmount;
@@ -182,18 +195,68 @@ export function OnChainTradingPanel({
     };
   }, [amount, tradeType, currentPrice, buyQuote, sellQuote]);
 
+  // Track pending trade details for sync
+  const pendingTradeRef = useRef<{
+    type: TradeType;
+    maticAmount: string;
+    tokenAmount: string;
+  } | null>(null);
+
+  // Sync confirmed trades to backend
+  const syncTradeToBackend = useCallback(
+    async (hash: string) => {
+      if (!pendingTradeRef.current) return;
+
+      const { type, maticAmount, tokenAmount } = pendingTradeRef.current;
+
+      try {
+        await recordOnChainTrade({
+          tokenId: tokenAddress,
+          bondingCurveAddress,
+          type,
+          maticAmount: parseEther(maticAmount).toString(),
+          tokenAmount: parseEther(tokenAmount).toString(),
+          txHash: hash,
+        });
+        console.log("[OnChainTrading] Trade synced to backend:", hash);
+      } catch (err) {
+        console.error("[OnChainTrading] Failed to sync trade to backend:", err);
+        // Don't show error to user - on-chain trade succeeded, backend sync is secondary
+      } finally {
+        pendingTradeRef.current = null;
+      }
+    },
+    [tokenAddress, bondingCurveAddress],
+  );
+
+  // Sync buy trade when confirmed
+  useEffect(() => {
+    if (isBuyConfirmed && buyTxHash) {
+      syncTradeToBackend(buyTxHash);
+    }
+  }, [isBuyConfirmed, buyTxHash, syncTradeToBackend]);
+
+  // Sync sell trade when confirmed
+  useEffect(() => {
+    if (isSellConfirmed && sellTxHash) {
+      syncTradeToBackend(sellTxHash);
+    }
+  }, [isSellConfirmed, sellTxHash, syncTradeToBackend]);
+
   // Handle approve
   const handleApprove = async () => {
     if (!amount) return;
     try {
       const amountWei = parseEther(amount);
       // Approve max uint256 for convenience
-      const maxApproval = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+      const maxApproval = BigInt(
+        "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      );
       await approve(tokenAddress, bondingCurveAddress, maxApproval);
-      toast.success('Approval successful!');
+      toast.success("Approval successful!");
     } catch (err) {
-      console.error('Approve failed:', err);
-      toast.error('Approval failed');
+      console.error("Approve failed:", err);
+      toast.error("Approval failed");
     }
   };
 
@@ -205,31 +268,45 @@ export function OnChainTradingPanel({
     resetSell();
 
     try {
-      if (tradeType === 'buy') {
-        toast.info('Confirm transaction in wallet...', { id: 'trade' });
+      if (tradeType === "buy") {
+        // Store pending trade details for backend sync
+        pendingTradeRef.current = {
+          type: "buy",
+          maticAmount: amount,
+          tokenAmount: tradeMetrics.outputAmount.toString(),
+        };
+
+        toast.info("Confirm transaction in wallet...", { id: "trade" });
         const hash = await buy({
           bondingCurveAddress,
           maticAmount: amount,
           slippageBps: slippage * 100,
         });
         if (hash) {
-          toast.success('Buy order submitted!', {
-            id: 'trade',
+          toast.success("Buy order submitted!", {
+            id: "trade",
             description: `Tx: ${hash.slice(0, 10)}...`,
             action: {
-              label: 'View',
-              onClick: () => window.open(getTxUrl(hash), '_blank'),
+              label: "View",
+              onClick: () => window.open(getTxUrl(hash), "_blank"),
             },
           });
         }
       } else {
         // Check approval first
         if (needsApproval) {
-          toast.error('Please approve tokens first');
+          toast.error("Please approve tokens first");
           return;
         }
 
-        toast.info('Confirm transaction in wallet...', { id: 'trade' });
+        // Store pending trade details for backend sync
+        pendingTradeRef.current = {
+          type: "sell",
+          maticAmount: tradeMetrics.outputAmount.toString(),
+          tokenAmount: amount,
+        };
+
+        toast.info("Confirm transaction in wallet...", { id: "trade" });
         const hash = await sell({
           bondingCurveAddress,
           tokenAddress,
@@ -237,78 +314,81 @@ export function OnChainTradingPanel({
           slippageBps: slippage * 100,
         });
         if (hash) {
-          toast.success('Sell order submitted!', {
-            id: 'trade',
+          toast.success("Sell order submitted!", {
+            id: "trade",
             description: `Tx: ${hash.slice(0, 10)}...`,
             action: {
-              label: 'View',
-              onClick: () => window.open(getTxUrl(hash), '_blank'),
+              label: "View",
+              onClick: () => window.open(getTxUrl(hash), "_blank"),
             },
           });
         }
       }
     } catch (err) {
-      console.error('Trade failed:', err);
-      toast.error('Trade failed', { id: 'trade' });
+      console.error("Trade failed:", err);
+      toast.error("Trade failed", { id: "trade" });
     }
   };
 
   // Quick amount buttons
-  const quickAmounts = tradeType === 'buy'
-    ? ['0.1', '0.5', '1', '5'] // MATIC amounts
-    : ['25%', '50%', '75%', 'MAX']; // Percentage of balance
+  const quickAmounts =
+    tradeType === "buy"
+      ? ["0.1", "0.5", "1", "5"] // MATIC amounts
+      : ["25%", "50%", "75%", "MAX"]; // Percentage of balance
 
   const handleQuickAmount = (qa: string) => {
-    if (tradeType === 'buy') {
+    if (tradeType === "buy") {
       setAmount(qa);
     } else {
       // Calculate percentage of token balance
       if (!tokenBalance) return;
       const balance = parseFloat(formatEther(tokenBalance as bigint));
       let percentage = 1;
-      if (qa === '25%') percentage = 0.25;
-      else if (qa === '50%') percentage = 0.5;
-      else if (qa === '75%') percentage = 0.75;
-      else if (qa === 'MAX') percentage = 1;
+      if (qa === "25%") percentage = 0.25;
+      else if (qa === "50%") percentage = 0.5;
+      else if (qa === "75%") percentage = 0.75;
+      else if (qa === "MAX") percentage = 1;
       setAmount((balance * percentage).toFixed(6));
     }
   };
 
   // Reset on trade type change
   useEffect(() => {
-    setAmount('');
+    setAmount("");
     resetBuy();
     resetSell();
     resetApprove();
   }, [tradeType]);
 
   return (
-    <div className={cn(
-      "bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl overflow-hidden",
-      className
-    )}>
+    <div
+      className={cn(
+        "bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl overflow-hidden",
+        className,
+      )}
+    >
       {/* Trade Type Tabs */}
       <div className="p-4">
         <div className="flex bg-background/50 rounded-lg p-1 gap-1">
           <button
-            onClick={() => setTradeType('buy')}
+            onClick={() => setTradeType("buy")}
             className={cn(
               "flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md font-medium transition-all",
-              tradeType === 'buy'
+              tradeType === "buy"
                 ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/20"
-                : "text-muted-foreground hover:text-foreground"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             <ArrowUpCircle className="h-4 w-4" />
             Buy
           </button>
           <button
-            onClick={() => setTradeType('sell')}
+            onClick={() => setTradeType("sell")}
             className={cn(
               "flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md font-medium transition-all",
-              tradeType === 'sell'
+              tradeType === "sell"
                 ? "bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg shadow-red-500/20"
-                : "text-muted-foreground hover:text-foreground"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             <ArrowDownCircle className="h-4 w-4" />
@@ -322,13 +402,15 @@ export function OnChainTradingPanel({
         <div className="mb-3">
           <div className="flex justify-between items-center mb-1.5">
             <label className="text-xs text-muted-foreground">
-              {tradeType === 'buy' ? 'You Pay (MATIC)' : `You Sell (${tokenSymbol})`}
+              {tradeType === "buy"
+                ? "You Pay (MATIC)"
+                : `You Sell (${tokenSymbol})`}
             </label>
             <span className="text-xs text-muted-foreground">
-              Balance:{' '}
-              {tradeType === 'buy'
-                ? `${nativeBalance?.value ? formatNumber(formatEther(nativeBalance.value)) : '0'} MATIC`
-                : `${tokenBalance ? formatNumber(formatEther(tokenBalance as bigint)) : '0'} ${tokenSymbol}`}
+              Balance:{" "}
+              {tradeType === "buy"
+                ? `${nativeBalance?.value ? formatNumber(formatEther(nativeBalance.value)) : "0"} MATIC`
+                : `${tokenBalance ? formatNumber(formatEther(tokenBalance as bigint)) : "0"} ${tokenSymbol}`}
             </span>
           </div>
           <div className="relative">
@@ -340,7 +422,7 @@ export function OnChainTradingPanel({
               className="pr-16 text-lg font-medium bg-background/50"
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-              {tradeType === 'buy' ? 'MATIC' : tokenSymbol}
+              {tradeType === "buy" ? "MATIC" : tokenSymbol}
             </div>
           </div>
         </div>
@@ -363,7 +445,7 @@ export function OnChainTradingPanel({
           {parseFloat(amount) > 0 && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
+              animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               className="space-y-2 mb-4"
             >
@@ -371,12 +453,12 @@ export function OnChainTradingPanel({
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">You Receive</span>
                   <span className="font-medium">
-                    {(isBuyQuoteLoading || isSellQuoteLoading) ? (
+                    {isBuyQuoteLoading || isSellQuoteLoading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <>
-                        {formatNumber(tradeMetrics.outputAmount)}{' '}
-                        {tradeType === 'buy' ? tokenSymbol : 'MATIC'}
+                        {formatNumber(tradeMetrics.outputAmount)}{" "}
+                        {tradeType === "buy" ? tokenSymbol : "MATIC"}
                       </>
                     )}
                   </span>
@@ -395,10 +477,14 @@ export function OnChainTradingPanel({
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Price Impact</span>
-                  <span className={cn(
-                    "font-medium",
-                    tradeMetrics.isHighImpact ? "text-destructive" : "text-muted-foreground"
-                  )}>
+                  <span
+                    className={cn(
+                      "font-medium",
+                      tradeMetrics.isHighImpact
+                        ? "text-destructive"
+                        : "text-muted-foreground",
+                    )}
+                  >
                     {tradeMetrics.priceImpact.toFixed(2)}%
                     {tradeMetrics.isHighImpact && (
                       <AlertTriangle className="h-3 w-3 inline ml-1" />
@@ -412,7 +498,9 @@ export function OnChainTradingPanel({
 
         {/* Slippage Setting */}
         <div className="flex items-center justify-between mb-4 p-2 bg-background/30 rounded-lg">
-          <span className="text-xs text-muted-foreground">Slippage Tolerance</span>
+          <span className="text-xs text-muted-foreground">
+            Slippage Tolerance
+          </span>
           <div className="flex gap-1">
             {[1, 3, 5, 10].map((s) => (
               <button
@@ -422,7 +510,7 @@ export function OnChainTradingPanel({
                   "px-2 py-1 text-xs rounded transition-colors",
                   slippage === s
                     ? "bg-primary text-primary-foreground"
-                    : "bg-background/50 hover:bg-background"
+                    : "bg-background/50 hover:bg-background",
                 )}
               >
                 {s}%
@@ -435,7 +523,7 @@ export function OnChainTradingPanel({
         {isConnected ? (
           <>
             {/* Approval Button (for sell) */}
-            {tradeType === 'sell' && needsApproval && (
+            {tradeType === "sell" && needsApproval && (
               <Button
                 onClick={handleApprove}
                 disabled={isApproving || isApproveConfirming}
@@ -463,13 +551,13 @@ export function OnChainTradingPanel({
                 parseFloat(amount) <= 0 ||
                 isLoading ||
                 isConfirming ||
-                (tradeType === 'sell' && needsApproval)
+                (tradeType === "sell" && needsApproval)
               }
               className={cn(
                 "w-full h-12 text-base font-semibold",
-                tradeType === 'buy'
+                tradeType === "buy"
                   ? "bg-gradient-to-r from-green-500 to-emerald-500 hover:opacity-90"
-                  : "bg-gradient-to-r from-red-500 to-rose-500 hover:opacity-90"
+                  : "bg-gradient-to-r from-red-500 to-rose-500 hover:opacity-90",
               )}
             >
               {isLoading ? (
@@ -484,21 +572,18 @@ export function OnChainTradingPanel({
                 </>
               ) : (
                 <>
-                  {tradeType === 'buy' ? (
+                  {tradeType === "buy" ? (
                     <TrendingUp className="h-5 w-5 mr-2" />
                   ) : (
                     <TrendingDown className="h-5 w-5 mr-2" />
                   )}
-                  {tradeType === 'buy' ? 'Buy' : 'Sell'} {tokenSymbol}
+                  {tradeType === "buy" ? "Buy" : "Sell"} {tokenSymbol}
                 </>
               )}
             </Button>
           </>
         ) : (
-          <Button
-            disabled
-            className="w-full h-12 bg-muted"
-          >
+          <Button disabled className="w-full h-12 bg-muted">
             <Wallet className="h-5 w-5 mr-2" />
             Connect Wallet to Trade
           </Button>
@@ -516,7 +601,9 @@ export function OnChainTradingPanel({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-primary" />
-                  <span className="text-sm font-medium">Transaction Submitted</span>
+                  <span className="text-sm font-medium">
+                    Transaction Submitted
+                  </span>
                 </div>
                 <a
                   href={getTxUrl(txHash)}

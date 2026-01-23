@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import {
+  Plus_Jakarta_Sans,
+  JetBrains_Mono,
+  Space_Grotesk,
+} from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import {
   QueryProvider,
@@ -12,14 +16,40 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+/**
+ * Font Configuration
+ *
+ * To change fonts globally, modify the font imports below.
+ *
+ * Popular font choices:
+ * - Inter - Clean and modern
+ * - Plus_Jakarta_Sans (current) - Friendly and professional
+ * - Outfit - Modern and versatile
+ * - DM_Sans - Elegant and minimal
+ * - Manrope - Geometric and clean
+ * - Urbanist - Minimal and trendy
+ * - Sora - Geometric and contemporary
+ */
+
+// Primary font - used for body text and most UI elements
+const primaryFont = Plus_Jakarta_Sans({
+  variable: "--font-primary",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// Mono font - used for numbers, prices, addresses, code
+const monoFont = JetBrains_Mono({
+  variable: "--font-mono",
   subsets: ["latin"],
+  display: "swap",
+});
+
+// Display font - used for hero headings and large titles
+const displayFont = Space_Grotesk({
+  variable: "--font-display",
+  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -44,7 +74,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background`}
+        className={`${primaryFont.variable} ${monoFont.variable} ${displayFont.variable} font-sans antialiased min-h-screen bg-background`}
       >
         <QueryProvider>
           <WagmiProvider>

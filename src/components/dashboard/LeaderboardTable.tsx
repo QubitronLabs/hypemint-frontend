@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Trophy, Medal, TrendingUp, Users, Zap } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, fromWei, formatNumber } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -34,11 +34,9 @@ export function LeaderboardTable({ className }: LeaderboardTableProps) {
   const { data: stats } = useLeaderboardStats(period);
   const { data: myRanking } = useMyRanking(period);
 
-  const formatValue = (value: string, decimals = 4) => {
-    const num = parseFloat(value) / 1e18;
-    if (num >= 1e6) return `${(num / 1e6).toFixed(2)}M`;
-    if (num >= 1e3) return `${(num / 1e3).toFixed(2)}K`;
-    return num.toFixed(decimals);
+  const formatValue = (value: string, _decimals = 4) => {
+    const num = fromWei(value);
+    return formatNumber(num);
   };
 
   const formatPercent = (value: number) => {
@@ -80,7 +78,7 @@ export function LeaderboardTable({ className }: LeaderboardTableProps) {
                 <span className="text-sm text-muted-foreground">Volume</span>
               </div>
               <p className="text-2xl font-bold">
-                {formatValue(stats.totalVolume, 2)} SOL
+                {formatValue(stats.totalVolume, 2)} MATIC
               </p>
             </CardContent>
           </Card>
@@ -134,7 +132,7 @@ export function LeaderboardTable({ className }: LeaderboardTableProps) {
                       : "text-red-400",
                   )}
                 >
-                  {formatValue(myRanking.entry.totalPnl)} SOL
+                  {formatValue(myRanking.entry.totalPnl)} MATIC
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {myRanking.entry.tradeCount} trades
@@ -241,7 +239,7 @@ export function LeaderboardTable({ className }: LeaderboardTableProps) {
                           : "text-red-400",
                       )}
                     >
-                      {formatValue(entry.totalPnl)} SOL
+                      {formatValue(entry.totalPnl)} MATIC
                     </p>
                     <p
                       className={cn(

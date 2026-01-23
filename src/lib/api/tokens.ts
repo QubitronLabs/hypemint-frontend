@@ -113,6 +113,7 @@ export async function getToken(id: string): Promise<Token | null> {
       ...token,
       currentPrice,
       marketCap: marketCap || "0",
+      bondingCurveAddress: curve.contractAddress || undefined,
       bondingCurveProgress: progress,
       graduationTarget: curve.graduationMarketCap || "69000", // Default target
       currentBondingAmount: curve.currentReserve || "0",
@@ -230,6 +231,19 @@ export async function getGraduatedTokens(options?: {
     return data.data ?? [];
   } catch (error) {
     console.error("Failed to get graduated tokens:", error);
+    return [];
+  }
+}
+
+// Get user's created tokens (requires auth)
+export async function getMyTokens(): Promise<Token[]> {
+  try {
+    const { data } = await apiClient.get<ApiResponse<Token[]>>(
+      "/api/v1/tokens/my-tokens",
+    );
+    return data.data ?? [];
+  } catch (error) {
+    console.error("Failed to get my tokens:", error);
     return [];
   }
 }

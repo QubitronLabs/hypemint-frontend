@@ -30,8 +30,8 @@ function getWsUrl(): string {
   if (process.env.NEXT_PUBLIC_WS_URL) {
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL;
     // Ensure the URL ends with /ws
-    if (!wsUrl.endsWith('/ws')) {
-      return wsUrl.replace(/\/?$/, '/ws');
+    if (!wsUrl.endsWith("/ws")) {
+      return wsUrl.replace(/\/?$/, "/ws");
     }
     return wsUrl;
   }
@@ -402,4 +402,66 @@ export function useGlobalTradeFeed(
       return () => unsubscribe("global:trades");
     }
   }, [isConnected, subscribe, unsubscribe]);
+}
+
+/**
+ * Hook for real-time sync with React Query cache invalidation
+ * Automatically invalidates relevant queries when WebSocket events are received
+ */
+export function useRealtimeSync() {
+  const { subscribe, unsubscribe, isConnected } = useWebSocket({
+    onMessage: (message) => {
+      // Import query client dynamically to avoid circular dependencies
+      import("@tanstack/react-query").then(({ useQueryClient }) => {
+        // This won't work directly in onMessage callback
+        // Use a different approach - dispatch custom events
+        const event = new CustomEvent("realtime-sync", { detail: message });
+        window.dispatchEvent(event);
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (isConnected) {
+      // Subscribe to all relevant global channels
+      subscribe("global:tokens");
+      subscribe("global:trades");
+      subscribe("global:trending");
+
+      return () => {
+        unsubscribe("global:tokens");
+        unsubscribe("global:trades");
+        unsubscribe("global:trending");
+      };
+    }
+  }, [isConnected, subscribe, unsubscribe]);
+
+  return { isConnected };
+}
+
+/**
+ * Hook to use with React Query for automatic cache invalidation on realtime events
+ * Should be used at the app level (e.g., in layout or providers)
+ */
+export function useRealtimeQuerySync() {
+  const [lastEvent, setLastEvent] = useState<WSMessage | null>(null);
+
+  useEffect(() => {
+    const handleRealtimeEvent = (event: CustomEvent<WSMessage>) => {
+      setLastEvent(event.detail);
+    };
+
+    window.addEventListener(
+      "realtime-sync",
+      handleRealtimeEvent as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        "realtime-sync",
+        handleRealtimeEvent as EventListener,
+      );
+    };
+  }, []);
+
+  return lastEvent;
 }

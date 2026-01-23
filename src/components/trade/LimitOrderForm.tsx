@@ -153,7 +153,7 @@ export function LimitOrderForm({
 
             <div className="flex justify-between text-sm py-2 border-t">
               <span className="text-muted-foreground">Total</span>
-              <span className="font-mono font-medium">{total} SOL</span>
+              <span className="font-mono font-medium">{total} MATIC</span>
             </div>
 
             <Button

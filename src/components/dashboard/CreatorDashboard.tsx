@@ -1,16 +1,15 @@
-'use client';
+"use client";
 
 /**
  * Creator Dashboard Component
  * Shows tokens created by the user, earnings, and analytics
  */
 
-import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import Link from 'next/link';
-import Image from 'next/image';
-import { useAccount } from 'wagmi';
-import { formatEther, type Address } from 'viem';
+import { useState, useMemo } from "react";
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { useAccount } from "wagmi";
+import { formatEther, type Address } from "viem";
 import {
   Coins,
   TrendingUp,
@@ -24,16 +23,17 @@ import {
   Rocket,
   Clock,
   Zap,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Progress } from '@/components/ui/progress';
-import { cn } from '@/lib/utils';
-import { useAuth } from '@/hooks';
-import { useTokens } from '@/hooks/useTokens';
-import type { Token } from '@/types';
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
+import { TokenImage } from "@/components/ui/token-image";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks";
+import { useMyTokens } from "@/hooks/useTokens";
+import type { Token } from "@/types";
 
 interface CreatorDashboardProps {
   className?: string;
@@ -48,32 +48,24 @@ interface TokenStats {
 
 // Format large numbers
 function formatNumber(num: number): string {
-  if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
-  if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
-  if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
+  if (num >= 1e9) return (num / 1e9).toFixed(2) + "B";
+  if (num >= 1e6) return (num / 1e6).toFixed(2) + "M";
+  if (num >= 1e3) return (num / 1e3).toFixed(2) + "K";
   return num.toFixed(2);
 }
 
 // Format currency
 function formatCurrency(num: number): string {
-  return '$' + formatNumber(num);
+  return "$" + formatNumber(num);
 }
 
 export function CreatorDashboard({ className }: CreatorDashboardProps) {
   const { isAuthenticated, walletAddress } = useAuth();
   const { address, isConnected } = useAccount();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState("overview");
 
-  // Fetch user's tokens - in production, filter by creator address
-  const { data: allTokens, isLoading: tokensLoading } = useTokens({ pageSize: 100 });
-
-  // Filter to only show tokens created by this user
-  const createdTokens = useMemo(() => {
-    if (!allTokens || !walletAddress) return [];
-    return allTokens.filter(
-      (token) => token.creator?.walletAddress?.toLowerCase() === walletAddress.toLowerCase()
-    );
-  }, [allTokens, walletAddress]);
+  // Fetch user's created tokens directly from API
+  const { data: createdTokens = [], isLoading: tokensLoading } = useMyTokens();
 
   // Calculate aggregate stats
   const stats = useMemo((): TokenStats => {
@@ -87,16 +79,16 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
     }
 
     const totalVolume = createdTokens.reduce(
-      (sum, token) => sum + parseFloat(token.volume24h || '0'),
-      0
+      (sum, token) => sum + parseFloat(token.volume24h || "0"),
+      0,
     );
     const totalTrades = createdTokens.reduce(
       (sum, token) => sum + (token.tradesCount || 0),
-      0
+      0,
     );
     const totalHolders = createdTokens.reduce(
       (sum, token) => sum + (token.holdersCount || 0),
-      0
+      0,
     );
     // Creator fee is 1% of volume
     const estimatedEarnings = totalVolume * 0.01;
@@ -112,7 +104,12 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
   // Not connected state
   if (!isAuthenticated || !isConnected) {
     return (
-      <div className={cn("bg-card border border-border rounded-xl p-8 text-center", className)}>
+      <div
+        className={cn(
+          "bg-card border border-border rounded-xl p-8 text-center",
+          className,
+        )}
+      >
         <Rocket className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
         <h3 className="text-lg font-semibold mb-2">Creator Dashboard</h3>
         <p className="text-muted-foreground mb-4">
@@ -149,7 +146,9 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
             <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
               <Coins className="h-4 w-4 text-primary" />
             </div>
-            <span className="text-sm text-muted-foreground">Tokens Created</span>
+            <span className="text-sm text-muted-foreground">
+              Tokens Created
+            </span>
           </div>
           <p className="text-2xl font-bold">{createdTokens.length}</p>
         </motion.div>
@@ -183,7 +182,9 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
             </div>
             <span className="text-sm text-muted-foreground">Total Volume</span>
           </div>
-          <p className="text-2xl font-bold">{formatCurrency(stats.totalVolume)}</p>
+          <p className="text-2xl font-bold">
+            {formatCurrency(stats.totalVolume)}
+          </p>
         </motion.div>
 
         <motion.div
@@ -240,7 +241,8 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
                 <Rocket className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-xl font-semibold mb-2">No Tokens Yet</h3>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  Create your first memecoin and start earning creator fees from every trade!
+                  Create your first memecoin and start earning creator fees from
+                  every trade!
                 </p>
                 <Link href="/create">
                   <Button className="gap-2 bg-gradient-to-r from-primary to-purple-600">
@@ -259,7 +261,11 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
                   </h3>
                   <div className="space-y-3">
                     {createdTokens
-                      .sort((a, b) => parseFloat(b.volume24h || '0') - parseFloat(a.volume24h || '0'))
+                      .sort(
+                        (a, b) =>
+                          parseFloat(b.volume24h || "0") -
+                          parseFloat(a.volume24h || "0"),
+                      )
                       .slice(0, 5)
                       .map((token, index) => (
                         <Link
@@ -271,33 +277,35 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
                             <span className="text-sm text-muted-foreground w-5">
                               #{index + 1}
                             </span>
-                            <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden">
-                              {token.imageUrl ? (
-                                <Image
-                                  src={token.imageUrl}
-                                  alt={token.name}
-                                  width={40}
-                                  height={40}
-                                  className="object-cover w-full h-full"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-sm font-bold">
-                                  {token.symbol?.slice(0, 2)}
-                                </div>
-                              )}
-                            </div>
+                            <TokenImage
+                              src={token.imageUrl}
+                              alt={token.name}
+                              symbol={token.symbol}
+                              size={40}
+                            />
                             <div>
                               <p className="font-medium">{token.name}</p>
-                              <p className="text-xs text-muted-foreground">${token.symbol}</p>
+                              <p className="text-xs text-muted-foreground">
+                                ${token.symbol}
+                              </p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="font-medium">{formatCurrency(parseFloat(token.marketCap || '0'))}</p>
-                            <p className={cn(
-                              "text-xs",
-                              (token.priceChange24h || 0) >= 0 ? "text-green-500" : "text-destructive"
-                            )}>
-                              {(token.priceChange24h || 0) >= 0 ? '+' : ''}{(token.priceChange24h || 0).toFixed(2)}%
+                            <p className="font-medium">
+                              {formatCurrency(
+                                parseFloat(token.marketCap || "0"),
+                              )}
+                            </p>
+                            <p
+                              className={cn(
+                                "text-xs",
+                                (token.priceChange24h || 0) >= 0
+                                  ? "text-green-500"
+                                  : "text-destructive",
+                              )}
+                            >
+                              {(token.priceChange24h || 0) >= 0 ? "+" : ""}
+                              {(token.priceChange24h || 0).toFixed(2)}%
                             </p>
                           </div>
                         </Link>
@@ -325,7 +333,9 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
             {createdTokens.length === 0 ? (
               <div className="bg-card border border-border rounded-xl p-12 text-center">
                 <Coins className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-xl font-semibold mb-2">No Tokens Created</h3>
+                <h3 className="text-xl font-semibold mb-2">
+                  No Tokens Created
+                </h3>
                 <p className="text-muted-foreground mb-6">
                   Launch your first token and start building your community!
                 </p>
@@ -353,14 +363,19 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
                   <DollarSign className="h-5 w-5 text-green-500" />
                   Creator Earnings
                 </h3>
-                <Badge variant="outline" className="text-green-500 border-green-500/30">
+                <Badge
+                  variant="outline"
+                  className="text-green-500 border-green-500/30"
+                >
                   1% Creator Fee
                 </Badge>
               </div>
 
               <div className="grid md:grid-cols-3 gap-4 mb-6">
                 <div className="p-4 bg-background/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">Total Earned</p>
+                  <p className="text-sm text-muted-foreground mb-1">
+                    Total Earned
+                  </p>
                   <p className="text-2xl font-bold text-green-500">
                     {formatCurrency(stats.estimatedEarnings)}
                   </p>
@@ -399,32 +414,26 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
               ) : (
                 <div className="space-y-3">
                   {createdTokens.map((token) => {
-                    const earnings = parseFloat(token.volume24h || '0') * 0.01;
+                    const earnings = parseFloat(token.volume24h || "0") * 0.01;
                     return (
                       <div
                         key={token.id}
                         className="flex items-center justify-between p-3 rounded-lg bg-background/50"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-muted overflow-hidden">
-                            {token.imageUrl ? (
-                              <Image
-                                src={token.imageUrl}
-                                alt={token.name}
-                                width={32}
-                                height={32}
-                                className="object-cover w-full h-full"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-xs font-bold">
-                                {token.symbol?.slice(0, 2)}
-                              </div>
-                            )}
-                          </div>
+                          <TokenImage
+                            src={token.imageUrl}
+                            alt={token.name}
+                            symbol={token.symbol}
+                            size={32}
+                          />
                           <div>
                             <p className="font-medium text-sm">{token.name}</p>
                             <p className="text-xs text-muted-foreground">
-                              Vol: {formatCurrency(parseFloat(token.volume24h || '0'))}
+                              Vol:{" "}
+                              {formatCurrency(
+                                parseFloat(token.volume24h || "0"),
+                              )}
                             </p>
                           </div>
                         </div>
@@ -457,25 +466,16 @@ function TokenCreatorCard({ token }: { token: Token }) {
     <Link href={`/token/${token.id}`}>
       <div className="bg-card border border-border rounded-xl p-4 hover:border-primary/30 transition-colors">
         <div className="flex items-start gap-3 mb-4">
-          <div className="w-12 h-12 rounded-xl bg-muted overflow-hidden flex-shrink-0">
-            {token.imageUrl ? (
-              <Image
-                src={token.imageUrl}
-                alt={token.name}
-                width={48}
-                height={48}
-                className="object-cover w-full h-full"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-lg font-bold text-muted-foreground">
-                {token.symbol?.slice(0, 2)}
-              </div>
-            )}
-          </div>
+          <TokenImage
+            src={token.imageUrl}
+            alt={token.name}
+            symbol={token.symbol}
+            size={48}
+          />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <p className="font-semibold truncate">{token.name}</p>
-              {token.status === 'graduated' && (
+              {token.status === "graduated" && (
                 <Badge className="bg-green-500/20 text-green-500 text-xs">
                   Graduated
                 </Badge>
@@ -483,23 +483,34 @@ function TokenCreatorCard({ token }: { token: Token }) {
             </div>
             <p className="text-sm text-muted-foreground">${token.symbol}</p>
           </div>
-          <div className={cn(
-            "flex items-center gap-1 text-sm font-medium",
-            pricePositive ? "text-green-500" : "text-destructive"
-          )}>
-            {pricePositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-            {pricePositive ? '+' : ''}{(token.priceChange24h || 0).toFixed(2)}%
+          <div
+            className={cn(
+              "flex items-center gap-1 text-sm font-medium",
+              pricePositive ? "text-green-500" : "text-destructive",
+            )}
+          >
+            {pricePositive ? (
+              <TrendingUp className="h-4 w-4" />
+            ) : (
+              <TrendingDown className="h-4 w-4" />
+            )}
+            {pricePositive ? "+" : ""}
+            {(token.priceChange24h || 0).toFixed(2)}%
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-3 text-sm">
           <div>
             <p className="text-muted-foreground text-xs">Market Cap</p>
-            <p className="font-medium">{formatCurrency(parseFloat(token.marketCap || '0'))}</p>
+            <p className="font-medium">
+              {formatCurrency(parseFloat(token.marketCap || "0"))}
+            </p>
           </div>
           <div>
             <p className="text-muted-foreground text-xs">Volume 24h</p>
-            <p className="font-medium">{formatCurrency(parseFloat(token.volume24h || '0'))}</p>
+            <p className="font-medium">
+              {formatCurrency(parseFloat(token.volume24h || "0"))}
+            </p>
           </div>
           <div>
             <p className="text-muted-foreground text-xs">Holders</p>
@@ -511,7 +522,9 @@ function TokenCreatorCard({ token }: { token: Token }) {
         <div className="mt-4 pt-3 border-t border-border">
           <div className="flex items-center justify-between text-xs mb-1">
             <span className="text-muted-foreground">Bonding Curve</span>
-            <span className="font-medium">{token.bondingCurveProgress || 0}%</span>
+            <span className="font-medium">
+              {token.bondingCurveProgress || 0}%
+            </span>
           </div>
           <Progress value={token.bondingCurveProgress || 0} className="h-1.5" />
         </div>
