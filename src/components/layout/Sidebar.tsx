@@ -37,9 +37,9 @@ export function Sidebar() {
         <motion.div
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/20"
+          className="w-10 h-10 rounded-xl   flex items-center justify-center  "
         >
-          <span className="text-primary-foreground font-bold text-lg">H</span>
+          <img src="/logo2.png" alt="" />
         </motion.div>
       </Link>
 
