@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
@@ -35,10 +35,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PriceChart } from "@/components/charts";
 import {
-  TradePanel,
-  TradeTape,
-  TradingPanel,
-  OnChainTradingPanel,
+	TradeTape,
+	TradingPanel,
+	OnChainTradingPanel,
 } from "@/components/trade";
 import { BondingCurveProgress, TokenChat } from "@/components/token";
 import { useToken, tokenKeys, useTokenHolders } from "@/hooks/useTokens";
@@ -56,14 +55,14 @@ import type { Address } from "viem";
 import type { Token } from "@/types";
 
 interface TokenDetailPageProps {
-  params: Promise<{ id: string }>;
+	params: Promise<{ id: string }>;
 }
 
 export default function TokenDetailPage({ params }: TokenDetailPageProps) {
-  const { id } = use(params);
-  const [copied, setCopied] = useState(false);
-  const [showFullDescription, setShowFullDescription] = useState(false);
-  const [isStarred, setIsStarred] = useState(false);
+	const { id } = use(params);
+	const [copied, setCopied] = useState(false);
+	const [showFullDescription, setShowFullDescription] = useState(false);
+	const [isStarred, setIsStarred] = useState(false);
 
   const { data: token, isLoading, error } = useToken(id);
   const { data: trades } = useTokenTrades(id);
@@ -109,169 +108,181 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
     [id, queryClient],
   );
 
-  const { isConnected, subscribe, unsubscribe } = useWebSocket({
-    onMessage: handleWebSocketMessage,
-  });
+	const { isConnected, subscribe, unsubscribe } = useWebSocket({
+		onMessage: handleWebSocketMessage,
+	});
 
-  // Subscribe to token-specific channels
-  useEffect(() => {
-    if (isConnected && id) {
-      subscribe(`trades:${id}`);
-      subscribe(`price:${id}`);
+	// Subscribe to token-specific channels
+	useEffect(() => {
+		if (isConnected && id) {
+			subscribe(`trades:${id}`);
+			subscribe(`price:${id}`);
 
-      return () => {
-        unsubscribe(`trades:${id}`);
-        unsubscribe(`price:${id}`);
-      };
-    }
-  }, [isConnected, id, subscribe, unsubscribe]);
+			return () => {
+				unsubscribe(`trades:${id}`);
+				unsubscribe(`price:${id}`);
+			};
+		}
+	}, [isConnected, id, subscribe, unsubscribe]);
 
-  // Format contract address for display
-  const formatAddress = (address: string) => {
-    if (!address) return "";
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
 
-  // Get explorer URL for contract
-  const getExplorerUrl = (address: string) => {
-    return `https://amoy.polygonscan.com/address/${address}`;
-  };
+	// Format contract address for display
+	const formatAddress = (address: string) => {
+		if (!address) return "";
+		return `${address.slice(0, 6)}...${address.slice(-4)}`;
+	};
 
-  const handleCopy = () => {
-    if (!token) return;
-    navigator.clipboard.writeText(token.id);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+	// Get explorer URL for contract
+	const getExplorerUrl = (address: string) => {
+		return `https://amoy.polygonscan.com/address/${address}`;
+	};
 
-  const handleShare = async () => {
-    if (!token) return;
-    const url = window.location.href;
-    const text = `Check out $${token.symbol} on HypeMint!`;
+	const handleCopy = () => {
+		if (!token) return;
+		navigator.clipboard.writeText(token.id);
+		setCopied(true);
+		setTimeout(() => setCopied(false), 2000);
+	};
 
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: token.name, text, url });
-      } catch (e) {
-        // User cancelled or error
-      }
-    } else {
-      navigator.clipboard.writeText(url);
-    }
-  };
+	const handleShare = async () => {
+		if (!token) return;
+		const url = window.location.href;
+		const text = `Check out $${token.symbol} on HypeMint!`;
 
-  // Calculate time since creation
-  const getTimeSinceCreation = () => {
-    if (!token?.createdAt) return "";
-    const created = new Date(token.createdAt);
-    const now = new Date();
-    const diffMs = now.getTime() - created.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffHours / 24);
+		if (navigator.share) {
+			try {
+				await navigator.share({ title: token.name, text, url });
+			} catch (e) {
+				// User cancelled or error
+			}
+		} else {
+			navigator.clipboard.writeText(url);
+		}
+	};
 
-    if (diffDays > 0) return `${diffDays}d ago`;
-    if (diffHours > 0) return `${diffHours}h ago`;
-    return "Just now";
-  };
+	// Calculate time since creation
+	const getTimeSinceCreation = () => {
+		if (!token?.createdAt) return "";
+		const created = new Date(token.createdAt);
+		const now = new Date();
+		const diffMs = now.getTime() - created.getTime();
+		const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+		const diffDays = Math.floor(diffHours / 24);
 
-  if (isLoading) {
-    return (
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="grid lg:grid-cols-[1fr_350px] gap-6">
-          <div className="space-y-6">
-            <Skeleton className="h-32 rounded-xl" />
-            <Skeleton className="h-[400px] rounded-xl" />
-            <Skeleton className="h-[300px] rounded-xl" />
-          </div>
-          <div className="space-y-6">
-            <Skeleton className="h-[400px] rounded-xl" />
-            <Skeleton className="h-[200px] rounded-xl" />
-          </div>
-        </div>
-      </div>
-    );
-  }
+		if (diffDays > 0) return `${diffDays}d ago`;
+		if (diffHours > 0) return `${diffHours}h ago`;
+		return "Just now";
+	};
 
-  if (error || !token) {
-    return (
-      <div className="max-w-7xl mx-auto p-6 flex flex-col items-center justify-center min-h-[50vh] text-center">
-        <h1 className="text-3xl font-bold mb-4">Token not found</h1>
-        <p className="text-muted-foreground mb-6">
-          The token you are looking for does not exist or has been removed.
-        </p>
-        <Link href="/">
-          <Button>Return to Home</Button>
-        </Link>
-      </div>
-    );
-  }
+	if (isLoading) {
+		return (
+			<div className="w-full mx-auto p-6">
+				<div className="grid lg:grid-cols-[1fr_350px] gap-6">
+					<div className="space-y-6">
+						<Skeleton className="h-32 rounded-xl" />
+						<Skeleton className="h-[400px] rounded-xl" />
+						<Skeleton className="h-[300px] rounded-xl" />
+					</div>
+					<div className="space-y-6">
+						<Skeleton className="h-[400px] rounded-xl" />
+						<Skeleton className="h-[200px] rounded-xl" />
+					</div>
+				</div>
+			</div>
+		);
+	}
 
-  const pricePositive = (token.priceChange24h ?? 0) >= 0;
+	if (error || !token) {
+		return (
+			<div className="w-full mx-auto p-6 flex flex-col items-center justify-center min-h-[50vh] text-center">
+				<h1 className="text-3xl font-bold mb-4">Token not found</h1>
+				<p className="text-muted-foreground mb-6">
+					The token you are looking for does not exist or has been
+					removed.
+				</p>
+				<Link href="/">
+					<Button>Return to Home</Button>
+				</Link>
+			</div>
+		);
+	}
 
-  return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="grid lg:grid-cols-[1fr_350px] gap-6">
-        {/* Main Content */}
-        <div className="space-y-6">
-          {/* Token Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-card border border-border rounded-xl p-6"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-xl bg-muted overflow-hidden flex-shrink-0">
-                  {token.imageUrl ? (
-                    <Image
-                      src={token.imageUrl.replace("0.0.0.0", "localhost")}
-                      alt={token.name || "Token"}
-                      width={64}
-                      height={64}
-                      unoptimized
-                      className="object-cover w-full h-full"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-muted-foreground">
-                      {token.symbol?.slice(0, 2) || "??"}
-                    </div>
-                  )}
-                </div>
+	const pricePositive = (token.priceChange24h ?? 0) >= 0;
 
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-xl font-bold">{token.name}</h1>
-                    <Badge variant="outline" className="text-xs">
-                      {token.symbol}
-                    </Badge>
-                    {token.status === "active" && (
-                      <Badge className="bg-primary/20 text-primary text-xs">
-                        Live
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-muted-foreground">
-                      Created by
-                    </span>
-                    <Link
-                      href={`/user/${token.creator?.walletAddress || ""}`}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      {token.creator?.displayName ||
-                        token.creator?.username ||
-                        (token.creator?.walletAddress
-                          ? `${token.creator.walletAddress.slice(0, 6)}...`
-                          : "Unknown")}
-                    </Link>
-                    <span className="text-xs text-muted-foreground">
-                      {token.createdAt
-                        ? new Date(token.createdAt).toLocaleDateString()
-                        : ""}
-                    </span>
-                  </div>
-                </div>
-              </div>
+	return (
+		<div className="w-full mx-auto p-6">
+			<div className="grid grid-cols-[1fr_350px] gap-6">
+				{/* Main Content */}
+				<div className="space-y-6 ">
+					{/* Token Header */}
+					<motion.div
+						initial={{ opacity: 0, y: 20 }}
+						animate={{ opacity: 1, y: 0 }}
+						className="bg-card border border-border rounded-xl p-6"
+					>
+						<div className="flex items-start justify-between">
+							<div className="flex items-center gap-4">
+								<div className="w-16 h-16 rounded-xl bg-muted overflow-hidden shrink-0">
+									{token.imageUrl ? (
+										<Image
+											src={token.imageUrl.replace(
+												"0.0.0.0",
+												"localhost",
+											)}
+											alt={token.name || "Token"}
+											width={64}
+											height={64}
+											unoptimized
+											className="object-cover w-full h-full"
+										/>
+									) : (
+										<div className="w-full h-full flex items-center justify-center text-2xl font-bold text-muted-foreground">
+											{token.symbol?.slice(0, 2) || "??"}
+										</div>
+									)}
+								</div>
+
+								<div>
+									<div className="flex items-center gap-2">
+										<h1 className="text-xl font-bold">
+											{token.name}
+										</h1>
+										<Badge
+											variant="outline"
+											className="text-xs"
+										>
+											{token.symbol}
+										</Badge>
+										{token.status === "active" && (
+											<Badge className="bg-primary/20 text-primary text-xs">
+												Live
+											</Badge>
+										)}
+									</div>
+									<div className="flex items-center gap-2 mt-1">
+										<span className="text-xs text-muted-foreground">
+											Created by
+										</span>
+										<Link
+											href={`/user/${token.creator?.walletAddress || ""}`}
+											className="text-xs text-primary hover:underline"
+										>
+											{token.creator?.displayName ||
+												token.creator?.username ||
+												(token.creator?.walletAddress
+													? `${token.creator.walletAddress.slice(0, 6)}...`
+													: "Unknown")}
+										</Link>
+										<span className="text-xs text-muted-foreground">
+											{token.createdAt
+												? new Date(
+														token.createdAt,
+													).toLocaleDateString()
+												: ""}
+										</span>
+									</div>
+								</div>
+							</div>
 
               <div className="flex items-center gap-2">
                 <Button
@@ -300,182 +311,201 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
                 </Button>
               </div>
             </div>
+					
+					
 
-            {/* Token Badges */}
-            <div className="flex flex-wrap items-center gap-2 mt-4">
-              {token.hypeBoostEnabled && (
-                <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs gap-1">
-                  <Shield className="h-3 w-3" />
-                  HypeBoost
-                </Badge>
-              )}
-              <Badge variant="outline" className="text-xs gap-1">
-                <Clock className="h-3 w-3" />
-                {getTimeSinceCreation()}
-              </Badge>
-              {token.id && (
-                <a
-                  href={getExplorerUrl(token.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex"
-                >
-                  <Badge
-                    variant="outline"
-                    className="text-xs gap-1 hover:bg-muted cursor-pointer"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    {formatAddress(token.id)}
-                  </Badge>
-                </a>
-              )}
-            </div>
+						{/* Token Badges */}
+						<div className="flex flex-wrap items-center gap-2 mt-4">
+							{token.hypeBoostEnabled && (
+								<Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs gap-1">
+									<Shield className="h-3 w-3" />
+									HypeBoost
+								</Badge>
+							)}
+							<Badge variant="outline" className="text-xs gap-1">
+								<Clock className="h-3 w-3" />
+								{getTimeSinceCreation()}
+							</Badge>
+							{token.id && (
+								<a
+									href={getExplorerUrl(token.id)}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="inline-flex"
+								>
+									<Badge
+										variant="outline"
+										className="text-xs gap-1 hover:bg-muted cursor-pointer"
+									>
+										<ExternalLink className="h-3 w-3" />
+										{formatAddress(token.id)}
+									</Badge>
+								</a>
+							)}
+						</div>
 
-            {/* Description */}
-            {token.description && (
-              <div className="mt-4">
-                <p
-                  className={cn(
-                    "text-sm text-muted-foreground",
-                    !showFullDescription && "line-clamp-2",
-                  )}
-                >
-                  {token.description}
-                </p>
-                {token.description.length > 150 && (
-                  <button
-                    onClick={() => setShowFullDescription(!showFullDescription)}
-                    className="text-xs text-primary hover:underline mt-1 flex items-center gap-1"
-                  >
-                    {showFullDescription ? (
-                      <>
-                        Show less <ChevronUp className="h-3 w-3" />
-                      </>
-                    ) : (
-                      <>
-                        Show more <ChevronDown className="h-3 w-3" />
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-            )}
+						{/* Description */}
+						{token.description && (
+							<div className="mt-4">
+								<p
+									className={cn(
+										"text-sm text-muted-foreground",
+										!showFullDescription && "line-clamp-2",
+									)}
+								>
+									{token.description}
+								</p>
+								{token.description.length > 150 && (
+									<button
+										onClick={() =>
+											setShowFullDescription(
+												!showFullDescription,
+											)
+										}
+										className="text-xs text-primary hover:underline mt-1 flex items-center gap-1"
+									>
+										{showFullDescription ? (
+											<>
+												Show less{" "}
+												<ChevronUp className="h-3 w-3" />
+											</>
+										) : (
+											<>
+												Show more{" "}
+												<ChevronDown className="h-3 w-3" />
+											</>
+										)}
+									</button>
+								)}
+							</div>
+						)}
 
-            {/* Price Stats */}
-            <div className="mt-6">
-              <div className="flex items-baseline gap-2">
-                <span className="text-muted-foreground text-sm">
-                  Market Cap
-                </span>
-              </div>
-              <div className="flex items-baseline gap-3 mt-1">
-                <span className="text-3xl font-bold">
-                  {formatMarketCap(token.marketCap)}
-                </span>
-                <span
-                  className={cn(
-                    "text-sm font-medium flex items-center gap-1",
-                    pricePositive ? "text-[#00ff88]" : "text-destructive",
-                  )}
-                >
-                  {pricePositive ? (
-                    <TrendingUp className="h-4 w-4" />
-                  ) : (
-                    <TrendingDown className="h-4 w-4" />
-                  )}
-                  {pricePositive ? "+" : ""}
-                  {(token.priceChange24h ?? 0).toFixed(2)}% 24hr
-                </span>
-              </div>
-            </div>
+						{/* Price Stats */}
+						<div className="mt-6">
+							<div className="flex items-baseline gap-2">
+								<span className="text-muted-foreground text-sm">
+									Market Cap
+								</span>
+							</div>
+							<div className="flex items-baseline gap-3 mt-1">
+								<span className="text-3xl font-bold">
+									{formatMarketCap(token.marketCap)}
+								</span>
+								<span
+									className={cn(
+										"text-sm font-medium flex items-center gap-1",
+										pricePositive
+											? "text-[#00ff88]"
+											: "text-destructive",
+									)}
+								>
+									{pricePositive ? (
+										<TrendingUp className="h-4 w-4" />
+									) : (
+										<TrendingDown className="h-4 w-4" />
+									)}
+									{pricePositive ? "+" : ""}
+									{(token.priceChange24h ?? 0).toFixed(2)}%
+									24hr
+								</span>
+							</div>
+						</div>
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-4 gap-4 mt-6 pt-6 border-t border-border">
-              <div>
-                <p className="text-xs text-muted-foreground">Vol 24h</p>
-                <p className="font-semibold tabular-nums">
-                  {formatVolume(token.volume24h)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Price</p>
-                <p className="font-semibold tabular-nums">
-                  {formatPrice(token.currentPrice)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Holders</p>
-                <p className="font-semibold tabular-nums">
-                  {token.holdersCount ?? 0}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Trades</p>
-                <p className="font-semibold tabular-nums">
-                  {token.tradesCount ?? 0}
-                </p>
-              </div>
-            </div>
+						{/* Quick Stats */}
+						<div className="grid grid-cols-4 gap-4 mt-6 pt-6 border-t border-border">
+							<div>
+								<p className="text-xs text-muted-foreground">
+									Vol 24h
+								</p>
+								<p className="font-semibold tabular-nums">
+									{formatVolume(token.volume24h)}
+								</p>
+							</div>
+							<div>
+								<p className="text-xs text-muted-foreground">
+									Price
+								</p>
+								<p className="font-semibold tabular-nums">
+									{formatPrice(token.currentPrice)}
+								</p>
+							</div>
+							<div>
+								<p className="text-xs text-muted-foreground">
+									Holders
+								</p>
+								<p className="font-semibold tabular-nums">
+									{token.holdersCount ?? 0}
+								</p>
+							</div>
+							<div>
+								<p className="text-xs text-muted-foreground">
+									Trades
+								</p>
+								<p className="font-semibold tabular-nums">
+									{token.tradesCount ?? 0}
+								</p>
+							</div>
+						</div>
 
-            {/* Social Links */}
-            <div className="flex flex-wrap items-center gap-3 mt-6 pt-6 border-t border-border">
-              {token.websiteUrl && (
-                <a
-                  href={token.websiteUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                >
-                  <Globe className="h-3.5 w-3.5" />
-                  Website
-                </a>
-              )}
-              {token.twitterUrl && (
-                <a
-                  href={token.twitterUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                >
-                  <Twitter className="h-3.5 w-3.5" />
-                  Twitter
-                </a>
-              )}
-              {token.telegramUrl && (
-                <a
-                  href={token.telegramUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                >
-                  <MessageCircle className="h-3.5 w-3.5" />
-                  Telegram
-                </a>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCopy}
-                className="h-7 text-xs gap-1.5 rounded-full"
-              >
-                {copied ? (
-                  <Check className="h-3.5 w-3.5 text-green-500" />
-                ) : (
-                  <Copy className="h-3.5 w-3.5" />
-                )}
-                {copied ? "Copied!" : "Copy Address"}
-              </Button>
-            </div>
-          </motion.div>
+						{/* Social Links */}
+						<div className="flex flex-wrap items-center gap-3 mt-6 pt-6 border-t border-border">
+							{token.websiteUrl && (
+								<a
+									href={token.websiteUrl}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+								>
+									<Globe className="h-3.5 w-3.5" />
+									Website
+								</a>
+							)}
+							{token.twitterUrl && (
+								<a
+									href={token.twitterUrl}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+								>
+									<Twitter className="h-3.5 w-3.5" />
+									Twitter
+								</a>
+							)}
+							{token.telegramUrl && (
+								<a
+									href={token.telegramUrl}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+								>
+									<MessageCircle className="h-3.5 w-3.5" />
+									Telegram
+								</a>
+							)}
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={handleCopy}
+								className="h-7 text-xs gap-1.5 rounded-full"
+							>
+								{copied ? (
+									<Check className="h-3.5 w-3.5 text-green-500" />
+								) : (
+									<Copy className="h-3.5 w-3.5" />
+								)}
+								{copied ? "Copied!" : "Copy Address"}
+							</Button>
+						</div>
+					</motion.div>
 
-          {/* Price Chart */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <PriceChart tokenId={id} />
-          </motion.div>
+					{/* Price Chart */}
+					<motion.div
+						initial={{ opacity: 0, y: 20 }}
+						animate={{ opacity: 1, y: 0 }}
+						transition={{ delay: 0.1 }}
+					>
+						<PriceChart tokenId={id} />
+					</motion.div>
 
           {/* Comments / Trades / Holders Tabs */}
           <motion.div
@@ -618,19 +648,19 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
             )}
           </motion.div>
 
-          {/* Bonding Curve */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-card border border-border rounded-xl p-4"
-          >
-            <BondingCurveProgress
-              progress={token.bondingCurveProgress ?? 0}
-              currentAmount={token.currentBondingAmount || "0"}
-              targetAmount={token.graduationTarget || "100"}
-            />
-          </motion.div>
+					{/* Bonding Curve */}
+					<motion.div
+						initial={{ opacity: 0, x: 20 }}
+						animate={{ opacity: 1, x: 0 }}
+						transition={{ delay: 0.1 }}
+						className="bg-card border border-border rounded-xl p-4"
+					>
+						<BondingCurveProgress
+							progress={token.bondingCurveProgress ?? 0}
+							currentAmount={token.currentBondingAmount || "0"}
+							targetAmount={token.graduationTarget || "100"}
+						/>
+					</motion.div>
 
           {/* Token Info */}
           <motion.div
@@ -699,34 +729,40 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
             </div>
           </motion.div>
 
-          {/* Quick Stats */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-card border border-border rounded-xl p-4"
-          >
-            <div className="flex items-center gap-2 mb-4">
-              <Activity className="h-4 w-4 text-muted-foreground" />
-              <span className="font-semibold text-sm">Activity</span>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-muted/30 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold tabular-nums">
-                  {token.holdersCount ?? 0}
-                </p>
-                <p className="text-xs text-muted-foreground">Holders</p>
-              </div>
-              <div className="bg-muted/30 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold tabular-nums">
-                  {token.tradesCount ?? 0}
-                </p>
-                <p className="text-xs text-muted-foreground">Trades</p>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </div>
-    </div>
-  );
+					{/* Quick Stats */}
+					<motion.div
+						initial={{ opacity: 0, x: 20 }}
+						animate={{ opacity: 1, x: 0 }}
+						transition={{ delay: 0.3 }}
+						className="bg-card border border-border rounded-xl p-4"
+					>
+						<div className="flex items-center gap-2 mb-4">
+							<Activity className="h-4 w-4 text-muted-foreground" />
+							<span className="font-semibold text-sm">
+								Activity
+							</span>
+						</div>
+						<div className="grid grid-cols-2 gap-3">
+							<div className="bg-muted/30 rounded-lg p-3 text-center">
+								<p className="text-2xl font-bold tabular-nums">
+									{token.holdersCount ?? 0}
+								</p>
+								<p className="text-xs text-muted-foreground">
+									Holders
+								</p>
+							</div>
+							<div className="bg-muted/30 rounded-lg p-3 text-center">
+								<p className="text-2xl font-bold tabular-nums">
+									{token.tradesCount ?? 0}
+								</p>
+								<p className="text-xs text-muted-foreground">
+									Trades
+								</p>
+							</div>
+						</div>
+					</motion.div>
+				</div>
+			</div>
+		</div>
+	);
 }

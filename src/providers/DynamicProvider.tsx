@@ -12,6 +12,7 @@ import { type ReactNode, useEffect, useRef, useCallback } from "react";
 import { useAuthStore, shouldFetchUser } from "@/lib/auth";
 import { getCurrentUser } from "@/lib/api/auth";
 import { forceLogout } from "@/lib/api/client";
+import { NetworkStateSynchronizer } from "@/components/network";
 
 interface DynamicProviderProps {
   children: ReactNode;
@@ -130,7 +131,13 @@ function AuthSync({ children }: { children: ReactNode }) {
     syncAuth();
   }, [syncAuth]);
 
-  return <>{children}</>;
+  return (
+    <>
+      {/* Global Network State Synchronizer - syncs wallet network to app state */}
+      <NetworkStateSynchronizer />
+      {children}
+    </>
+  );
 }
 
 /**

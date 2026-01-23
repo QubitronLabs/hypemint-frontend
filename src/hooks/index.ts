@@ -9,21 +9,33 @@ export * from "./useOrders";
 export * from "./useLeaderboard";
 export * from "./useBlockchainSync";
 export {
-  useNativeBalance,
-  useCreationFee,
-  useCreateToken as useCreateTokenOnChain,
-  useBondingCurveState,
-  useBuyQuote,
-  useSellQuote,
-  useBuyTokens,
-  useSellTokens,
-  useTokenBalance,
-  useApproveToken,
-  useTokenAllowance,
+	usePersistedTabs,
+	useLocalTabs,
+	useSmartTabs,
+} from "./usePersistedTabs";
+export {
+	useGlobalNetwork,
+	useActiveChainId,
+	useIsOnChain,
+	type NetworkInfo,
+	type NetworkState,
+} from "./useNetwork";
+export {
+	useNativeBalance,
+	useCreationFee,
+	useCreateToken as useCreateTokenOnChain,
+	useBondingCurveState,
+	useBuyQuote,
+	useSellQuote,
+	useBuyTokens,
+	useSellTokens,
+	useTokenBalance,
+	useApproveToken,
+	useTokenAllowance,
 } from "./useContracts";
 export type {
-  CreateTokenParams as OnChainCreateTokenParams,
-  CreateTokenResult,
-  BuyParams,
-  SellParams,
+	CreateTokenParams as OnChainCreateTokenParams,
+	CreateTokenResult,
+	BuyParams,
+	SellParams,
 } from "./useContracts";

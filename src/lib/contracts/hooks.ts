@@ -4,7 +4,7 @@
  * React hooks for interacting with HypeMint smart contracts
  */
 
-import { useCallback, useMemo } from "react";
+// import { useCallback, useMemo } from "react";
 import { parseEther, formatEther, type Address } from "viem";
 import { HYPE_FACTORY_ABI, HYPE_BONDING_CURVE_ABI, HYPE_TOKEN_ABI } from "./abis";
 import { getContractAddress, DEFAULT_CREATION_FEE, DEFAULT_SLIPPAGE_BPS } from "./config";
