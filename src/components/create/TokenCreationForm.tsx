@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAccount } from "wagmi";
-import { formatEther } from "viem";
+import { formatEther, parseEther, type Address } from "viem";
 import {
   Upload,
   Globe,
@@ -33,10 +33,15 @@ import {
   useCreateTokenOnChain,
   useCreationFee,
   useNativeBalance,
+  useBuyTokens,
 } from "@/hooks";
 import { useCreateToken } from "@/hooks/useTokens";
 import { getTxUrl } from "@/lib/wagmi";
 import { toast } from "sonner";
+import {
+  getInitialSupplyPreview,
+  type InitialSupplyPreview,
+} from "@/lib/api/tokens";
 
 // Real-time Preview Card Component
 interface TokenPreviewProps {
@@ -220,6 +225,15 @@ export function TokenCreationForm() {
   const { data: creationFee } = useCreationFee();
   const { data: balance } = useNativeBalance();
 
+  // Buy hook for initial purchase
+  const {
+    buy: buyTokens,
+    isBuying,
+    isConfirming: isBuyConfirming,
+    txHash: buyTxHash,
+    error: buyError,
+  } = useBuyTokens();
+
   // Backend API hook
   const createTokenApi = useCreateToken();
 
@@ -234,11 +248,24 @@ export function TokenCreationForm() {
   const [twitterUrl, setTwitterUrl] = useState("");
   const [telegramUrl, setTelegramUrl] = useState("");
 
+  // Initial buy amount (dev buy / initial liquidity)
+  const [initialBuyAmount, setInitialBuyAmount] = useState<string>("");
+  const [wantInitialBuy, setWantInitialBuy] = useState(false);
+
+  // Initial supply preview state
+  const [supplyPreview, setSupplyPreview] =
+    useState<InitialSupplyPreview | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const debouncedBuyAmount = useDebounce(initialBuyAmount, 300);
+
   // HypeBoost toggle
   const [hypeBoostEnabled, setHypeBoostEnabled] = useState(true);
 
   // Upload state
   const [isUploading, setIsUploading] = useState(false);
+
+  // Initial buy state
+  const [isInitialBuying, setIsInitialBuying] = useState(false);
 
   // Drag and drop
   const [isDragging, setIsDragging] = useState(false);
@@ -281,6 +308,33 @@ export function TokenCreationForm() {
     checkSymbol();
   }, [debouncedSymbol]);
 
+  // Fetch initial supply preview when buy amount changes
+  useEffect(() => {
+    async function fetchSupplyPreview() {
+      if (
+        !wantInitialBuy ||
+        !debouncedBuyAmount ||
+        parseFloat(debouncedBuyAmount) <= 0
+      ) {
+        setSupplyPreview(null);
+        return;
+      }
+
+      setIsLoadingPreview(true);
+      try {
+        const preview = await getInitialSupplyPreview(debouncedBuyAmount);
+        setSupplyPreview(preview);
+      } catch (error) {
+        console.error("Failed to fetch supply preview:", error);
+        setSupplyPreview(null);
+      } finally {
+        setIsLoadingPreview(false);
+      }
+    }
+
+    fetchSupplyPreview();
+  }, [debouncedBuyAmount, wantInitialBuy]);
+
   // Validation
   const isFormValid =
     name.length >= 2 &&
@@ -288,9 +342,14 @@ export function TokenCreationForm() {
     symbol.length <= 10 &&
     symbolAvailable !== false;
 
-  // Check balance
+  // Calculate total cost (creation fee + initial buy amount)
   const fee = creationFee || BigInt("10000000000000000");
-  const hasEnoughBalance = balance?.value ? balance.value >= fee : false;
+  const initialBuyWei =
+    wantInitialBuy && initialBuyAmount
+      ? parseEther(initialBuyAmount || "0")
+      : BigInt(0);
+  const totalCost = fee + initialBuyWei;
+  const hasEnoughBalance = balance?.value ? balance.value >= totalCost : false;
 
   // Handle image upload
   const handleImageUpload = (file: File) => {
@@ -431,6 +490,38 @@ export function TokenCreationForm() {
           }
         } catch (apiError) {
           console.warn("Failed to store token metadata:", apiError);
+        }
+
+        // Initial buy if enabled
+        if (
+          wantInitialBuy &&
+          initialBuyAmount &&
+          parseFloat(initialBuyAmount) > 0
+        ) {
+          setIsInitialBuying(true);
+          toast.info("Making initial purchase...", { id: "initial-buy" });
+
+          try {
+            const buyHash = await buyTokens({
+              bondingCurveAddress: result.bondingCurveAddress as Address,
+              maticAmount: initialBuyAmount,
+              slippageBps: 500, // 5% slippage
+            });
+
+            if (buyHash) {
+              toast.success("Initial purchase successful!", {
+                id: "initial-buy",
+                description: `You now own ${symbol.toUpperCase()} tokens!`,
+              });
+            }
+          } catch (buyErr) {
+            console.error("Initial buy failed:", buyErr);
+            toast.error("Initial purchase failed, but token was created", {
+              id: "initial-buy",
+            });
+          } finally {
+            setIsInitialBuying(false);
+          }
         }
 
         if (backendTokenId) {
@@ -709,6 +800,165 @@ export function TokenCreationForm() {
               </div>
             </div>
 
+            {/* Initial Buy (Dev Buy) Section */}
+            <div className="border border-border rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setWantInitialBuy(!wantInitialBuy)}
+                className={cn(
+                  "w-full p-4 flex items-center gap-3 transition-colors",
+                  wantInitialBuy
+                    ? "bg-primary/5"
+                    : "bg-muted/30 hover:bg-muted/50",
+                )}
+              >
+                <div
+                  className={cn(
+                    "w-10 h-10 rounded-lg flex items-center justify-center",
+                    wantInitialBuy ? "bg-primary text-white" : "bg-muted",
+                  )}
+                >
+                  <Coins className="h-5 w-5" />
+                </div>
+                <div className="flex-1 text-left">
+                  <span className="font-medium">
+                    Initial Purchase (Dev Buy)
+                  </span>
+                  <p className="text-xs text-muted-foreground">
+                    Buy tokens immediately after creation to seed liquidity
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "text-xs px-3 py-1.5 rounded-full font-medium",
+                    wantInitialBuy
+                      ? "bg-primary text-white"
+                      : "bg-muted text-muted-foreground",
+                  )}
+                >
+                  {wantInitialBuy ? "Enabled" : "Optional"}
+                </span>
+              </button>
+
+              <AnimatePresence>
+                {wantInitialBuy && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="p-4 border-t border-border space-y-4">
+                      <div>
+                        <label className="text-sm font-medium mb-1.5 block">
+                          Amount to Buy (POL)
+                        </label>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0.01"
+                            placeholder="0.5"
+                            value={initialBuyAmount}
+                            onChange={(e) =>
+                              setInitialBuyAmount(e.target.value)
+                            }
+                            className="h-11 pr-16 bg-background text-lg font-mono"
+                          />
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                            POL
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quick amount buttons */}
+                      <div className="flex gap-2">
+                        {["0.1", "0.5", "1", "5", "10"].map((amt) => (
+                          <button
+                            key={amt}
+                            type="button"
+                            onClick={() => setInitialBuyAmount(amt)}
+                            className={cn(
+                              "flex-1 py-2 text-sm font-medium rounded-lg border transition-colors",
+                              initialBuyAmount === amt
+                                ? "bg-primary text-white border-primary"
+                                : "bg-muted/50 border-border hover:border-primary/50",
+                            )}
+                          >
+                            {amt} POL
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Initial Supply Preview */}
+                      {wantInitialBuy &&
+                        initialBuyAmount &&
+                        parseFloat(initialBuyAmount) > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="p-4 bg-gradient-to-br from-primary/10 to-purple-500/10 border border-primary/20 rounded-xl"
+                          >
+                            <div className="flex items-center gap-2 mb-3">
+                              <TrendingUp className="h-4 w-4 text-primary" />
+                              <span className="text-sm font-medium">
+                                Estimated Token Allocation
+                              </span>
+                            </div>
+
+                            {isLoadingPreview ? (
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                                <span className="text-sm">Calculating...</span>
+                              </div>
+                            ) : supplyPreview ? (
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm text-muted-foreground">
+                                    You will receive:
+                                  </span>
+                                  <span className="text-lg font-bold text-primary">
+                                    {supplyPreview.estimatedTokensFormatted}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs text-muted-foreground">
+                                  <span>Starting Price:</span>
+                                  <span className="font-mono">
+                                    {supplyPreview.startingPriceFormatted}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs text-muted-foreground">
+                                  <span>Platform Fees:</span>
+                                  <span className="font-mono">
+                                    {supplyPreview.feesFormatted}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground/70 pt-1 border-t border-border/50">
+                                  {supplyPreview.note}
+                                </p>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">
+                                Enter an amount to see estimated tokens
+                              </p>
+                            )}
+                          </motion.div>
+                        )}
+
+                      <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                        <p className="text-xs text-blue-400">
+                          <strong>Pro tip:</strong> Initial purchases help
+                          establish the bonding curve and show other traders
+                          that you believe in your token. This amount will be
+                          added to the creation fee.
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             {/* Launch Info */}
             <div className="bg-muted/50 rounded-xl p-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
@@ -724,6 +974,20 @@ export function TokenCreationForm() {
                   <p className="text-muted-foreground">Creation Fee</p>
                   <p className="font-mono font-medium">
                     {formatEther(fee)} POL
+                  </p>
+                </div>
+                {wantInitialBuy && initialBuyAmount && (
+                  <div>
+                    <p className="text-muted-foreground">Initial Buy</p>
+                    <p className="font-mono font-medium text-primary">
+                      +{initialBuyAmount} POL
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-muted-foreground">Total Cost</p>
+                  <p className="font-mono font-medium text-primary">
+                    {formatEther(totalCost)} POL
                   </p>
                 </div>
                 <div>
@@ -748,7 +1012,8 @@ export function TokenCreationForm() {
               <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-500">
                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
                 <span className="text-sm">
-                  Insufficient balance. Need at least {formatEther(fee)} POL.
+                  Insufficient balance. Need at least {formatEther(totalCost)}{" "}
+                  POL.
                 </span>
               </div>
             )}
@@ -787,7 +1052,10 @@ export function TokenCreationForm() {
                 !hasEnoughBalance ||
                 isCreating ||
                 isConfirming ||
-                isUploading
+                isUploading ||
+                isInitialBuying ||
+                isBuying ||
+                isBuyConfirming
               }
               className="w-full h-12 text-base font-semibold gap-2 bg-gradient-to-r from-primary to-purple-600 hover:opacity-90"
             >
@@ -804,12 +1072,19 @@ export function TokenCreationForm() {
               ) : isConfirming ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  Confirming Transaction...
+                  Creating Token...
+                </>
+              ) : isInitialBuying || isBuying || isBuyConfirming ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Making Initial Purchase...
                 </>
               ) : (
                 <>
                   <Rocket className="h-5 w-5" />
-                  Launch Token
+                  {wantInitialBuy && initialBuyAmount
+                    ? `Launch Token + Buy ${initialBuyAmount} POL`
+                    : "Launch Token"}
                 </>
               )}
             </Button>

@@ -599,9 +599,9 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
           >
-            {token.bondingCurveAddress ? (
+            {token.bondingCurveAddress && token.contractAddress ? (
               <OnChainTradingPanel
-                tokenAddress={token.id as Address}
+                tokenAddress={token.contractAddress as Address}
                 bondingCurveAddress={token.bondingCurveAddress as Address}
                 tokenSymbol={token.symbol || "TOKEN"}
                 tokenName={token.name || "Unknown Token"}
@@ -665,7 +665,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Reserve</span>
                 <span className="text-sm font-mono tabular-nums">
-                  {parseFloat(token.currentBondingAmount || "0").toFixed(4)} POL
+                  {fromWei(token.currentBondingAmount || "0").toFixed(4)} POL
                 </span>
               </div>
               <div className="flex items-center justify-between">

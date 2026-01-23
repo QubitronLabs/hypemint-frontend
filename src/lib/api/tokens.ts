@@ -333,3 +333,80 @@ export async function getTokenHolders(tokenId: string): Promise<{
     return { holders: [], totalHolders: 0 };
   }
 }
+
+// Get initial supply preview for token creation
+export interface InitialSupplyPreview {
+  maticAmount: number;
+  estimatedTokens: number;
+  estimatedTokensFormatted: string;
+  startingPrice: number;
+  startingPriceFormatted: string;
+  fees: number;
+  feesFormatted: string;
+  note: string;
+}
+
+export async function getInitialSupplyPreview(
+  maticAmount: string,
+): Promise<InitialSupplyPreview | null> {
+  try {
+    const { data } = await apiClient.get<ApiResponse<InitialSupplyPreview>>(
+      `/api/v1/config/initial-supply-preview`,
+      { params: { amount: maticAmount } },
+    );
+    return data.data;
+  } catch (error) {
+    console.error("Failed to get initial supply preview:", error);
+    return null;
+  }
+}
+
+// Get platform fees configuration
+export interface PlatformFees {
+  protocolFee: string;
+  creatorFee: string;
+  totalTradeFee: string;
+  creationFee: string;
+  graduationFee: string;
+}
+
+export async function getPlatformFees(): Promise<PlatformFees | null> {
+  try {
+    const { data } =
+      await apiClient.get<ApiResponse<PlatformFees>>(`/api/v1/config/fees`);
+    return data.data;
+  } catch (error) {
+    console.error("Failed to get platform fees:", error);
+    return null;
+  }
+}
+
+// Get buy quote for a token
+export interface BuyQuote {
+  tokenAmount: string;
+  tokenAmountFormatted: number;
+  protocolFee: string;
+  creatorFee: string;
+  totalFees: string;
+  totalFeesFormatted: number;
+  effectivePrice: number;
+  priceImpact: number;
+  maticAmount: string;
+  tokenSymbol?: string;
+}
+
+export async function getBuyQuote(
+  tokenId: string,
+  maticAmount: string,
+): Promise<BuyQuote | null> {
+  try {
+    const { data } = await apiClient.get<ApiResponse<BuyQuote>>(
+      `/api/v1/tokens/${tokenId}/quote/buy`,
+      { params: { amount: maticAmount } },
+    );
+    return data.data;
+  } catch (error) {
+    console.error("Failed to get buy quote:", error);
+    return null;
+  }
+}

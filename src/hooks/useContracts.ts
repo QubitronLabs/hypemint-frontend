@@ -564,6 +564,9 @@ export function useApproveToken() {
           functionName: "approve",
           args: [spenderAddress, amount],
           chainId: ACTIVE_CHAIN_ID,
+          // Set higher gas price for Polygon Amoy testnet (minimum 25 gwei)
+          maxFeePerGas: BigInt(50000000000), // 50 gwei
+          maxPriorityFeePerGas: BigInt(30000000000), // 30 gwei
         });
 
         setTxHash(hash);

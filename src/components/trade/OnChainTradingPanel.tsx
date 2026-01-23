@@ -49,15 +49,49 @@ interface OnChainTradingPanelProps {
 
 type TradeType = "buy" | "sell";
 
-// Format number with commas
+// Format number with commas - handles extremely large numbers
 function formatNumber(num: number | string): string {
   const n = typeof num === "string" ? parseFloat(num) : num;
-  if (isNaN(n)) return "0";
+  if (isNaN(n) || !isFinite(n)) return "0";
+  if (n >= 1e15) return (n / 1e15).toFixed(2) + "Q"; // Quadrillion
+  if (n >= 1e12) return (n / 1e12).toFixed(2) + "T"; // Trillion
   if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
   if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
   if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
-  if (n < 0.0001 && n > 0) return "<0.0001";
-  return n.toFixed(4);
+  if (n < 0.00000001 && n > 0) return "<0.00000001";
+  if (n < 0.0001 && n > 0) return n.toExponential(2);
+  return n.toFixed(n < 1 ? 8 : 4);
+}
+
+// Format price with better precision for small values
+function formatPrice(num: number): string {
+  if (isNaN(num) || !isFinite(num)) return "0";
+  if (num >= 1e9) return ">999M MATIC";
+  if (num >= 1e6) return (num / 1e6).toFixed(2) + "M";
+  if (num >= 1e3) return (num / 1e3).toFixed(2) + "K";
+  if (num >= 1) return num.toFixed(4);
+  if (num >= 0.0001) return num.toFixed(6);
+  if (num >= 0.00000001) return num.toFixed(10);
+  if (num > 0) return num.toExponential(4);
+  return "0";
+}
+
+// Validate trade amount is reasonable
+function validateTradeAmount(
+  amount: string,
+  isBuy: boolean,
+  balance: bigint | undefined,
+): { valid: boolean; error?: string } {
+  const parsed = parseFloat(amount);
+  if (isNaN(parsed) || parsed <= 0)
+    return { valid: false, error: "Enter a valid amount" };
+  if (!isFinite(parsed)) return { valid: false, error: "Amount too large" };
+
+  // Check if amount would result in astronomical values (likely calculation error)
+  if (isBuy && parsed > 1000000)
+    return { valid: false, error: "Amount exceeds reasonable limit" };
+
+  return { valid: true };
 }
 
 export function OnChainTradingPanel({
@@ -73,9 +107,31 @@ export function OnChainTradingPanel({
   const [amount, setAmount] = useState("");
   const [slippage, setSlippage] = useState(5); // 5% default
 
-  // Balances
-  const { data: nativeBalance } = useNativeBalance();
-  const { data: tokenBalance } = useTokenBalance(tokenAddress);
+  // Balances - with refetch capability
+  const { data: nativeBalance, refetch: refetchNativeBalance } =
+    useNativeBalance();
+  const {
+    data: tokenBalance,
+    refetch: refetchTokenBalance,
+    isLoading: isLoadingBalance,
+  } = useTokenBalance(tokenAddress);
+
+  // Debug logging for balance
+  useEffect(() => {
+    console.log("[OnChainTrading] Token balance data:", {
+      tokenAddress,
+      bondingCurveAddress,
+      userAddress: address,
+      tokenBalance: tokenBalance?.toString(),
+      isLoadingBalance,
+    });
+  }, [
+    tokenAddress,
+    bondingCurveAddress,
+    address,
+    tokenBalance,
+    isLoadingBalance,
+  ]);
 
   // Quotes
   const { data: buyQuote, isLoading: isBuyQuoteLoading } = useBuyQuote(
@@ -141,7 +197,7 @@ export function OnChainTradingPanel({
     }
   }, [tradeType, amount, allowance]);
 
-  // Calculate trade metrics
+  // Calculate trade metrics with safety checks
   const tradeMetrics = useMemo(() => {
     const parsedAmount = parseFloat(amount) || 0;
     const price = parseFloat(currentPrice) || 0.00001;
@@ -154,15 +210,21 @@ export function OnChainTradingPanel({
       ];
       const tokensOut = parseFloat(formatEther(tokenAmount));
       const totalFees = parseFloat(formatEther(protocolFee + creatorFee));
-      const effectivePrice = parsedAmount / tokensOut;
-      const priceImpact = ((effectivePrice - price) / price) * 100;
+      const effectivePrice = tokensOut > 0 ? parsedAmount / tokensOut : 0;
+      const priceImpact =
+        price > 0 ? ((effectivePrice - price) / price) * 100 : 0;
+
+      // Safety check for unreasonable values
+      const isUnreasonable =
+        !isFinite(tokensOut) || tokensOut > 1e18 || !isFinite(effectivePrice);
 
       return {
-        outputAmount: tokensOut,
-        fees: totalFees,
-        effectivePrice,
-        priceImpact: Math.abs(priceImpact),
+        outputAmount: isUnreasonable ? 0 : tokensOut,
+        fees: isFinite(totalFees) ? totalFees : 0,
+        effectivePrice: isUnreasonable ? 0 : effectivePrice,
+        priceImpact: isFinite(priceImpact) ? Math.abs(priceImpact) : 0,
         isHighImpact: Math.abs(priceImpact) > 5,
+        isUnreasonable,
       };
     }
 
@@ -174,15 +236,21 @@ export function OnChainTradingPanel({
       ];
       const maticOut = parseFloat(formatEther(maticAmount));
       const totalFees = parseFloat(formatEther(protocolFee + creatorFee));
-      const effectivePrice = maticOut / parsedAmount;
-      const priceImpact = ((price - effectivePrice) / price) * 100;
+      const effectivePrice = parsedAmount > 0 ? maticOut / parsedAmount : 0;
+      const priceImpact =
+        price > 0 ? ((price - effectivePrice) / price) * 100 : 0;
+
+      // Safety check for unreasonable values (e.g., more than 1 billion MATIC)
+      const isUnreasonable =
+        !isFinite(maticOut) || maticOut > 1e9 || !isFinite(effectivePrice);
 
       return {
-        outputAmount: maticOut,
-        fees: totalFees,
-        effectivePrice,
-        priceImpact: Math.abs(priceImpact),
+        outputAmount: isUnreasonable ? 0 : maticOut,
+        fees: isFinite(totalFees) ? totalFees : 0,
+        effectivePrice: isUnreasonable ? 0 : effectivePrice,
+        priceImpact: isFinite(priceImpact) ? Math.abs(priceImpact) : 0,
         isHighImpact: Math.abs(priceImpact) > 5,
+        isUnreasonable,
       };
     }
 
@@ -192,6 +260,7 @@ export function OnChainTradingPanel({
       effectivePrice: price,
       priceImpact: 0,
       isHighImpact: false,
+      isUnreasonable: false,
     };
   }, [amount, tradeType, currentPrice, buyQuote, sellQuote]);
 
@@ -229,19 +298,41 @@ export function OnChainTradingPanel({
     [tokenAddress, bondingCurveAddress],
   );
 
-  // Sync buy trade when confirmed
+  // Refetch balances and sync when trades are confirmed
   useEffect(() => {
     if (isBuyConfirmed && buyTxHash) {
       syncTradeToBackend(buyTxHash);
+      // Refetch balances after confirmed trade
+      setTimeout(() => {
+        refetchNativeBalance();
+        refetchTokenBalance();
+      }, 2000); // Wait 2s for blockchain state to update
     }
-  }, [isBuyConfirmed, buyTxHash, syncTradeToBackend]);
+  }, [
+    isBuyConfirmed,
+    buyTxHash,
+    syncTradeToBackend,
+    refetchNativeBalance,
+    refetchTokenBalance,
+  ]);
 
   // Sync sell trade when confirmed
   useEffect(() => {
     if (isSellConfirmed && sellTxHash) {
       syncTradeToBackend(sellTxHash);
+      // Refetch balances after confirmed trade
+      setTimeout(() => {
+        refetchNativeBalance();
+        refetchTokenBalance();
+      }, 2000); // Wait 2s for blockchain state to update
     }
-  }, [isSellConfirmed, sellTxHash, syncTradeToBackend]);
+  }, [
+    isSellConfirmed,
+    sellTxHash,
+    syncTradeToBackend,
+    refetchNativeBalance,
+    refetchTokenBalance,
+  ]);
 
   // Handle approve
   const handleApprove = async () => {
@@ -449,12 +540,24 @@ export function OnChainTradingPanel({
               exit={{ opacity: 0, height: 0 }}
               className="space-y-2 mb-4"
             >
+              {/* Warning for unreasonable values */}
+              {tradeMetrics.isUnreasonable && (
+                <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                  <span className="text-sm text-destructive">
+                    Calculation overflow - try a smaller amount
+                  </span>
+                </div>
+              )}
+
               <div className="p-3 bg-background/30 rounded-lg space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">You Receive</span>
                   <span className="font-medium">
                     {isBuyQuoteLoading || isSellQuoteLoading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : tradeMetrics.isUnreasonable ? (
+                      <span className="text-destructive">--</span>
                     ) : (
                       <>
                         {formatNumber(tradeMetrics.outputAmount)}{" "}
@@ -466,13 +569,19 @@ export function OnChainTradingPanel({
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Price per Token</span>
                   <span className="font-medium">
-                    {tradeMetrics.effectivePrice.toFixed(8)} MATIC
+                    {tradeMetrics.isUnreasonable
+                      ? "--"
+                      : formatPrice(tradeMetrics.effectivePrice)}{" "}
+                    MATIC
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Fees (2%)</span>
                   <span className="font-medium">
-                    {tradeMetrics.fees.toFixed(6)} MATIC
+                    {tradeMetrics.isUnreasonable
+                      ? "--"
+                      : formatNumber(tradeMetrics.fees)}{" "}
+                    MATIC
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -485,10 +594,13 @@ export function OnChainTradingPanel({
                         : "text-muted-foreground",
                     )}
                   >
-                    {tradeMetrics.priceImpact.toFixed(2)}%
-                    {tradeMetrics.isHighImpact && (
-                      <AlertTriangle className="h-3 w-3 inline ml-1" />
-                    )}
+                    {tradeMetrics.isUnreasonable
+                      ? "--"
+                      : `${tradeMetrics.priceImpact.toFixed(2)}%`}
+                    {tradeMetrics.isHighImpact &&
+                      !tradeMetrics.isUnreasonable && (
+                        <AlertTriangle className="h-3 w-3 inline ml-1" />
+                      )}
                   </span>
                 </div>
               </div>
