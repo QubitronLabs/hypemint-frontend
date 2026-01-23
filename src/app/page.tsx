@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap,
   BarChart3,
@@ -15,37 +15,44 @@ import {
   Plus,
   Wifi,
   WifiOff,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
-import { TokenCard } from '@/components/token';
-import { useTrendingTokens, useNewTokens, useTokens } from '@/hooks/useTokens';
-import { useNewTokenFeed, useGlobalTradeFeed } from '@/hooks/useWebSocket';
-import { cn } from '@/lib/utils';
-import Link from 'next/link';
-import type { Token } from '@/types';
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TokenCard } from "@/components/token";
+import { useTrendingTokens, useNewTokens, useTokens } from "@/hooks/useTokens";
+import { useNewTokenFeed, useGlobalTradeFeed } from "@/hooks/useWebSocket";
+import { cn } from "@/lib/utils";
+import Link from "next/link";
+import type { Token } from "@/types";
 
 // Filter tabs configuration
 const FILTER_TABS = [
-  { id: 'all', label: 'All', icon: BarChart3, description: 'All tokens' },
-  { id: 'trending', label: 'Trending', icon: Flame, description: 'Hot right now' },
-  { id: 'new', label: 'New', icon: Sparkles, description: 'Just launched' },
-  { id: 'live', label: 'Live', icon: Zap, description: 'Active trading' },
-  { id: 'graduated', label: 'Graduated', icon: Trophy, description: 'Made it' },
+  { id: "all", label: "All", icon: BarChart3, description: "All tokens" },
+  {
+    id: "trending",
+    label: "Trending",
+    icon: Flame,
+    description: "Hot right now",
+  },
+  { id: "new", label: "New", icon: Sparkles, description: "Just launched" },
+  { id: "live", label: "Live", icon: Zap, description: "Active trading" },
+  { id: "graduated", label: "Graduated", icon: Trophy, description: "Made it" },
 ] as const;
 
-type FilterTab = typeof FILTER_TABS[number]['id'];
+type FilterTab = (typeof FILTER_TABS)[number]["id"];
 
 // Live activity indicator component
 function LiveIndicator({ isConnected }: { isConnected: boolean }) {
   return (
-    <div className={cn(
-      "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all",
-      isConnected
-        ? "bg-green-500/10 text-green-500 border border-green-500/20"
-        : "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20"
-    )}>
+    <div
+      className={cn(
+        "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all",
+        isConnected
+          ? "bg-green-500/10 text-green-500 border border-green-500/20"
+          : "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20",
+      )}
+    >
       {isConnected ? (
         <>
           <span className="relative flex h-2 w-2">
@@ -68,7 +75,7 @@ function LiveIndicator({ isConnected }: { isConnected: boolean }) {
 // Recent activity feed item
 interface ActivityItem {
   id: string;
-  type: 'new_token' | 'trade';
+  type: "new_token" | "trade";
   tokenSymbol: string;
   tokenName?: string;
   message: string;
@@ -90,15 +97,23 @@ function ActivityFeed({ items }: { items: ActivityItem[] }) {
             <motion.div
               key={item.id}
               initial={{ opacity: 0, x: -20, height: 0 }}
-              animate={{ opacity: 1, x: 0, height: 'auto' }}
+              animate={{ opacity: 1, x: 0, height: "auto" }}
               exit={{ opacity: 0, x: 20, height: 0 }}
               className="flex items-center gap-3 text-sm py-2 border-b border-border/30 last:border-0"
             >
-              <div className={cn(
-                "w-8 h-8 rounded-lg flex items-center justify-center",
-                item.type === 'new_token' ? "bg-primary/20 text-primary" : "bg-green-500/20 text-green-500"
-              )}>
-                {item.type === 'new_token' ? <Sparkles className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
+              <div
+                className={cn(
+                  "w-8 h-8 rounded-lg flex items-center justify-center",
+                  item.type === "new_token"
+                    ? "bg-primary/20 text-primary"
+                    : "bg-green-500/20 text-green-500",
+                )}
+              >
+                {item.type === "new_token" ? (
+                  <Sparkles className="h-4 w-4" />
+                ) : (
+                  <TrendingUp className="h-4 w-4" />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-foreground truncate">{item.message}</p>
@@ -115,7 +130,12 @@ function ActivityFeed({ items }: { items: ActivityItem[] }) {
 }
 
 // Stats card component
-function StatsCard({ icon: Icon, label, value, trend }: {
+function StatsCard({
+  icon: Icon,
+  label,
+  value,
+  trend,
+}: {
   icon: React.ElementType;
   label: string;
   value: string;
@@ -132,11 +152,16 @@ function StatsCard({ icon: Icon, label, value, trend }: {
           <p className="text-xs text-muted-foreground">{label}</p>
         </div>
         {trend !== undefined && (
-          <div className={cn(
-            "ml-auto text-xs font-medium px-2 py-1 rounded",
-            trend >= 0 ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
-          )}>
-            {trend >= 0 ? '+' : ''}{trend}%
+          <div
+            className={cn(
+              "ml-auto text-xs font-medium px-2 py-1 rounded",
+              trend >= 0
+                ? "bg-green-500/10 text-green-500"
+                : "bg-red-500/10 text-red-500",
+            )}
+          >
+            {trend >= 0 ? "+" : ""}
+            {trend}%
           </div>
         )}
       </div>
@@ -145,10 +170,10 @@ function StatsCard({ icon: Icon, label, value, trend }: {
 }
 
 export default function HomePage() {
-  const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [mounted, setMounted] = useState(false);
-  const [wsConnected, setWsConnected] = useState(false);
+  // const [wsConnected, setWsConnected] = useState(false);
   const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
 
   // Prevent hydration mismatch
@@ -157,71 +182,89 @@ export default function HomePage() {
   }, []);
 
   // Fetch data
-  const { data: allTokens = [], isLoading: allLoading, refetch: refetchAll } = useTokens({ page: 1, pageSize: 50 });
-  const { data: trendingTokens = [], isLoading: trendingLoading } = useTrendingTokens();
+  const {
+    data: allTokens = [],
+    isLoading: allLoading,
+    refetch: refetchAll,
+  } = useTokens({ page: 1, pageSize: 50 });
+  const { data: trendingTokens = [], isLoading: trendingLoading } =
+    useTrendingTokens();
   const { data: newTokens = [], isLoading: newLoading } = useNewTokens();
 
   // WebSocket: Listen for new tokens
-  useNewTokenFeed(useCallback((newToken) => {
-    setWsConnected(true);
+  useNewTokenFeed(
+    useCallback(
+      (newToken) => {
+        // setWsConnected(true);
 
-    // Add to activity feed
-    const activity: ActivityItem = {
-      id: `token-${newToken.tokenId}-${Date.now()}`,
-      type: 'new_token',
-      tokenSymbol: newToken.symbol,
-      tokenName: newToken.name,
-      message: `${newToken.name} ($${newToken.symbol}) just launched!`,
-      timestamp: Date.now(),
-    };
+        // Add to activity feed
+        const activity: ActivityItem = {
+          id: `token-${newToken.tokenId}-${Date.now()}`,
+          type: "new_token",
+          tokenSymbol: newToken.symbol,
+          tokenName: newToken.name,
+          message: `${newToken.name} ($${newToken.symbol}) just launched!`,
+          timestamp: Date.now(),
+        };
 
-    setActivityFeed(prev => [activity, ...prev].slice(0, 20));
+        setActivityFeed((prev) => [activity, ...prev].slice(0, 20));
 
-    // Refetch tokens after a small delay
-    setTimeout(() => refetchAll(), 1000);
-  }, [refetchAll]));
+        // Refetch tokens after a small delay
+        setTimeout(() => refetchAll(), 1000);
+      },
+      [refetchAll],
+    ),
+  );
 
   // WebSocket: Listen for trades
-  useGlobalTradeFeed(useCallback((trade) => {
-    setWsConnected(true);
+  useGlobalTradeFeed(
+    useCallback((trade) => {
+      // setWsConnected(true);
 
-    const activity: ActivityItem = {
-      id: `trade-${trade.tradeId}-${Date.now()}`,
-      type: 'trade',
-      tokenSymbol: trade.tokenSymbol,
-      message: `${trade.username || 'Someone'} ${trade.type === 'buy' ? 'bought' : 'sold'} $${trade.tokenSymbol}`,
-      timestamp: Date.now(),
-    };
+      const activity: ActivityItem = {
+        id: `trade-${trade.tradeId}-${Date.now()}`,
+        type: "trade",
+        tokenSymbol: trade.tokenSymbol,
+        message: `${trade.username || "Someone"} ${trade.type === "buy" ? "bought" : "sold"} $${trade.tokenSymbol}`,
+        timestamp: Date.now(),
+      };
 
-    setActivityFeed(prev => [activity, ...prev].slice(0, 20));
-  }, []));
+      setActivityFeed((prev) => [activity, ...prev].slice(0, 20));
+    }, []),
+  );
 
   // Determine display tokens
   const getDisplayTokens = (): Token[] => {
     switch (activeFilter) {
-      case 'trending':
+      case "trending":
         return Array.isArray(trendingTokens) ? trendingTokens : [];
-      case 'new':
+      case "new":
         return Array.isArray(newTokens) ? newTokens : [];
-      case 'graduated':
-        return allTokens.filter(t => t.status === 'graduated');
-      case 'live':
-        return allTokens.filter(t => t.status === 'active');
-      case 'all':
+      case "graduated":
+        return allTokens.filter((t) => t.status === "graduated");
+      case "live":
+        return allTokens.filter((t) => t.status === "active");
+      case "all":
       default:
         return Array.isArray(allTokens) ? allTokens : [];
     }
   };
 
   const tokens = getDisplayTokens();
-  const isLoading = activeFilter === 'all' ? allLoading :
-    activeFilter === 'trending' ? trendingLoading :
-      activeFilter === 'new' ? newLoading : false;
+  const isLoading =
+    activeFilter === "all"
+      ? allLoading
+      : activeFilter === "trending"
+        ? trendingLoading
+        : activeFilter === "new"
+          ? newLoading
+          : false;
 
   // Search filtering
-  const filteredTokens = tokens.filter((token: Token) =>
-    token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    token.symbol.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredTokens = tokens.filter(
+    (token: Token) =>
+      token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      token.symbol.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   if (!mounted) return null;
@@ -229,7 +272,6 @@ export default function HomePage() {
   return (
     <main className="min-h-screen pb-20">
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-6">
-
         {/* Hero Section - Clean and Minimal */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -249,7 +291,7 @@ export default function HomePage() {
             </div>
 
             <div className="flex items-center gap-3">
-              <LiveIndicator isConnected={wsConnected} />
+              {/* <LiveIndicator isConnected={wsConnected} /> */}
               <Link href="/create">
                 <Button className="gap-2 bg-gradient-to-r from-primary to-purple-600 hover:opacity-90">
                   <Plus className="h-4 w-4" />
@@ -267,10 +309,29 @@ export default function HomePage() {
           transition={{ delay: 0.1 }}
           className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
         >
-          <StatsCard icon={Rocket} label="Total Tokens" value={allTokens.length.toString()} />
-          <StatsCard icon={Flame} label="Trending" value={trendingTokens.length.toString()} trend={12} />
-          <StatsCard icon={Clock} label="New Today" value={newTokens.length.toString()} />
-          <StatsCard icon={Trophy} label="Graduated" value={allTokens.filter(t => t.status === 'graduated').length.toString()} />
+          <StatsCard
+            icon={Rocket}
+            label="Total Tokens"
+            value={allTokens.length.toString()}
+          />
+          <StatsCard
+            icon={Flame}
+            label="Trending"
+            value={trendingTokens.length.toString()}
+            trend={12}
+          />
+          <StatsCard
+            icon={Clock}
+            label="New Today"
+            value={newTokens.length.toString()}
+          />
+          <StatsCard
+            icon={Trophy}
+            label="Graduated"
+            value={allTokens
+              .filter((t) => t.status === "graduated")
+              .length.toString()}
+          />
         </motion.div>
 
         {/* Main Content Grid */}
@@ -295,14 +356,20 @@ export default function HomePage() {
                       onClick={() => setActiveFilter(tab.id)}
                       className={cn(
                         "relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap",
-                        isActive ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                        isActive
+                          ? "text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground",
                       )}
                     >
                       {isActive && (
                         <motion.div
                           layoutId="activeFilter"
                           className="absolute inset-0 bg-primary rounded-lg"
-                          transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
+                          transition={{
+                            type: "spring",
+                            bounce: 0.2,
+                            duration: 0.5,
+                          }}
                         />
                       )}
                       <span className="relative z-10 flex items-center gap-1.5">
@@ -337,7 +404,10 @@ export default function HomePage() {
                   className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"
                 >
                   {Array.from({ length: 9 }).map((_, i) => (
-                    <div key={i} className="bg-card/40 border border-border/50 rounded-xl p-4 space-y-3">
+                    <div
+                      key={i}
+                      className="bg-card/40 border border-border/50 rounded-xl p-4 space-y-3"
+                    >
                       <div className="flex items-center gap-3">
                         <Skeleton className="w-12 h-12 rounded-lg" />
                         <div className="flex-1 space-y-2">
@@ -363,12 +433,13 @@ export default function HomePage() {
                   <div className="w-20 h-20 rounded-2xl bg-muted/30 flex items-center justify-center mb-4">
                     <Search className="w-8 h-8 text-muted-foreground" />
                   </div>
-                  <h3 className="text-lg font-semibold mb-2">No tokens found</h3>
+                  <h3 className="text-lg font-semibold mb-2">
+                    No tokens found
+                  </h3>
                   <p className="text-muted-foreground text-sm max-w-sm mb-4">
                     {searchQuery
                       ? `No tokens match "${searchQuery}"`
-                      : "Be the first to launch a token!"
-                    }
+                      : "Be the first to launch a token!"}
                   </p>
                   <Link href="/create">
                     <Button variant="outline" className="gap-2">
@@ -416,13 +487,19 @@ export default function HomePage() {
               <h3 className="text-sm font-medium mb-3">Quick Actions</h3>
               <div className="space-y-2">
                 <Link href="/create" className="block">
-                  <Button variant="outline" className="w-full justify-start gap-2 h-10">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 h-10"
+                  >
                     <Plus className="h-4 w-4" />
                     Create New Token
                   </Button>
                 </Link>
                 <Link href="/portfolio" className="block">
-                  <Button variant="ghost" className="w-full justify-start gap-2 h-10">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2 h-10"
+                  >
                     <BarChart3 className="h-4 w-4" />
                     View Portfolio
                   </Button>
@@ -437,7 +514,8 @@ export default function HomePage() {
                 <span className="text-sm font-medium">Pro Tip</span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Enable HypeBoost when creating tokens to protect against bots and ensure fair distribution.
+                Enable HypeBoost when creating tokens to protect against bots
+                and ensure fair distribution.
               </p>
             </div>
           </motion.div>
