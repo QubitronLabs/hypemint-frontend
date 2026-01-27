@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { TrendingUp, TrendingDown, User } from "lucide-react";
@@ -43,9 +42,25 @@ export function TradeTape({
         : "Unknown"),
   }));
 
-  const [trades, setTrades] = useState<any[]>(normalizedInitialTrades);
+	const [trades, setTrades] = useState(normalizedInitialTrades);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+	const scrollRef = useRef<HTMLDivElement>(null);
+
+	// Update trades when initialTrades changes (e.g., when data loads)
+	useEffect(() => {
+		if (safeInitialTrades.length > 0) {
+			const normalized = safeInitialTrades.map((t) => ({
+				...t,
+				username:
+					t.user?.displayName ||
+					t.user?.username ||
+					(t.user?.walletAddress
+						? `${t.user.walletAddress.slice(0, 4)}...${t.user.walletAddress.slice(-4)}`
+						: "Unknown"),
+			}));
+			setTrades(normalized);
+		}
+	}, [initialTrades]);
 
   useEffect(() => {
     // Subscribe to trade events

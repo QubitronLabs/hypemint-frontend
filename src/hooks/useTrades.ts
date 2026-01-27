@@ -74,16 +74,25 @@ export function useCreateTrade() {
 export function useConfirmTrade() {
     const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: ({ tradeId, input }: { tradeId: string; input: ConfirmTradeInput }) =>
-            confirmTrade(tradeId, input),
-        onSuccess: (trade) => {
-            // Invalidate related queries
-            queryClient.invalidateQueries({ queryKey: tradeKeys.byToken(trade.tokenId) });
-            queryClient.invalidateQueries({ queryKey: tokenKeys.detail(trade.tokenId) });
-            queryClient.invalidateQueries({ queryKey: tokenKeys.lists() });
-        },
-    });
+	return useMutation({
+		mutationFn: ({
+			tradeId,
+			input,
+		}: {
+			tradeId: string;
+			input: ConfirmTradeInput;
+		}) => confirmTrade(tradeId, input),
+		onSuccess: (trade) => {
+			// Invalidate related queries
+			queryClient.invalidateQueries({
+				queryKey: tradeKeys.byToken(trade.tokenId),
+			});
+			queryClient.invalidateQueries({
+				queryKey: tokenKeys.detail(trade.tokenId),
+			});
+			queryClient.invalidateQueries({ queryKey: tokenKeys.lists() });
+		},
+	});
 }
 
 // Hook to get current user's trades

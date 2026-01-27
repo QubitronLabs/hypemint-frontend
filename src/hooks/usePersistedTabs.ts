@@ -93,7 +93,6 @@ export function usePersistedTabs<T extends string>(
   useEffect(() => {
     const storedTab = getStoredTab();
     // Only update if different to avoid unnecessary re-renders
-function blahBlah(){}
 
     setActiveTabState((prev) => (prev !== storedTab ? storedTab : prev));
     setIsHydrated(true);

@@ -1,3 +1,5 @@
+// TODO: backend s data mangwana hai via api api for this total supply box
+
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -585,29 +587,31 @@ export function TokenCreationForm() {
 	}
 
 	return (
-		<div className="min-h-screen py-8 px-4">
-			<div className="max-w-5xl mx-auto">
+		<div className="py-8 px-4">
+			<div className=" mx-auto">
 				{/* Header */}
-				<motion.div
-					initial={{ opacity: 0, y: -20 }}
-					animate={{ opacity: 1, y: 0 }}
-					className="text-center mb-8"
-				>
-					<h1 className="text-3xl font-bold mb-2">Create Token</h1>
-					<p className="text-muted-foreground">
-						Launch on Polygon in under a minute
-					</p>
-				</motion.div>
 
 				{/* Two Column Layout */}
-				<div className="grid lg:grid-cols-5 gap-6">
+				<div className="grid lg:grid-cols-6 gap-6">
 					{/* Left Column - Form */}
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ delay: 0.1 }}
-						className="lg:col-span-3 bg-card border border-border rounded-2xl p-6 space-y-6"
+						className="lg:col-span-4 bg-card border border-border rounded-2xl p-6 space-y-6"
 					>
+						<motion.div
+							initial={{ opacity: 0, y: -20 }}
+							animate={{ opacity: 1, y: 0 }}
+							className="mb-8"
+						>
+							<h1 className="text-3xl font-bold mb-2">
+								Create Token
+							</h1>
+							<p className="text-muted-foreground">
+								Launch on Polygon in under a minute
+							</p>
+						</motion.div>
 						{/* Token Basics */}
 						<div className="grid md:grid-cols-2 gap-6">
 							{/* Left Column */}
@@ -686,78 +690,131 @@ export function TokenCreationForm() {
 										onChange={(e) =>
 											setDescription(e.target.value)
 										}
-										className="min-h-[80px] bg-background resize-none"
+										className="min-h-[80px] dark:bg-input/30 resize-none"
 										maxLength={500}
 									/>
+								</div>
+								{/* Social Links */}
+								<div>
+									<label className="text-sm font-medium mb-3 block">
+										Social Links{" "}
+										<span className="text-muted-foreground text-xs">
+											(optional)
+										</span>
+									</label>
+									<div className=" w-full space-y-3">
+										<div className="relative w-full">
+											<Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+											<Input
+												placeholder="Website"
+												value={websiteUrl}
+												onChange={(e) =>
+													setWebsiteUrl(
+														e.target.value,
+													)
+												}
+												className="pl-9 h-10 bg-background text-sm"
+											/>
+										</div>
+										<div className="relative w-full">
+											<Twitter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+											<Input
+												placeholder="Twitter"
+												value={twitterUrl}
+												onChange={(e) =>
+													setTwitterUrl(
+														e.target.value,
+													)
+												}
+												className="pl-9 h-10 bg-background text-sm"
+											/>
+										</div>
+										<div className="relative w-full">
+											<MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+											<Input
+												placeholder="Telegram"
+												value={telegramUrl}
+												onChange={(e) =>
+													setTelegramUrl(
+														e.target.value,
+													)
+												}
+												className="pl-9 h-10 bg-background text-sm"
+											/>
+										</div>
+									</div>
 								</div>
 							</div>
 
 							{/* Right Column - Image Upload */}
-							<div>
-								<label className="text-sm font-medium mb-1.5 block">
-									Token Image
-								</label>
-								<div
-									onDragOver={handleDragOver}
-									onDragLeave={handleDragLeave}
-									onDrop={handleDrop}
-									onClick={() =>
-										!imagePreview &&
-										fileInputRef.current?.click()
-									}
-									className={cn(
-										"relative h-48 border-2 border-dashed rounded-xl transition-all flex flex-col items-center justify-center",
-										isDragging
-											? "border-primary bg-primary/10"
-											: imagePreview
-												? "border-green-500/50 cursor-default"
-												: "border-border hover:border-primary/50 cursor-pointer",
-									)}
-								>
-									{imagePreview ? (
-										<>
-											<img
-												src={imagePreview}
-												alt="Token"
-												className="absolute inset-0 w-full h-full object-cover rounded-xl"
-											/>
-											<button
-												onClick={(e) => {
-													e.stopPropagation();
-													removeImage();
-												}}
-												className="absolute top-2 right-2 w-8 h-8 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center"
-											>
-												<X className="h-4 w-4 text-white" />
-											</button>
-										</>
-									) : (
-										<>
-											<Upload
-												className={cn(
-													"h-8 w-8 mb-2",
-													isDragging
-														? "text-primary"
-														: "text-muted-foreground",
-												)}
-											/>
-											<p className="text-sm font-medium">
-												{isDragging
-													? "Drop image here"
-													: "Click or drag to upload"}
-											</p>
-											<p className="text-xs text-muted-foreground mt-1">
-												PNG, JPG, GIF up to 5MB
-											</p>
-										</>
-									)}
-									<input
-										ref={fileInputRef}
-										type="file"
-										accept="image/*"
-										onChange={handleFileChange}
-										className="hidden"
-									/>
+							<div className="space-y-4">
+								{/* Token image uploader */}
+								<div>
+									<label className="text-sm font-medium mb-1.5 block">
+										Token Image
+									</label>
+									<div
+										onDragOver={handleDragOver}
+										onDragLeave={handleDragLeave}
+										onDrop={handleDrop}
+										onClick={() =>
+											!imagePreview &&
+											fileInputRef.current?.click()
+										}
+										className={cn(
+											"relative h-40 border-2 border-dashed rounded-xl transition-all flex flex-col items-center justify-center",
+											isDragging
+												? "border-primary bg-primary/10"
+												: imagePreview
+													? "border-green-500/50 cursor-default"
+													: "border-border hover:border-primary/50 cursor-pointer",
+										)}
+									>
+										{imagePreview ? (
+											<>
+												<img
+													src={imagePreview}
+													alt="Token"
+													className="absolute inset-0 w-full h-full object-cover rounded-xl"
+												/>
+												<button
+													onClick={(e) => {
+														e.stopPropagation();
+														removeImage();
+													}}
+													className="absolute top-2 right-2 w-8 h-8 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center"
+												>
+													<X className="h-4 w-4 text-white" />
+												</button>
+											</>
+										) : (
+											<>
+												<Upload
+													className={cn(
+														"h-8 w-8 mb-2",
+														isDragging
+															? "text-primary"
+															: "text-muted-foreground",
+													)}
+												/>
+												<p className="text-sm font-medium">
+													{isDragging
+														? "Drop image here"
+														: "Click or drag to upload"}
+												</p>
+												<p className="text-xs text-muted-foreground mt-1">
+													PNG, JPG, GIF up to 5MB
+												</p>
+											</>
+										)}
+										<input
+											ref={fileInputRef}
+											type="file"
+											accept="image/*"
+											onChange={handleFileChange}
+											className="hidden"
+										/>
+									</div>
 								</div>
 
 								{/* HypeBoost Toggle */}
@@ -767,7 +824,7 @@ export function TokenCreationForm() {
 										setHypeBoostEnabled(!hypeBoostEnabled)
 									}
 									className={cn(
-										"w-full mt-4 p-3 rounded-xl border-2 transition-all flex items-center gap-3",
+										"w-full p-3 rounded-lg border-2 transition-all flex items-center gap-3",
 										hypeBoostEnabled
 											? "border-primary bg-primary/5"
 											: "border-border hover:border-primary/50",
@@ -802,124 +859,95 @@ export function TokenCreationForm() {
 										{hypeBoostEnabled ? "ON" : "OFF"}
 									</span>
 								</button>
-							</div>
-						</div>
 
-						{/* Social Links */}
-						<div>
-							<label className="text-sm font-medium mb-3 block">
-								Social Links{" "}
-								<span className="text-muted-foreground text-xs">
-									(optional)
-								</span>
-							</label>
-							<div className="grid sm:grid-cols-3 gap-3">
-								<div className="relative">
-									<Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-									<Input
-										placeholder="Website"
-										value={websiteUrl}
-										onChange={(e) =>
-											setWebsiteUrl(e.target.value)
+								{/* Initial Buy (Dev Buy) Section */}
+								<div className="border border-border rounded-lg overflow-hidden">
+									<button
+										type="button"
+										onClick={() =>
+											setWantInitialBuy(!wantInitialBuy)
 										}
-										className="pl-9 h-10 bg-background text-sm"
-									/>
-								</div>
-								<div className="relative">
-									<Twitter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-									<Input
-										placeholder="Twitter"
-										value={twitterUrl}
-										onChange={(e) =>
-											setTwitterUrl(e.target.value)
-										}
-										className="pl-9 h-10 bg-background text-sm"
-									/>
-								</div>
-								<div className="relative">
-									<MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-									<Input
-										placeholder="Telegram"
-										value={telegramUrl}
-										onChange={(e) =>
-											setTelegramUrl(e.target.value)
-										}
-										className="pl-9 h-10 bg-background text-sm"
-									/>
-								</div>
-							</div>
-						</div>
+										className={cn(
+											"w-full p-4 flex items-center gap-3 transition-colors",
+											wantInitialBuy
+												? "bg-primary/5"
+												: "bg-muted/30 hover:bg-muted/50",
+										)}
+									>
+										<div
+											className={cn(
+												"w-10 h-10 rounded-lg flex items-center justify-center",
+												wantInitialBuy
+													? "bg-primary text-white"
+													: "bg-muted",
+											)}
+										>
+											<Coins className="h-5 w-5" />
+										</div>
+										<div className="flex-1 text-left">
+											<span className="font-medium">
+												Initial Purchase (Dev Buy)
+											</span>
+											<p className="text-xs text-muted-foreground">
+												Buy tokens immediately after
+												creation to seed liquidity
+											</p>
+										</div>
+										<span
+											className={cn(
+												"text-xs px-3 py-1.5 rounded-full font-medium",
+												wantInitialBuy
+													? "bg-primary text-white"
+													: "bg-muted text-muted-foreground",
+											)}
+										>
+											{wantInitialBuy
+												? "Enabled"
+												: "Optional"}
+										</span>
+									</button>
 
-            {/* Initial Buy (Dev Buy) Section */}
-            <div className="border border-border rounded-xl overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setWantInitialBuy(!wantInitialBuy)}
-                className={cn(
-                  "w-full p-4 flex items-center gap-3 transition-colors",
-                  wantInitialBuy
-                    ? "bg-primary/5"
-                    : "bg-muted/30 hover:bg-muted/50",
-                )}
-              >
-                <div
-                  className={cn(
-                    "w-10 h-10 rounded-lg flex items-center justify-center",
-                    wantInitialBuy ? "bg-primary text-white" : "bg-muted",
-                  )}
-                >
-                  <Coins className="h-5 w-5" />
-                </div>
-                <div className="flex-1 text-left">
-                  <span className="font-medium">
-                    Initial Purchase (Dev Buy)
-                  </span>
-                  <p className="text-xs text-muted-foreground">
-                    Buy tokens immediately after creation to seed liquidity
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    "text-xs px-3 py-1.5 rounded-full font-medium",
-                    wantInitialBuy
-                      ? "bg-primary text-white"
-                      : "bg-muted text-muted-foreground",
-                  )}
-                >
-                  {wantInitialBuy ? "Enabled" : "Optional"}
-                </span>
-              </button>
-
-              <AnimatePresence>
-                {wantInitialBuy && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="p-4 border-t border-border space-y-4">
-                      <div>
-                        <label className="text-sm font-medium mb-1.5 block">
-                          Amount to Buy (POL)
-                        </label>
-                        <div className="relative">
-                          <Input
-                            type="number"
-                            step="0.1"
-                            min="0.01"
-                            placeholder="0.5"
-                            value={initialBuyAmount}
-                            onChange={(e) =>
-                              setInitialBuyAmount(e.target.value)
-                            }
-                            className="h-11 pr-16 bg-background text-lg font-mono"
-                          />
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                            POL
-                          </div>
-                        </div>
-                      </div>
+									<AnimatePresence>
+										{wantInitialBuy && (
+											<motion.div
+												initial={{
+													height: 0,
+													opacity: 0,
+												}}
+												animate={{
+													height: "auto",
+													opacity: 1,
+												}}
+												exit={{ height: 0, opacity: 0 }}
+												className="overflow-hidden"
+											>
+												<div className="p-4 border-t border-border space-y-4">
+													<div>
+														<label className="text-sm font-medium mb-1.5 block">
+															Amount to Buy (POL)
+														</label>
+														<div className="relative">
+															<Input
+																type="number"
+																step="0.1"
+																min="0.01"
+																placeholder="0.5"
+																value={
+																	initialBuyAmount
+																}
+																onChange={(e) =>
+																	setInitialBuyAmount(
+																		e.target
+																			.value,
+																	)
+																}
+																className="h-11 pr-16 bg-background text-lg font-mono"
+															/>
+															<div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+																POL
+															</div>
+														</div>
+													</div>
 
                       {/* Quick amount buttons */}
                       <div className="flex gap-2">
@@ -995,19 +1023,28 @@ export function TokenCreationForm() {
                           </motion.div>
                         )}
 
-                      <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                        <p className="text-xs text-blue-400">
-                          <strong>Pro tip:</strong> Initial purchases help
-                          establish the bonding curve and show other traders
-                          that you believe in your token. This amount will be
-                          added to the creation fee.
-                        </p>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+													<div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+														<p className="text-xs text-blue-400">
+															<strong>
+																Pro tip:
+															</strong>{" "}
+															Initial purchases
+															help establish the
+															bonding curve and
+															show other traders
+															that you believe in
+															your token. This
+															amount will be added
+															to the creation fee.
+														</p>
+													</div>
+												</div>
+											</motion.div>
+										)}
+									</AnimatePresence>
+								</div>
+							</div>
+						</div>
 
             {/* Launch Info */}
             <div className="bg-muted/50 rounded-xl p-4">

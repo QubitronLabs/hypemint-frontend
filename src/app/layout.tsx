@@ -94,6 +94,7 @@ export default function RootLayout({
 
 									{/* Toast Notifications */}
 									<Toaster
+										richColors
 										position="bottom-right"
 										toastOptions={{
 											style: {

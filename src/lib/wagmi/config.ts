@@ -4,8 +4,8 @@
  * Configures Wagmi with Polygon chain support and Ganache for local testing
  */
 
-import { http, createConfig, type Chain } from "wagmi";
-import { polygon, polygonAmoy } from "wagmi/chains";
+import { http, createConfig } from "wagmi";
+import { Chain, polygon, polygonAmoy } from "wagmi/chains";
 
 // Ganache Local Development Chain
 export const ganache: Chain = {

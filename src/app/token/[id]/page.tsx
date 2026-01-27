@@ -6,28 +6,26 @@ import Image from "next/image";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  Globe,
-  Twitter,
-  Share2,
-  Star,
-  Copy,
-  Check,
-  TrendingUp,
-  TrendingDown,
-  MessageCircle,
-  ExternalLink,
-  Shield,
-  Zap,
-  Activity,
-  Users,
-  BarChart3,
-  Clock,
-  Wallet,
-  Info,
-  ChevronDown,
-  ChevronUp,
-  Loader2,
-  RefreshCw,
+	Globe,
+	Twitter,
+	Share2,
+	Star,
+	Copy,
+	Check,
+	TrendingUp,
+	TrendingDown,
+	MessageCircle,
+	ExternalLink,
+	Shield,
+	Activity,
+	Users,
+	BarChart3,
+	Clock,
+	Info,
+	ChevronDown,
+	ChevronUp,
+	Loader2,
+	RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,12 +42,13 @@ import { useToken, tokenKeys, useTokenHolders } from "@/hooks/useTokens";
 import { useTokenTrades, tradeKeys } from "@/hooks/useTrades";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useManualSync } from "@/hooks/useBlockchainSync";
+import { usePersistedTabs } from "@/hooks/usePersistedTabs";
 import {
-  cn,
-  formatMarketCap,
-  formatVolume,
-  formatPrice,
-  fromWei,
+	cn,
+	formatMarketCap,
+	formatVolume,
+	formatPrice,
+	fromWei,
 } from "@/lib/utils";
 import type { Address } from "viem";
 import type { Token } from "@/types";
@@ -64,14 +63,27 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 	const [showFullDescription, setShowFullDescription] = useState(false);
 	const [isStarred, setIsStarred] = useState(false);
 
-  const { data: token, isLoading, error } = useToken(id);
-  const { data: trades } = useTokenTrades(id);
-  const { data: holdersData, isLoading: holdersLoading } = useTokenHolders(id);
-  const { sync: syncWithBlockchain, isSyncing } = useManualSync(id);
-  const queryClient = useQueryClient();
+	const { data: token, isLoading, error } = useToken(id);
+	const { data: tradesData } = useTokenTrades(id);
 
-  // Get holders from blockchain data
-  const holders = holdersData?.holders || [];
+	// Ensure trades is always an array, even if data is undefined
+	const trades = tradesData || [];
+
+	console.log({ trades });
+	const { data: holdersData, isLoading: holdersLoading } =
+		useTokenHolders(id);
+	const { sync: syncWithBlockchain, isSyncing } = useManualSync(id);
+	const queryClient = useQueryClient();
+
+	// Tab persistence with URL sync
+	const { activeTab, setActiveTab } = usePersistedTabs({
+		key: "tab",
+		defaultTab: "trades" as const,
+		validTabs: ["trades", "comments", "holders"] as const,
+	});
+
+	// Get holders from blockchain data
+	const holders = holdersData?.holders || [];
 
   // Real-time updates via WebSocket
   const handleWebSocketMessage = useCallback(
@@ -507,120 +519,151 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						<PriceChart tokenId={id} />
 					</motion.div>
 
-          {/* Comments / Trades / Holders Tabs */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <Tabs defaultValue="trades">
-              <TabsList className="w-full bg-card border border-border">
-                <TabsTrigger value="trades" className="flex-1 gap-1.5">
-                  <BarChart3 className="h-3.5 w-3.5" />
-                  Trades
-                </TabsTrigger>
-                <TabsTrigger value="comments" className="flex-1 gap-1.5">
-                  <MessageCircle className="h-3.5 w-3.5" />
-                  Comments
-                </TabsTrigger>
-                <TabsTrigger value="holders" className="flex-1 gap-1.5">
-                  <Users className="h-3.5 w-3.5" />
-                  Holders{" "}
-                  {holdersData?.totalHolders
-                    ? `(${holdersData.totalHolders})`
-                    : ""}
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="trades" className="mt-4">
-                <TradeTape tokenId={id} initialTrades={trades || []} />
-              </TabsContent>
-              <TabsContent value="comments" className="mt-4">
-                <TokenChat tokenId={id} className="min-h-[350px]" />
-              </TabsContent>
-              <TabsContent value="holders" className="mt-4">
-                <div className="bg-card border border-border rounded-xl p-6">
-                  {holdersLoading ? (
-                    <div className="text-center py-12">
-                      <Loader2 className="h-12 w-12 mx-auto text-primary animate-spin mb-4" />
-                      <p className="text-muted-foreground">
-                        Loading holders from blockchain...
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Scanning Transfer events
-                      </p>
-                    </div>
-                  ) : holders.length > 0 ? (
-                    <div className="space-y-3">
-                      {holders.map((holder, index) => (
-                        <div
-                          key={holder.address}
-                          className="flex items-center justify-between py-2 border-b border-border/50 last:border-0"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span
-                              className={cn(
-                                "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
-                                index === 0
-                                  ? "bg-yellow-500/20 text-yellow-500"
-                                  : index === 1
-                                    ? "bg-gray-400/20 text-gray-400"
-                                    : index === 2
-                                      ? "bg-orange-500/20 text-orange-500"
-                                      : "bg-muted text-muted-foreground",
-                              )}
-                            >
-                              {index + 1}
-                            </span>
-                            <div>
-                              <Link
-                                href={`/user/${holder.address}`}
-                                className="font-mono text-sm hover:text-primary"
-                              >
-                                {formatAddress(holder.address)}
-                              </Link>
-                              <p className="text-xs text-muted-foreground">
-                                {holder.balanceFormatted.toLocaleString(
-                                  undefined,
-                                  {
-                                    maximumFractionDigits: 2,
-                                  },
-                                )}{" "}
-                                tokens
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <span className="font-semibold tabular-nums">
-                              {holder.percentage.toFixed(2)}%
-                            </span>
-                            <div className="w-20 h-1.5 bg-muted rounded-full mt-1">
-                              <div
-                                className="h-full bg-primary rounded-full"
-                                style={{
-                                  width: `${Math.min(holder.percentage, 100)}%`,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <Users className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">
-                        No holders data available yet
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Holder data will appear after trading begins
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
-            </Tabs>
-          </motion.div>
-        </div>
+					{/* Comments / Trades / Holders Tabs */}
+					<motion.div
+						initial={{ opacity: 0, y: 20 }}
+						animate={{ opacity: 1, y: 0 }}
+						transition={{ delay: 0.2 }}
+					>
+						<Tabs
+							value={activeTab}
+							onValueChange={(value) =>
+								setActiveTab(
+									value as "trades" | "comments" | "holders",
+								)
+							}
+						>
+							<TabsList className="w-full bg-card border border-border">
+								<TabsTrigger
+									value="trades"
+									className="flex-1 gap-1.5"
+								>
+									<BarChart3 className="h-3.5 w-3.5" />
+									Trades
+								</TabsTrigger>
+								<TabsTrigger
+									value="comments"
+									className="flex-1 gap-1.5"
+								>
+									<MessageCircle className="h-3.5 w-3.5" />
+									Comments
+								</TabsTrigger>
+								<TabsTrigger
+									value="holders"
+									className="flex-1 gap-1.5"
+								>
+									<Users className="h-3.5 w-3.5" />
+									Holders{" "}
+									{holdersData?.totalHolders
+										? `(${holdersData.totalHolders})`
+										: ""}
+								</TabsTrigger>
+							</TabsList>
+							<TabsContent value="trades" className="mt-4">
+								<TradeTape
+									tokenId={id}
+									initialTrades={trades}
+								/>
+							</TabsContent>
+							<TabsContent value="comments" className="mt-4">
+								<TokenChat
+									tokenId={id}
+									className="min-h-[350px]"
+								/>
+							</TabsContent>
+							<TabsContent value="holders" className="mt-4">
+								<div className="bg-card border border-border rounded-xl p-6">
+									{holdersLoading ? (
+										<div className="text-center py-12">
+											<Loader2 className="h-12 w-12 mx-auto text-primary animate-spin mb-4" />
+											<p className="text-muted-foreground">
+												Loading holders from
+												blockchain...
+											</p>
+											<p className="text-xs text-muted-foreground mt-1">
+												Scanning Transfer events
+											</p>
+										</div>
+									) : holders.length > 0 ? (
+										<div className="space-y-3">
+											{holders.map((holder, index) => (
+												<div
+													key={holder.address}
+													className="flex items-center justify-between py-2 border-b border-border/50 last:border-0"
+												>
+													<div className="flex items-center gap-3">
+														<span
+															className={cn(
+																"w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
+																index === 0
+																	? "bg-yellow-500/20 text-yellow-500"
+																	: index ===
+																		  1
+																		? "bg-gray-400/20 text-gray-400"
+																		: index ===
+																			  2
+																			? "bg-orange-500/20 text-orange-500"
+																			: "bg-muted text-muted-foreground",
+															)}
+														>
+															{index + 1}
+														</span>
+														<div>
+															<Link
+																href={`/user/${holder.address}`}
+																className="font-mono text-sm hover:text-primary"
+															>
+																{formatAddress(
+																	holder.address,
+																)}
+															</Link>
+															<p className="text-xs text-muted-foreground">
+																{holder.balanceFormatted.toLocaleString(
+																	undefined,
+																	{
+																		maximumFractionDigits: 2,
+																	},
+																)}{" "}
+																tokens
+															</p>
+														</div>
+													</div>
+													<div className="text-right">
+														<span className="font-semibold tabular-nums">
+															{holder.percentage.toFixed(
+																2,
+															)}
+															%
+														</span>
+														<div className="w-20 h-1.5 bg-muted rounded-full mt-1">
+															<div
+																className="h-full bg-primary rounded-full"
+																style={{
+																	width: `${Math.min(holder.percentage, 100)}%`,
+																}}
+															/>
+														</div>
+													</div>
+												</div>
+											))}
+										</div>
+									) : (
+										<div className="text-center py-12">
+											<Users className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+											<p className="text-muted-foreground">
+												No holders data available yet
+											</p>
+											<p className="text-xs text-muted-foreground mt-1">
+												Holder data will appear after
+												trading begins
+											</p>
+										</div>
+									)}
+								</div>
+							</TabsContent>
+						</Tabs>
+					</motion.div>
+				</div>
 
         {/* Sidebar */}
         <div className="space-y-6">
