@@ -21,7 +21,6 @@ export {
 	useNativeCurrencySymbol,
 	type NetworkInfo,
 	type NetworkState,
-	type NativeCurrencyInfo,
 } from "./useNetwork";
 export {
 	useNativeBalance,
