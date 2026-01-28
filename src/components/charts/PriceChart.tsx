@@ -189,7 +189,6 @@ export function PriceChart({ tokenId, className }: PriceChartProps) {
                 : "rgba(255, 68, 68, 0.3)",
           }));
           volumeSeriesRef.current.setData(volData);
-          setChartData(chartData);
         }
       } catch (error) {
         console.error("Failed to load chart:", error);
