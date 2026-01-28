@@ -7,7 +7,8 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * Convert Wei string (10^18) to decimal number
- * Handles both Wei strings and already-converted decimal values
+ * Since backend now always sends decimal values, this just parses the number
+ * Legacy Wei detection kept for backward compatibility
  */
 export function fromWei(weiStr: string | number | undefined | null): number {
   if (!weiStr) return 0;
@@ -16,7 +17,12 @@ export function fromWei(weiStr: string | number | undefined | null): number {
     const val = parseFloat(strVal);
     if (isNaN(val)) return 0;
     // Check if this is likely a Wei value (very large integer string without decimal)
+    // This shouldn't happen anymore since backend converts to decimal
     if (strVal.length > 15 && !strVal.includes(".")) {
+      console.warn(
+        "[fromWei] Received Wei value, but backend should send decimal:",
+        weiStr,
+      );
       return val / 1e18;
     }
     return val;
@@ -55,19 +61,29 @@ export function formatCurrency(num: number, decimals: number = 2): string {
 
 /**
  * Format price with proper decimal places for crypto
- * Uses more decimals for small prices
+ * Backend always sends decimal values now, so we just parse and format
  */
 export function formatPrice(price: number | string | undefined | null): string {
-  const val = typeof price === "string" ? parseFloat(price) : (price ?? 0);
+  if (!price) return "$0";
+
+  const val = typeof price === "string" ? parseFloat(price) : price;
+
+  // Debug log for troubleshooting
+  if (val > 1000000) {
+    console.warn("[formatPrice] Received unexpectedly large price value:", {
+      input: price,
+      parsed: val,
+      type: typeof price,
+    });
+  }
+
   if (isNaN(val) || val === 0) return "$0";
 
-  // For Wei values, convert first
-  const converted = fromWei(price);
-
-  if (converted >= 1) return `$${converted.toFixed(2)}`;
-  if (converted >= 0.01) return `$${converted.toFixed(4)}`;
-  if (converted >= 0.0001) return `$${converted.toFixed(6)}`;
-  if (converted > 0) return `$${converted.toFixed(8)}`;
+  // Format based on magnitude
+  if (val >= 1) return `$${val.toFixed(2)}`;
+  if (val >= 0.01) return `$${val.toFixed(4)}`;
+  if (val >= 0.0001) return `$${val.toFixed(6)}`;
+  if (val > 0) return `$${val.toFixed(8)}`;
   return "$0";
 }
 

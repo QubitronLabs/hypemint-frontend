@@ -144,7 +144,7 @@ export function OnChainTradingPanel({
   );
 
   // Allowance check for selling
-  const { data: allowance } = useTokenAllowance(
+  const { data: allowance, refetch: refetchAllowance } = useTokenAllowance(
     tokenAddress,
     bondingCurveAddress,
   );
@@ -323,6 +323,18 @@ export function OnChainTradingPanel({
     refetchNativeBalance,
     refetchTokenBalance,
   ]);
+
+  // Refetch allowance when approve is confirmed
+  useEffect(() => {
+    if (isApproveConfirmed) {
+      console.log("[OnChainTrading] Approve confirmed, refetching allowance");
+      setTimeout(() => {
+        refetchAllowance();
+      }, 2000); // Wait 2s for blockchain state to update
+      toast.success("Approval confirmed! You can now sell tokens.");
+      resetApprove();
+    }
+  }, [isApproveConfirmed, refetchAllowance, resetApprove]);
 
   // Handle approve
   const handleApprove = async () => {
