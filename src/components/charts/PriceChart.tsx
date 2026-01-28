@@ -43,27 +43,16 @@ export function PriceChart({ tokenId, className }: PriceChartProps) {
   useTokenPriceUpdates(tokenId, (update) => {
     if (!candleSeriesRef.current || !volumeSeriesRef.current) return;
 
-    // Parse price (which might be in raw format or formatted string)
-    // If it's a huge Wei number > 1e9, assume we need to format it.
-    // But backend broadcasts "price" which is usually derived from executionResult.newPrice (bigint string)
-    // Let's explicitly try to normalize it.
-    let price = parseFloat(update.price);
+    // Backend now sends price as decimal number (already divided by 1e18)
+    const price = parseFloat(update.price);
+    if (isNaN(price) || !isFinite(price)) return;
 
-    // Safety check for raw huge numbers
-    if (update.price.length > 15 && !update.price.includes(".")) {
-      // likely wei integer
-      price = parseFloat(update.price) / 1e18;
-    }
+    const currentTime = Math.floor(Date.now() / 1000) as unknown as any;
 
-    const time = Math.floor(Date.now() / 1000) as unknown as any; // Cast for LWChart
-
-    // Update current candle or add new one
-    // For simplicity in this demo, we just update the "last" candle
-    // In reality, we'd check if we need to start a new candle based on interval
-
+    // Update the last candle with new price data
     const currentData = {
-      time: time,
-      open: price, // In a real update, we'd want to maintain Open from the start of the minute
+      time: currentTime,
+      open: price,
       high: price,
       low: price,
       close: price,
@@ -181,9 +170,7 @@ export function PriceChart({ tokenId, className }: PriceChartProps) {
         }
 
         if (candleSeriesRef.current && volumeSeriesRef.current) {
-          // Ensure time is unique and sorted (backend should handle this, but safety first)
-          // Lightweight charts requires ascending order
-
+          // Backend now returns properly formatted decimal values
           const data = chartData.map((d: any) => ({
             time: d.time as unknown as any,
             open: d.open,
@@ -193,19 +180,9 @@ export function PriceChart({ tokenId, className }: PriceChartProps) {
           }));
           candleSeriesRef.current.setData(data);
 
-          // Convert volume from Wei to formatted number
-          // Volume values might be very large (Wei), need to divide by 1e18
-          const formatVolume = (vol: number | string): number => {
-            const v = typeof vol === "string" ? parseFloat(vol) : vol;
-            if (isNaN(v)) return 0;
-            // If value is extremely large (likely Wei), divide by 1e18
-            if (v > 1e15) return v / 1e18;
-            return v;
-          };
-
           const volData = chartData.map((d: any) => ({
             time: d.time as unknown as any,
-            value: formatVolume(d.volume),
+            value: d.volume,
             color:
               d.close >= d.open
                 ? "rgba(0, 255, 136, 0.3)"

@@ -143,11 +143,11 @@ export function OnChainTradingPanel({
 		tradeType === "sell" ? amount : "",
 	);
 
-	// Allowance check for selling
-	const { data: allowance } = useTokenAllowance(
-		tokenAddress,
-		bondingCurveAddress,
-	);
+  // Allowance check for selling
+  const { data: allowance, refetch: refetchAllowance } = useTokenAllowance(
+    tokenAddress,
+    bondingCurveAddress,
+  );
 
 	// Trade hooks
 	const {
@@ -332,22 +332,34 @@ export function OnChainTradingPanel({
 		refetchTokenBalance,
 	]);
 
-	// Handle approve
-	const handleApprove = async () => {
-		if (!amount) return;
-		try {
-			const amountWei = parseEther(amount);
-			// Approve max uint256 for convenience
-			const maxApproval = BigInt(
-				"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-			);
-			await approve(tokenAddress, bondingCurveAddress, maxApproval);
-			toast.success("Approval successful!");
-		} catch (err) {
-			console.error("Approve failed:", err);
-			toast.error("Approval failed");
-		}
-	};
+  // Refetch allowance when approve is confirmed
+  useEffect(() => {
+    if (isApproveConfirmed) {
+      console.log("[OnChainTrading] Approve confirmed, refetching allowance");
+      setTimeout(() => {
+        refetchAllowance();
+      }, 2000); // Wait 2s for blockchain state to update
+      toast.success("Approval confirmed! You can now sell tokens.");
+      resetApprove();
+    }
+  }, [isApproveConfirmed, refetchAllowance, resetApprove]);
+
+  // Handle approve
+  const handleApprove = async () => {
+    if (!amount) return;
+    try {
+      const amountWei = parseEther(amount);
+      // Approve max uint256 for convenience
+      const maxApproval = BigInt(
+        "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      );
+      await approve(tokenAddress, bondingCurveAddress, maxApproval);
+      toast.success("Approval successful!");
+    } catch (err) {
+      console.error("Approve failed:", err);
+      toast.error("Approval failed");
+    }
+  };
 
 	// Handle trade execution
 	const handleTrade = async () => {
