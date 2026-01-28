@@ -17,8 +17,11 @@ export {
 	useGlobalNetwork,
 	useActiveChainId,
 	useIsOnChain,
+	useNativeCurrency,
+	useNativeCurrencySymbol,
 	type NetworkInfo,
 	type NetworkState,
+	type NativeCurrencyInfo,
 } from "./useNetwork";
 export {
 	useNativeBalance,

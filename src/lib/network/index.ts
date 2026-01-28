@@ -1,10 +1,11 @@
 export {
-    useNetworkStore,
-    useNetwork,
-    useChainId,
-    useChainLogo,
-    useNetworkHasHydrated,
-    getNetworkState,
-    type NetworkInfo,
-    type NetworkState,
-} from './store';
+	useNetworkStore,
+	useNetwork,
+	useChainId,
+	useChainLogo,
+	useNativeCurrency,
+	useNetworkHasHydrated,
+	getNetworkState,
+	type NetworkInfo,
+	type NetworkState,
+} from "./store";

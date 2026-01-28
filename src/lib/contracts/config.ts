@@ -15,25 +15,29 @@ export const ACTIVE_CHAIN_ID = POLYGON_AMOY_CHAIN_ID;
 
 // Contract addresses - UPDATE THESE AFTER DEPLOYMENT
 export const CONTRACT_ADDRESSES = {
-  // Polygon Mainnet
-  [POLYGON_CHAIN_ID]: {
-    factory: "0x0000000000000000000000000000000000000000" as `0x${string}`,
-    tokenImplementation: "0x0000000000000000000000000000000000000000" as `0x${string}`,
-    bondingCurveImplementation: "0x0000000000000000000000000000000000000000" as `0x${string}`,
-  },
-  // Polygon Amoy Testnet - Deployed 2025-01-17
-  [POLYGON_AMOY_CHAIN_ID]: {
-    factory: "0xa024e8aeFb2047D1060212b15CaD0bC24b10e576" as `0x${string}`,
-    tokenImplementation: "0x138e1806ecc55B373e9905Af4CD1a1E710b20487" as `0x${string}`,
-    bondingCurveImplementation: "0xBf1db253e60D268545aF0c3c5f11F98BFD7Bcff2" as `0x${string}`,
-  },
+	// Polygon Mainnet
+	[POLYGON_CHAIN_ID]: {
+		factory: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+		tokenImplementation:
+			"0x0000000000000000000000000000000000000000" as `0x${string}`,
+		bondingCurveImplementation:
+			"0x0000000000000000000000000000000000000000" as `0x${string}`,
+	},
+	// Polygon Amoy Testnet - Deployed 2025-01-17
+	[POLYGON_AMOY_CHAIN_ID]: {
+		factory: "0xa024e8aeFb2047D1060212b15CaD0bC24b10e576" as `0x${string}`,
+		tokenImplementation:
+			"0x138e1806ecc55B373e9905Af4CD1a1E710b20487" as `0x${string}`,
+		bondingCurveImplementation:
+			"0xBf1db253e60D268545aF0c3c5f11F98BFD7Bcff2" as `0x${string}`,
+	},
 } as const;
 
 // Get contract address for active chain
 export function getContractAddress(
-  contract: "factory" | "tokenImplementation" | "bondingCurveImplementation"
+	contract: "factory" | "tokenImplementation" | "bondingCurveImplementation",
 ): `0x${string}` {
-  return CONTRACT_ADDRESSES[ACTIVE_CHAIN_ID][contract];
+	return CONTRACT_ADDRESSES[ACTIVE_CHAIN_ID][contract];
 }
 
 // Default creation fee in wei (0.01 MATIC)
@@ -47,14 +51,14 @@ export const GRADUATION_THRESHOLD_USD = 69000;
 
 // HypeBoost default configuration
 export const HYPE_BOOST_DEFAULTS = {
-  maxWalletPercent: 200, // 2%
-  snipeProtectionBlocks: 5,
-  vestingDuration: 3600, // 1 hour
-  immediateUnlockPercent: 2500, // 25%
+	maxWalletPercent: 200, // 2%
+	snipeProtectionBlocks: 5,
+	vestingDuration: 3600, // 1 hour
+	immediateUnlockPercent: 2500, // 25%
 };
 
 // Fee configuration (basis points)
 export const FEE_CONFIG = {
-  protocolFee: 100, // 1%
-  creatorFee: 100, // 1%
+	protocolFee: 100, // 1%
+	creatorFee: 100, // 1%
 };

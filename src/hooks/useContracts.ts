@@ -4,7 +4,7 @@
  * React hooks for interacting with HypeMint smart contracts using Wagmi
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
 	useWriteContract,
 	useReadContract,
@@ -24,6 +24,7 @@ import {
 	DEFAULT_SLIPPAGE_BPS,
 } from "@/lib/contracts";
 import { ACTIVE_CHAIN_ID } from "@/lib/contracts/config";
+import { useChainId as useNetworkChainId } from "@/lib/network";
 
 // Types
 export interface CreateTokenParams {
@@ -53,21 +54,32 @@ export interface SellParams {
 	slippageBps?: number;
 }
 
-// Hook: Get user's native balance (MATIC)
+// Hook: Get user's native balance for the current network
+// Updates automatically when the user switches networks
 export function useNativeBalance() {
 	const { address } = useAccount();
+	const networkChainId = useNetworkChainId();
+
+	// for debugging
+	useEffect(
+		() => console.log("[useNativeBalance] networkChainId:", networkChainId),
+		[networkChainId],
+	);
+	// Use the network store's chain ID, falling back to ACTIVE_CHAIN_ID
+	const chainId = networkChainId ?? ACTIVE_CHAIN_ID;
+
 	return useBalance({
 		address,
-		chainId: ACTIVE_CHAIN_ID,
+		chainId,
 	});
 }
 
-// Hook: Get factory creation fee
+/**
+ * Hook: Get factory creation fee
+ */
 export function useCreationFee() {
-	const factoryAddress = getContractAddress("factory");
-
 	return useReadContract({
-		address: factoryAddress,
+		address: getContractAddress("factory"),
 		abi: HYPE_FACTORY_ABI,
 		functionName: "creationFee",
 		chainId: ACTIVE_CHAIN_ID,
@@ -158,6 +170,10 @@ export function useCreateToken() {
 
 				console.log("Transaction submitted:", hash);
 				setTxHash(hash);
+
+				// Set isCreating to false immediately after transaction submission
+				// The isConfirming state from useWaitForTransactionReceipt will handle the waiting period
+				setIsCreating(false);
 
 				// Wait for receipt and get the created token addresses
 				if (publicClient) {
@@ -252,9 +268,9 @@ export function useCreateToken() {
 				}
 
 				setError(new Error(errorMessage));
-				return null;
-			} finally {
+				// Reset isCreating if it's still true (in case of early error before tx submission)
 				setIsCreating(false);
+				return null;
 			}
 		},
 		[
