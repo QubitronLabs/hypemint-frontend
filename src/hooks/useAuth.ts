@@ -28,6 +28,7 @@ export function useAuth() {
     const isAuthenticated = useIsAuthenticated();
     const isUserFetched = useIsUserFetched();
     const { isLoading } = useAuthStore();
+    
 
     return {
         // Auth state
@@ -43,7 +44,7 @@ export function useAuth() {
         // Dynamic.xyz data
         dynamicUser,
         primaryWallet,
-        walletAddress: primaryWallet?.address,
+        walletAddress: primaryWallet?.address as `0x${string}`,
         isLoggedIn,
 
         // Actions

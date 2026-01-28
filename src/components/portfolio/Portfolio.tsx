@@ -9,7 +9,6 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
-import { useAccount } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import {
@@ -67,7 +66,6 @@ interface HoldingDisplay {
 
 export function Portfolio({ className }: PortfolioProps) {
 	const { isAuthenticated, walletAddress } = useAuth();
-	const { isConnected } = useAccount();
 	const [activeTab, setActiveTab] = useState("holdings");
 	const queryClient = useQueryClient();
 
@@ -273,7 +271,7 @@ export function Portfolio({ className }: PortfolioProps) {
 	}, [holdings, nativeBalance]);
 
 	// Not connected state
-	if (!isAuthenticated || !isConnected) {
+	if (!isAuthenticated) {
 		return (
 			<div
 				className={cn(
