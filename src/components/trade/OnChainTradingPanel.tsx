@@ -5,7 +5,7 @@
  * Real blockchain trading interface using Wagmi/Viem
  */
 
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAccount } from "wagmi";
 import { formatEther, parseEther, type Address } from "viem";
@@ -264,35 +264,23 @@ export function OnChainTradingPanel({
     };
   }, [amount, tradeType, currentPrice, buyQuote, sellQuote]);
 
-  // Track pending trade details for sync
-  const pendingTradeRef = useRef<{
-    type: TradeType;
-    maticAmount: string;
-    tokenAmount: string;
-  } | null>(null);
-
-  // Sync confirmed trades to backend
+  // Sync confirmed trades to backend (verified on-chain before recording)
   const syncTradeToBackend = useCallback(
-    async (hash: string) => {
-      if (!pendingTradeRef.current) return;
-
-      const { type, maticAmount, tokenAmount } = pendingTradeRef.current;
-
+    async (hash: string, type: "buy" | "sell") => {
       try {
+        // Backend verifies the transaction on-chain before recording
         await recordOnChainTrade({
           tokenId: tokenAddress,
           bondingCurveAddress,
           type,
-          maticAmount: parseEther(maticAmount).toString(),
-          tokenAmount: parseEther(tokenAmount).toString(),
+          maticAmount: "0", // Will be extracted from blockchain
+          tokenAmount: "0", // Will be extracted from blockchain
           txHash: hash,
         });
         console.log("[OnChainTrading] Trade synced to backend:", hash);
       } catch (err) {
         console.error("[OnChainTrading] Failed to sync trade to backend:", err);
         // Don't show error to user - on-chain trade succeeded, backend sync is secondary
-      } finally {
-        pendingTradeRef.current = null;
       }
     },
     [tokenAddress, bondingCurveAddress],
@@ -301,7 +289,8 @@ export function OnChainTradingPanel({
   // Refetch balances and sync when trades are confirmed
   useEffect(() => {
     if (isBuyConfirmed && buyTxHash) {
-      syncTradeToBackend(buyTxHash);
+      console.log("[OnChainTrading] Buy trade confirmed:", buyTxHash);
+      syncTradeToBackend(buyTxHash, "buy");
       // Refetch balances after confirmed trade
       setTimeout(() => {
         refetchNativeBalance();
@@ -319,7 +308,8 @@ export function OnChainTradingPanel({
   // Sync sell trade when confirmed
   useEffect(() => {
     if (isSellConfirmed && sellTxHash) {
-      syncTradeToBackend(sellTxHash);
+      console.log("[OnChainTrading] Sell trade confirmed:", sellTxHash);
+      syncTradeToBackend(sellTxHash, "sell");
       // Refetch balances after confirmed trade
       setTimeout(() => {
         refetchNativeBalance();
@@ -360,13 +350,6 @@ export function OnChainTradingPanel({
 
     try {
       if (tradeType === "buy") {
-        // Store pending trade details for backend sync
-        pendingTradeRef.current = {
-          type: "buy",
-          maticAmount: amount,
-          tokenAmount: tradeMetrics.outputAmount.toString(),
-        };
-
         toast.info("Confirm transaction in wallet...", { id: "trade" });
         const hash = await buy({
           bondingCurveAddress,
@@ -389,13 +372,6 @@ export function OnChainTradingPanel({
           toast.error("Please approve tokens first");
           return;
         }
-
-        // Store pending trade details for backend sync
-        pendingTradeRef.current = {
-          type: "sell",
-          maticAmount: tradeMetrics.outputAmount.toString(),
-          tokenAmount: amount,
-        };
 
         toast.info("Confirm transaction in wallet...", { id: "trade" });
         const hash = await sell({
