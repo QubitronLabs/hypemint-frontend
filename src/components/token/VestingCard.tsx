@@ -17,21 +17,19 @@ export function VestingCard({ bondingCurveAddress, symbol }: VestingCardProps) {
     const { vestingInfo, claimableAmount } = useVestingInfo(bondingCurveAddress);
     const { claim, isClaiming, isConfirming, isConfirmed, txHash, error } = useClaimVested();
 
-    // If no vesting info or total amount is 0, don't show card (unless loading state needs handling)
-    if (!vestingInfo || vestingInfo.totalAmount === 0n) {
-        return null;
-    }
-
-    const { totalAmount, claimedAmount, startTime } = vestingInfo;
-    const remaining = totalAmount - claimedAmount;
-
     // Vesting duration is fixed at 1 hour (3600 seconds) in current contract
     const VESTING_DURATION = 3600;
     
-    // Calculate progress
+    // All hooks MUST be called before any conditional returns (Rules of Hooks)
     const [elapsed, setElapsed] = useState(0);
 
+    // Get startTime safely (may be undefined if no vestingInfo)
+    const startTime = vestingInfo?.startTime ?? 0n;
+
     useEffect(() => {
+        // Only update if we have a valid startTime
+        if (!startTime || startTime === 0n) return;
+
         const updateElapsed = () => {
             const now = Math.floor(Date.now() / 1000);
             const start = Number(startTime);
@@ -41,7 +39,15 @@ export function VestingCard({ bondingCurveAddress, symbol }: VestingCardProps) {
         updateElapsed();
         const interval = setInterval(updateElapsed, 1000);
         return () => clearInterval(interval);
-    }, [startTime]);
+    }, [startTime, VESTING_DURATION]);
+
+    // Early return AFTER all hooks
+    if (!vestingInfo || vestingInfo.totalAmount === 0n) {
+        return null;
+    }
+
+    const { totalAmount, claimedAmount } = vestingInfo;
+    const remaining = totalAmount - claimedAmount;
 
     const progressPercent = Math.min(100, (elapsed / VESTING_DURATION) * 100);
     const timeRemaining = Math.max(0, VESTING_DURATION - elapsed);

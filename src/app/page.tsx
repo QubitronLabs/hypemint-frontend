@@ -235,25 +235,25 @@ function HomePage() {
 	);
 
 	// Trending tokens (for "trending" tab)
-	const { data: trendingTokens = [], isLoading: trendingLoading } =
+	const { data: trendingTokens = [], isLoading: trendingLoading, refetch: refetchTrending } =
 		useTrendingTokens(undefined, {
 			enabled: isHydrated && activeFilter === "trending",
 		});
 
 	// New tokens (for "new" tab)
-	const { data: newTokens = [], isLoading: newLoading } = useNewTokens(
+	const { data: newTokens = [], isLoading: newLoading, refetch: refetchNew } = useNewTokens(
 		undefined,
 		{ enabled: isHydrated && activeFilter === "new" },
 	);
 
 	// Live tokens (for "live" tab)
-	const { data: liveTokens = [], isLoading: liveLoading } = useLiveTokens(
+	const { data: liveTokens = [], isLoading: liveLoading, refetch: refetchLive } = useLiveTokens(
 		undefined,
 		{ enabled: isHydrated && activeFilter === "live" },
 	);
 
 	// Graduated tokens (for "graduated" tab)
-	const { data: graduatedTokens = [], isLoading: graduatedLoading } =
+	const { data: graduatedTokens = [], isLoading: graduatedLoading, refetch: refetchGraduated } =
 		useGraduatedTokens(undefined, {
 			enabled: isHydrated && activeFilter === "graduated",
 		});
@@ -283,7 +283,7 @@ function HomePage() {
 		),
 	);
 
-	// WebSocket: Listen for trades
+	// WebSocket: Listen for trades - refetch tokens to update graduation line
 	useGlobalTradeFeed(
 		useCallback((trade) => {
 			// setWsConnected(true);
@@ -297,7 +297,30 @@ function HomePage() {
 			};
 
 			setActivityFeed((prev) => [activity, ...prev].slice(0, 20));
-		}, []),
+
+			// Refetch token list after trade to update graduation progress
+			// Use small delay to let backend update the data
+			setTimeout(() => {
+				// Refetch based on active tab
+				switch (activeFilter) {
+					case "all":
+						refetchAll();
+						break;
+					case "trending":
+						refetchTrending();
+						break;
+					case "new":
+						refetchNew();
+						break;
+					case "live":
+						refetchLive();
+						break;
+					case "graduated":
+						refetchGraduated();
+						break;
+				}
+			}, 500);
+		}, [activeFilter, refetchAll, refetchTrending, refetchNew, refetchLive, refetchGraduated]),
 	);
 
 	// Determine display tokens based on active tab
