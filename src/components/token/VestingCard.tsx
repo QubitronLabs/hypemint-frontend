@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { formatEther, type Address } from "viem";
 import { useVestingInfo, useClaimVested } from "@/hooks";

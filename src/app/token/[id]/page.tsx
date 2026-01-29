@@ -107,6 +107,9 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							// Update tradesCount in real-time
 							tradesCount:
 								message.data.tradesCount ?? oldData.tradesCount,
+              priceChange5m: message.data.priceChange5m ?? oldData.priceChange5m,
+              priceChange1h: message.data.priceChange1h ?? oldData.priceChange1h,
+              priceChange6h: message.data.priceChange6h ?? oldData.priceChange6h,
 						};
 					},
 				);
@@ -412,24 +415,36 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							<p className="text-xs text-muted-foreground mb-1">
 								5m
 							</p>
-							<p className="font-semibold tabular-nums text-destructive">
-								-7.46%
+							<p className={cn(
+								"font-semibold tabular-nums",
+								parseFloat(token.priceChange5m || "0") >= 0 ? "text-[#00ff88]" : "text-destructive"
+							)}>
+								{parseFloat(token.priceChange5m || "0") >= 0 ? "+" : ""}
+								{parseFloat(token.priceChange5m || "0").toFixed(2)}%
 							</p>
 						</div>
 						<div className="bg-card border border-border rounded-lg p-3 text-center">
 							<p className="text-xs text-muted-foreground mb-1">
 								1h
 							</p>
-							<p className="font-semibold tabular-nums text-[#00ff88]">
-								+1,188.82%
+							<p className={cn(
+								"font-semibold tabular-nums",
+								parseFloat(token.priceChange1h || "0") >= 0 ? "text-[#00ff88]" : "text-destructive"
+							)}>
+								{parseFloat(token.priceChange1h || "0") >= 0 ? "+" : ""}
+								{parseFloat(token.priceChange1h || "0").toFixed(2)}%
 							</p>
 						</div>
 						<div className="bg-card border border-border rounded-lg p-3 text-center col-span-2 sm:col-span-1">
 							<p className="text-xs text-muted-foreground mb-1">
 								6h
 							</p>
-							<p className="font-semibold tabular-nums text-[#00ff88]">
-								+1,188.82%
+							<p className={cn(
+								"font-semibold tabular-nums",
+								parseFloat(token.priceChange6h || "0") >= 0 ? "text-[#00ff88]" : "text-destructive"
+							)}>
+								{parseFloat(token.priceChange6h || "0") >= 0 ? "+" : ""}
+								{parseFloat(token.priceChange6h || "0").toFixed(2)}%
 							</p>
 						</div>
 					</motion.div>

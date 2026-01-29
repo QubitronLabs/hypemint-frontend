@@ -70,6 +70,9 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 
+	const [parentId, setParentId] = useState<string | null>(null);
+	const [replyingTo, setReplyingTo] = useState<string | null>(null);
+
 	const { isAuthenticated, setShowAuthFlow } = useAuth();
 
 	// Initial fetch
@@ -80,7 +83,9 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 					`/api/v1/comments/token/${tokenId}`,
 				);
 				if (response.data?.success) {
-					setComments(response.data.data.comments || []);
+					// We need to deduplicate because websocket might have added some
+					const fetchedComments = response.data.data.comments || [];
+					setComments(fetchedComments);
 				}
 			} catch (error) {
 				console.error("Failed to fetch comments:", error);
@@ -101,6 +106,8 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			) {
 				const newComment = msg.data as Comment;
 				setComments((prev) => {
+					// Update if exists (e.g. like count change - though we only broadcast creation mostly, but if we broadcast update...)
+					// Actually our broadcast is creation only right now.
 					if (prev.find((c) => c.id === newComment.id)) return prev;
 					return [newComment, ...prev];
 				});
@@ -145,34 +152,60 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 	};
 
 	// Handle like
-	const handleLike = async (commentId: string) => {
+	const handleLike = async (commentId: string, isLiked: boolean) => {
 		if (!isAuthenticated) {
 			setShowAuthFlow(true);
 			return;
 		}
 
+		// Optimistic update
+		setComments((prev) =>
+			prev.map((c) =>
+				c.id === commentId
+					? {
+							...c,
+							isLiked: !isLiked,
+							likesCount: isLiked
+								? (c.likesCount || 1) - 1
+								: (c.likesCount || 0) + 1,
+						}
+					: c,
+			),
+		);
+
 		try {
-			const response = await apiClient.post(
-				`/api/v1/comments/${commentId}/like`,
-			);
-			if (response.data?.success) {
-				setComments((prev) =>
-					prev.map((c) =>
-						c.id === commentId
-							? {
-									...c,
-									isLiked: !c.isLiked,
-									likesCount: c.isLiked
-										? (c.likesCount || 1) - 1
-										: (c.likesCount || 0) + 1,
-								}
-							: c,
-					),
-				);
+			if (isLiked) {
+				await apiClient.delete(`/api/v1/comments/${commentId}/like`);
+			} else {
+				await apiClient.post(`/api/v1/comments/${commentId}/like`);
 			}
 		} catch (error) {
-			console.error("Failed to like comment:", error);
+			console.error("Failed to like/unlike comment:", error);
+			// Revert on failure
+			setComments((prev) =>
+				prev.map((c) =>
+					c.id === commentId
+						? {
+								...c,
+								isLiked: isLiked, // Revert to original
+								likesCount: isLiked
+									? (c.likesCount || 0) + 1
+									: (c.likesCount || 1) - 1,
+							}
+						: c,
+				),
+			);
 		}
+	};
+
+	const handleReply = (comment: Comment) => {
+		if (!isAuthenticated) {
+			setShowAuthFlow(true);
+			return;
+		}
+		setParentId(comment.id);
+		setReplyingTo(comment.user.displayName || comment.user.username || "Anonymous");
+		setShowCommentDialog(true);
 	};
 
 	// Send message from dialog
@@ -186,10 +219,13 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			if (selectedImage) {
 				formData.append("image", selectedImage);
 			}
+			if (parentId) {
+				formData.append("parentId", parentId);
+			}
 
 			const response = await apiClient.post(
 				`/api/v1/comments/token/${tokenId}`,
-				selectedImage ? formData : { content: dialogMessage.trim() },
+				selectedImage ? formData : { content: dialogMessage.trim(), parentId },
 				selectedImage
 					? { headers: { "Content-Type": "multipart/form-data" } }
 					: undefined,
@@ -198,6 +234,8 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			if (response.data?.success) {
 				setDialogMessage("");
 				clearImage();
+				setParentId(null);
+				setReplyingTo(null);
 				setShowCommentDialog(false);
 			}
 		} catch (error) {
@@ -226,6 +264,8 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			setShowAuthFlow(true);
 			return;
 		}
+		setParentId(null);
+		setReplyingTo(null);
 		setShowCommentDialog(true);
 	};
 
@@ -328,14 +368,17 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 									</p>
 
 									{/* Reply link */}
-									<button className="text-xs text-muted-foreground hover:text-foreground mt-1">
+									<button 
+										onClick={() => handleReply(comment)}
+										className="text-xs text-muted-foreground hover:text-foreground mt-1"
+									>
 										Reply
 									</button>
 								</div>
 
 								{/* Like button */}
 								<button
-									onClick={() => handleLike(comment.id)}
+									onClick={() => handleLike(comment.id, !!comment.isLiked)}
 									className="flex flex-col items-center gap-0.5 shrink-0"
 								>
 									<Heart
@@ -360,15 +403,23 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			{/* Comment Dialog */}
 			<Dialog
 				open={showCommentDialog}
-				onOpenChange={setShowCommentDialog}
+				onOpenChange={(open) => {
+					setShowCommentDialog(open);
+					if (!open) {
+						setParentId(null);
+						setReplyingTo(null);
+					}
+				}}
 			>
 				<DialogContent className="sm:max-w-md">
 					<DialogHeader>
-						<DialogTitle>Add a comment</DialogTitle>
+						<DialogTitle>
+							{replyingTo ? `Reply to ${replyingTo}` : "Add a comment"}
+						</DialogTitle>
 					</DialogHeader>
 					<div className="space-y-4">
 						<Textarea
-							placeholder="comment"
+							placeholder={replyingTo ? "Write a reply..." : "Write a comment..."}
 							value={dialogMessage}
 							onChange={(e) => setDialogMessage(e.target.value)}
 							className="min-h-[100px] bg-muted/50 resize-none"
@@ -439,6 +490,8 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 									setShowCommentDialog(false);
 									setDialogMessage("");
 									clearImage();
+									setParentId(null);
+									setReplyingTo(null);
 								}}
 							>
 								Cancel
@@ -451,7 +504,7 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 								{sending ? (
 									<Loader2 className="h-4 w-4 animate-spin mr-2" />
 								) : null}
-								Post reply
+								{replyingTo ? "Post reply" : "Post comment"}
 							</Button>
 						</div>
 					</div>

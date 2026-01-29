@@ -42,6 +42,9 @@ export interface Token {
 	marketCap: string;
 	volume24h: string;
 	priceChange24h: number;
+	priceChange5m?: string;
+	priceChange1h?: string;
+	priceChange6h?: string;
 	chainId: number;
 	status: TokenStatus;
 	creatorId: string;
