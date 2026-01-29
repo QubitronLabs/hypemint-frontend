@@ -20,7 +20,7 @@ import {
  * NO API CALLS - uses cached data from auth store
  */
 export function useAuth() {
-    const { user: dynamicUser, primaryWallet, handleLogOut } = useDynamicContext();
+    const { user: dynamicUser, primaryWallet, handleLogOut ,setShowAuthFlow} = useDynamicContext();
     const isLoggedIn = useIsLoggedIn();
 
     const jwt = useJwt();
@@ -49,6 +49,9 @@ export function useAuth() {
 
         // Actions
         logout: handleLogOut,
+
+        // Show auth flow
+        setShowAuthFlow,
     };
 }
 

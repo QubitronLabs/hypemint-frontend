@@ -553,175 +553,196 @@ export function Portfolio({ className }: PortfolioProps) {
 								</div>
 							) : (
 								<div className="bg-card border border-border rounded-xl overflow-hidden">
-									{/* Table Header */}
-									<div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-4 p-4 border-b border-border text-sm text-muted-foreground">
-										<span>Token</span>
-										<span className="text-right">
-											Balance
-										</span>
-										<span className="text-right">
-											Value
-										</span>
-										<span className="text-right">P&L</span>
-										<span className="text-right">
-											Last Trade
-										</span>
-									</div>
+									{/* Mobile scrollable table container */}
+									<div className="overflow-x-auto">
+										<div className="min-w-[600px]">
+											{/* Table Header */}
+											<div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-4 p-4 border-b border-border text-sm text-muted-foreground">
+												<span>Token</span>
+												<span className="text-right">
+													Balance
+												</span>
+												<span className="text-right">
+													Value
+												</span>
+												<span className="text-right">
+													P&L
+												</span>
+												<span className="text-right">
+													Last Trade
+												</span>
+											</div>
 
-									{/* Holdings Rows */}
-									{holdings.map((holding) => (
-										<Link
-											key={holding.tokenId}
-											href={`/token/${holding.tokenId}`}
-											className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-4 p-4 items-center border-b border-border last:border-0 hover:bg-muted/50 transition-colors"
-										>
-											<div className="flex items-center gap-3 min-w-0">
-												<div className="w-10 h-10 rounded-lg bg-muted overflow-hidden flex-shrink-0">
-													{holding.tokenImage ? (
-														<Image
-															src={
-																holding.tokenImage
-															}
-															alt={
-																holding.tokenName
-															}
-															width={40}
-															height={40}
-															className="object-cover w-full h-full"
-														/>
-													) : (
-														<div className="w-full h-full flex items-center justify-center text-sm font-bold">
-															{holding.tokenSymbol.slice(
-																0,
-																2,
+											{/* Holdings Rows */}
+											{holdings.map((holding) => (
+												<Link
+													key={holding.tokenId}
+													href={`/token/${holding.tokenId}`}
+													className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-4 p-4 items-center border-b border-border last:border-0 hover:bg-muted/50 transition-colors"
+												>
+													<div className="flex items-center gap-3 min-w-0">
+														<div className="w-10 h-10 rounded-lg bg-muted overflow-hidden flex-shrink-0">
+															{holding.tokenImage ? (
+																<Image
+																	src={
+																		holding.tokenImage
+																	}
+																	alt={
+																		holding.tokenName
+																	}
+																	width={40}
+																	height={40}
+																	className="object-cover w-full h-full"
+																/>
+															) : (
+																<div className="w-full h-full flex items-center justify-center text-sm font-bold">
+																	{holding.tokenSymbol.slice(
+																		0,
+																		2,
+																	)}
+																</div>
 															)}
 														</div>
-													)}
-												</div>
-												<div className="min-w-0">
-													<p className="font-medium truncate">
-														{holding.tokenName}
-													</p>
-													<p className="text-xs text-muted-foreground truncate">
-														${holding.tokenSymbol}
-													</p>
-												</div>
-											</div>
-
-											<div className="text-right min-w-0">
-												<Tooltip>
-													<TooltipTrigger asChild>
-														<p className="font-medium tabular-nums truncate cursor-help">
-															{
-																formatSafeTokenAmount(
-																	holding.balance,
-																).display
-															}
-														</p>
-													</TooltipTrigger>
-													<TooltipContent>
-														<p className="font-mono text-xs">
-															{
-																formatSafeTokenAmount(
-																	holding.balance,
-																).full
-															}
-														</p>
-													</TooltipContent>
-												</Tooltip>
-											</div>
-
-											<div className="text-right min-w-0">
-												<Tooltip>
-													<TooltipTrigger asChild>
-														<p className="font-medium tabular-nums truncate cursor-help">
-															{
-																formatSafeValue(
-																	holding.value,
-																).display
-															}
-														</p>
-													</TooltipTrigger>
-													<TooltipContent>
-														<p className="font-mono text-xs">
-															{
-																formatSafeValue(
-																	holding.value,
-																).full
-															}
-														</p>
-													</TooltipContent>
-												</Tooltip>
-											</div>
-
-											<div className="text-right min-w-0">
-												<Tooltip>
-													<TooltipTrigger asChild>
-														<div className="cursor-help">
-															<p
-																className={cn(
-																	"font-medium tabular-nums truncate",
-																	holding.pnl >=
-																		0
-																		? "text-green-500"
-																		: "text-red-500",
-																)}
-															>
-																{holding.pnl >=
-																0
-																	? "+"
-																	: ""}
+														<div className="min-w-0">
+															<p className="font-medium truncate">
 																{
-																	formatSafeValue(
-																		holding.pnl,
-																	).display
+																	holding.tokenName
 																}
 															</p>
-															<p
-																className={cn(
-																	"text-xs",
-																	holding.pnl >=
-																		0
-																		? "text-green-500"
-																		: "text-red-500",
-																)}
-															>
-																{holding.pnlPercent >=
-																0
-																	? "+"
-																	: ""}
-																{Number.isFinite(
-																	holding.pnlPercent,
-																)
-																	? holding.pnlPercent.toFixed(
-																			2,
-																		)
-																	: "0.00"}
-																%
+															<p className="text-xs text-muted-foreground truncate">
+																$
+																{
+																	holding.tokenSymbol
+																}
 															</p>
 														</div>
-													</TooltipTrigger>
-													<TooltipContent>
-														<p className="font-mono text-xs">
-															{
-																formatSafeValue(
-																	holding.pnl,
-																).full
-															}
-														</p>
-													</TooltipContent>
-												</Tooltip>
-											</div>
+													</div>
 
-											<div className="text-right text-sm text-muted-foreground">
-												{holding.lastTrade
-													? formatRelativeTime(
-															holding.lastTrade,
-														)
-													: "-"}
-											</div>
-										</Link>
-									))}
+													<div className="text-right min-w-0">
+														<Tooltip>
+															<TooltipTrigger
+																asChild
+															>
+																<p className="font-medium tabular-nums truncate cursor-help">
+																	{
+																		formatSafeTokenAmount(
+																			holding.balance,
+																		)
+																			.display
+																	}
+																</p>
+															</TooltipTrigger>
+															<TooltipContent>
+																<p className="font-mono text-xs">
+																	{
+																		formatSafeTokenAmount(
+																			holding.balance,
+																		).full
+																	}
+																</p>
+															</TooltipContent>
+														</Tooltip>
+													</div>
+
+													<div className="text-right min-w-0">
+														<Tooltip>
+															<TooltipTrigger
+																asChild
+															>
+																<p className="font-medium tabular-nums truncate cursor-help">
+																	{
+																		formatSafeValue(
+																			holding.value,
+																		)
+																			.display
+																	}
+																</p>
+															</TooltipTrigger>
+															<TooltipContent>
+																<p className="font-mono text-xs">
+																	{
+																		formatSafeValue(
+																			holding.value,
+																		).full
+																	}
+																</p>
+															</TooltipContent>
+														</Tooltip>
+													</div>
+
+													<div className="text-right min-w-0">
+														<Tooltip>
+															<TooltipTrigger
+																asChild
+															>
+																<div className="cursor-help">
+																	<p
+																		className={cn(
+																			"font-medium tabular-nums truncate",
+																			holding.pnl >=
+																				0
+																				? "text-green-500"
+																				: "text-red-500",
+																		)}
+																	>
+																		{holding.pnl >=
+																		0
+																			? "+"
+																			: ""}
+																		{
+																			formatSafeValue(
+																				holding.pnl,
+																			)
+																				.display
+																		}
+																	</p>
+																	<p
+																		className={cn(
+																			"text-xs",
+																			holding.pnl >=
+																				0
+																				? "text-green-500"
+																				: "text-red-500",
+																		)}
+																	>
+																		{holding.pnlPercent >=
+																		0
+																			? "+"
+																			: ""}
+																		{Number.isFinite(
+																			holding.pnlPercent,
+																		)
+																			? holding.pnlPercent.toFixed(
+																					2,
+																				)
+																			: "0.00"}
+																		%
+																	</p>
+																</div>
+															</TooltipTrigger>
+															<TooltipContent>
+																<p className="font-mono text-xs">
+																	{
+																		formatSafeValue(
+																			holding.pnl,
+																		).full
+																	}
+																</p>
+															</TooltipContent>
+														</Tooltip>
+													</div>
+
+													<div className="text-right text-sm text-muted-foreground">
+														{holding.lastTrade
+															? formatRelativeTime(
+																	holding.lastTrade,
+																)
+															: "-"}
+													</div>
+												</Link>
+											))}
+										</div>
+									</div>
 								</div>
 							)}
 						</TabsContent>
@@ -740,181 +761,217 @@ export function Portfolio({ className }: PortfolioProps) {
 								</div>
 							) : (
 								<div className="bg-card border border-border rounded-xl overflow-hidden">
-									{/* Table Header */}
-									<div className="grid grid-cols-[auto_2fr_1fr_1fr_1fr_auto] gap-4 p-4 border-b border-border text-sm text-muted-foreground">
-										<span>Type</span>
-										<span>Token</span>
-										<span className="text-right">
-											Amount
-										</span>
-										<span className="text-right">
-											Price
-										</span>
-										<span className="text-right">
-											Value
-										</span>
-										<span className="text-right">Time</span>
-									</div>
-
-									{/* Transaction Rows */}
-									{userTrades.slice(0, 50).map((trade) => (
-										<div
-											key={trade.id}
-											className="grid grid-cols-[auto_2fr_1fr_1fr_1fr_auto] gap-4 p-4 items-center border-b border-border last:border-0"
-										>
-											<div
-												className={cn(
-													"w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
-													trade.type === "buy"
-														? "bg-green-500/20"
-														: "bg-red-500/20",
-												)}
-											>
-												{trade.type === "buy" ? (
-													<ArrowUpRight className="h-4 w-4 text-green-500" />
-												) : (
-													<ArrowDownRight className="h-4 w-4 text-red-500" />
-												)}
+									{/* Mobile scrollable table container */}
+									<div className="overflow-x-auto">
+										<div className="min-w-[700px]">
+											{/* Table Header */}
+											<div className="grid grid-cols-[auto_2fr_1fr_1fr_1fr_auto] gap-4 p-4 border-b border-border text-sm text-muted-foreground">
+												<span>Type</span>
+												<span>Token</span>
+												<span className="text-right">
+													Amount
+												</span>
+												<span className="text-right">
+													Price
+												</span>
+												<span className="text-right">
+													Value
+												</span>
+												<span className="text-right">
+													Time
+												</span>
 											</div>
 
-											<div className="flex items-center gap-3 min-w-0">
-												<div className="w-8 h-8 rounded-lg bg-muted overflow-hidden flex-shrink-0">
-													{trade.token?.imageUrl ? (
-														<Image
-															src={
-																trade.token
-																	.imageUrl
-															}
-															alt={
-																trade.token
-																	.name || ""
-															}
-															width={32}
-															height={32}
-															className="object-cover w-full h-full"
-														/>
-													) : (
-														<div className="w-full h-full flex items-center justify-center text-xs font-bold">
-															{trade.token?.symbol?.slice(
-																0,
-																2,
-															) || "??"}
-														</div>
-													)}
-												</div>
-												<div className="min-w-0">
-													<p className="font-medium text-sm truncate">
-														{trade.token?.name ||
-															"Unknown"}
-													</p>
-													<p className="text-xs text-muted-foreground truncate">
-														$
-														{trade.token?.symbol ||
-															"???"}
-													</p>
-												</div>
-											</div>
-
-											<div className="text-right min-w-0">
-												<Tooltip>
-													<TooltipTrigger asChild>
-														<p
+											{/* Transaction Rows */}
+											{userTrades
+												.slice(0, 50)
+												.map((trade) => (
+													<div
+														key={trade.id}
+														className="grid grid-cols-[auto_2fr_1fr_1fr_1fr_auto] gap-4 p-4 items-center border-b border-border last:border-0"
+													>
+														<div
 															className={cn(
-																"font-medium tabular-nums text-sm truncate cursor-help",
+																"w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
 																trade.type ===
 																	"buy"
-																	? "text-green-500"
-																	: "text-red-500",
+																	? "bg-green-500/20"
+																	: "bg-red-500/20",
 															)}
 														>
 															{trade.type ===
-															"buy"
-																? "+"
-																: "-"}
-															{
-																formatSafeTokenAmount(
-																	fromWei(
-																		trade.amount,
-																	),
-																).display
-															}
-														</p>
-													</TooltipTrigger>
-													<TooltipContent>
-														<p className="font-mono text-xs">
-															{
-																formatSafeTokenAmount(
-																	fromWei(
-																		trade.amount,
-																	),
-																).full
-															}
-														</p>
-													</TooltipContent>
-												</Tooltip>
-											</div>
+															"buy" ? (
+																<ArrowUpRight className="h-4 w-4 text-green-500" />
+															) : (
+																<ArrowDownRight className="h-4 w-4 text-red-500" />
+															)}
+														</div>
 
-											<div className="text-right min-w-0">
-												<Tooltip>
-													<TooltipTrigger asChild>
-														<p className="font-medium tabular-nums text-sm truncate cursor-help">
-															{
-																formatSafePrice(
-																	fromWei(
-																		trade.price,
-																	),
-																).display
-															}
-														</p>
-													</TooltipTrigger>
-													<TooltipContent>
-														<p className="font-mono text-xs">
-															{
-																formatSafePrice(
-																	fromWei(
-																		trade.price,
-																	),
-																).full
-															}
-														</p>
-													</TooltipContent>
-												</Tooltip>
-											</div>
+														<div className="flex items-center gap-3 min-w-0">
+															<div className="w-8 h-8 rounded-lg bg-muted overflow-hidden flex-shrink-0">
+																{trade.token
+																	?.imageUrl ? (
+																	<Image
+																		src={
+																			trade
+																				.token
+																				.imageUrl
+																		}
+																		alt={
+																			trade
+																				.token
+																				.name ||
+																			""
+																		}
+																		width={
+																			32
+																		}
+																		height={
+																			32
+																		}
+																		className="object-cover w-full h-full"
+																	/>
+																) : (
+																	<div className="w-full h-full flex items-center justify-center text-xs font-bold">
+																		{trade.token?.symbol?.slice(
+																			0,
+																			2,
+																		) ||
+																			"??"}
+																	</div>
+																)}
+															</div>
+															<div className="min-w-0">
+																<p className="font-medium text-sm truncate">
+																	{trade.token
+																		?.name ||
+																		"Unknown"}
+																</p>
+																<p className="text-xs text-muted-foreground truncate">
+																	$
+																	{trade.token
+																		?.symbol ||
+																		"???"}
+																</p>
+															</div>
+														</div>
 
-											<div className="text-right min-w-0">
-												<Tooltip>
-													<TooltipTrigger asChild>
-														<p className="font-medium tabular-nums text-sm truncate cursor-help">
-															{
-																formatSafeValue(
-																	fromWei(
-																		trade.totalValue,
-																	),
-																).display
-															}
-														</p>
-													</TooltipTrigger>
-													<TooltipContent>
-														<p className="font-mono text-xs">
-															{
-																formatSafeValue(
-																	fromWei(
-																		trade.totalValue,
-																	),
-																).full
-															}
-														</p>
-													</TooltipContent>
-												</Tooltip>
-											</div>
+														<div className="text-right min-w-0">
+															<Tooltip>
+																<TooltipTrigger
+																	asChild
+																>
+																	<p
+																		className={cn(
+																			"font-medium tabular-nums text-sm truncate cursor-help",
+																			trade.type ===
+																				"buy"
+																				? "text-green-500"
+																				: "text-red-500",
+																		)}
+																	>
+																		{trade.type ===
+																		"buy"
+																			? "+"
+																			: "-"}
+																		{
+																			formatSafeTokenAmount(
+																				fromWei(
+																					trade.amount,
+																				),
+																			)
+																				.display
+																		}
+																	</p>
+																</TooltipTrigger>
+																<TooltipContent>
+																	<p className="font-mono text-xs">
+																		{
+																			formatSafeTokenAmount(
+																				fromWei(
+																					trade.amount,
+																				),
+																			)
+																				.full
+																		}
+																	</p>
+																</TooltipContent>
+															</Tooltip>
+														</div>
 
-											<div className="text-right text-xs text-muted-foreground min-w-[80px]">
-												{formatRelativeTime(
-													new Date(trade.createdAt),
-												)}
-											</div>
+														<div className="text-right min-w-0">
+															<Tooltip>
+																<TooltipTrigger
+																	asChild
+																>
+																	<p className="font-medium tabular-nums text-sm truncate cursor-help">
+																		{
+																			formatSafePrice(
+																				fromWei(
+																					trade.price,
+																				),
+																			)
+																				.display
+																		}
+																	</p>
+																</TooltipTrigger>
+																<TooltipContent>
+																	<p className="font-mono text-xs">
+																		{
+																			formatSafePrice(
+																				fromWei(
+																					trade.price,
+																				),
+																			)
+																				.full
+																		}
+																	</p>
+																</TooltipContent>
+															</Tooltip>
+														</div>
+
+														<div className="text-right min-w-0">
+															<Tooltip>
+																<TooltipTrigger
+																	asChild
+																>
+																	<p className="font-medium tabular-nums text-sm truncate cursor-help">
+																		{
+																			formatSafeValue(
+																				fromWei(
+																					trade.totalValue,
+																				),
+																			)
+																				.display
+																		}
+																	</p>
+																</TooltipTrigger>
+																<TooltipContent>
+																	<p className="font-mono text-xs">
+																		{
+																			formatSafeValue(
+																				fromWei(
+																					trade.totalValue,
+																				),
+																			)
+																				.full
+																		}
+																	</p>
+																</TooltipContent>
+															</Tooltip>
+														</div>
+
+														<div className="text-right text-xs text-muted-foreground min-w-[80px]">
+															{formatRelativeTime(
+																new Date(
+																	trade.createdAt,
+																),
+															)}
+														</div>
+													</div>
+												))}
 										</div>
-									))}
+									</div>
 								</div>
 							)}
 						</TabsContent>

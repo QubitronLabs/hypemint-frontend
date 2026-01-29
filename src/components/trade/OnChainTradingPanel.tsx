@@ -17,6 +17,7 @@ import {
 	TrendingDown,
 	Loader2,
 	CheckCircle2,
+	XCircle,
 	ExternalLink,
 	Zap,
 } from "lucide-react";
@@ -105,7 +106,11 @@ export function OnChainTradingPanel({
 	currentPrice,
 	className,
 }: OnChainTradingPanelProps) {
-	const { walletAddress: address, isAuthenticated } = useAuth();
+	const {
+		walletAddress: address,
+		isAuthenticated,
+		setShowAuthFlow,
+	} = useAuth();
 	const [tradeType, setTradeType] = useState<TradeType>("buy");
 	const [amount, setAmount] = useState("");
 	const [slippage, setSlippage] = useState(5); // 5% default
@@ -146,11 +151,11 @@ export function OnChainTradingPanel({
 		tradeType === "sell" ? amount : "",
 	);
 
-  // Allowance check for selling
-  const { data: allowance, refetch: refetchAllowance } = useTokenAllowance(
-    tokenAddress,
-    bondingCurveAddress,
-  );
+	// Allowance check for selling
+	const { data: allowance, refetch: refetchAllowance } = useTokenAllowance(
+		tokenAddress,
+		bondingCurveAddress,
+	);
 
 	// Trade hooks
 	const {
@@ -158,6 +163,7 @@ export function OnChainTradingPanel({
 		isBuying,
 		isConfirming: isBuyConfirming,
 		isConfirmed: isBuyConfirmed,
+		isFailed: isBuyFailed,
 		txHash: buyTxHash,
 		error: buyError,
 		reset: resetBuy,
@@ -168,6 +174,7 @@ export function OnChainTradingPanel({
 		isSelling,
 		isConfirming: isSellConfirming,
 		isConfirmed: isSellConfirmed,
+		isFailed: isSellFailed,
 		txHash: sellTxHash,
 		error: sellError,
 		reset: resetSell,
@@ -187,6 +194,8 @@ export function OnChainTradingPanel({
 	const isLoading = isBuying || isSelling || isApproving;
 	const isConfirming =
 		isBuyConfirming || isSellConfirming || isApproveConfirming;
+	const isConfirmed = isBuyConfirmed || isSellConfirmed;
+	const isFailed = isBuyFailed || isSellFailed;
 	const txHash = buyTxHash || sellTxHash;
 	const error = buyError || sellError || approveError;
 
@@ -303,7 +312,15 @@ export function OnChainTradingPanel({
 	// Note: Backend event listener also records the trade independently
 	useEffect(() => {
 		if (isBuyConfirmed && buyTxHash) {
-			// console.log("[OnChainTrading] Buy trade confirmed:", buyTxHash);
+			console.log("[OnChainTrading] Buy trade confirmed:", buyTxHash);
+			toast.success("Buy transaction confirmed!", {
+				id: "trade-result",
+				description: `Transaction successful`,
+				action: {
+					label: "View",
+					onClick: () => window.open(getTxUrl(buyTxHash), "_blank"),
+				},
+			});
 			syncTradeToBackend(buyTxHash, "buy");
 			// Refetch balances after confirmed trade
 			setTimeout(() => {
@@ -319,10 +336,33 @@ export function OnChainTradingPanel({
 		refetchTokenBalance,
 	]);
 
+	// Show toast for failed buy trades
+	useEffect(() => {
+		if (isBuyFailed && buyTxHash) {
+			console.log("[OnChainTrading] Buy trade failed:", buyTxHash);
+			toast.error("Buy transaction failed!", {
+				id: "trade-result",
+				description: "Transaction reverted on-chain",
+				action: {
+					label: "View",
+					onClick: () => window.open(getTxUrl(buyTxHash), "_blank"),
+				},
+			});
+		}
+	}, [isBuyFailed, buyTxHash]);
+
 	// Sync sell trade when confirmed
 	useEffect(() => {
 		if (isSellConfirmed && sellTxHash) {
-			// console.log("[OnChainTrading] Sell trade confirmed:", sellTxHash);
+			console.log("[OnChainTrading] Sell trade confirmed:", sellTxHash);
+			toast.success("Sell transaction confirmed!", {
+				id: "trade-result",
+				description: `Transaction successful`,
+				action: {
+					label: "View",
+					onClick: () => window.open(getTxUrl(sellTxHash), "_blank"),
+				},
+			});
 			syncTradeToBackend(sellTxHash, "sell");
 			// Refetch balances after confirmed trade
 			setTimeout(() => {
@@ -338,38 +378,59 @@ export function OnChainTradingPanel({
 		refetchTokenBalance,
 	]);
 
-  // Refetch allowance when approve is confirmed
-  useEffect(() => {
-    if (isApproveConfirmed) {
-      // console.log("[OnChainTrading] Approve confirmed, refetching allowance");
-      setTimeout(() => {
-        refetchAllowance();
-      }, 2000); // Wait 2s for blockchain state to update
-      toast.success("Approval confirmed! You can now sell tokens.");
-      resetApprove();
-    }
-  }, [isApproveConfirmed, refetchAllowance, resetApprove]);
+	// Show toast for failed sell trades
+	useEffect(() => {
+		if (isSellFailed && sellTxHash) {
+			console.log("[OnChainTrading] Sell trade failed:", sellTxHash);
+			toast.error("Sell transaction failed!", {
+				id: "trade-result",
+				description: "Transaction reverted on-chain",
+				action: {
+					label: "View",
+					onClick: () => window.open(getTxUrl(sellTxHash), "_blank"),
+				},
+			});
+		}
+	}, [isSellFailed, sellTxHash]);
 
-  // Handle approve
-  const handleApprove = async () => {
-    if (!amount) return;
-    try {
-      const amountWei = parseEther(amount);
-      // Approve max uint256 for convenience
-      const maxApproval = BigInt(
-        "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-      );
-      await approve(tokenAddress, bondingCurveAddress, maxApproval);
-      toast.success("Approval successful!");
-    } catch (err) {
-      console.error("Approve failed:", err);
-      toast.error("Approval failed");
-    }
-  };
+	// Refetch allowance when approve is confirmed
+	useEffect(() => {
+		if (isApproveConfirmed) {
+			console.log(
+				"[OnChainTrading] Approve confirmed, refetching allowance",
+			);
+			setTimeout(() => {
+				refetchAllowance();
+			}, 2000); // Wait 2s for blockchain state to update
+			toast.success("Approval confirmed! You can now sell tokens.");
+			resetApprove();
+		}
+	}, [isApproveConfirmed, refetchAllowance, resetApprove]);
+
+	// Handle approve
+	const handleApprove = async () => {
+		if (!amount) return;
+		try {
+			const amountWei = parseEther(amount);
+			// Approve max uint256 for convenience
+			const maxApproval = BigInt(
+				"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+			);
+			await approve(tokenAddress, bondingCurveAddress, maxApproval);
+			toast.success("Approval successful!");
+		} catch (err) {
+			console.error("Approve failed:", err);
+			toast.error("Approval failed");
+		}
+	};
 
 	// Handle trade execution
 	// Note: Backend event listener will automatically record trades from blockchain events
 	const handleTrade = async () => {
+		if (!isAuthenticated) {
+			setShowAuthFlow(true);
+			return;
+		}
 		if (!amount || parseFloat(amount) <= 0 || !isAuthenticated) return;
 
 		resetBuy();
@@ -402,10 +463,28 @@ export function OnChainTradingPanel({
 				}
 
 				toast.info("Confirm transaction in wallet...", { id: "trade" });
+
+				// Calculate minMatic from sellQuote with slippage
+				let minMaticStr = "0";
+				if (sellQuote) {
+					const [maticAmount] = sellQuote as [bigint, bigint, bigint];
+					// Apply slippage: minMatic = expectedMatic * (1 - slippage%)
+					const slippageMultiplier = BigInt(10000 - slippage * 100);
+					const minMaticWei =
+						(maticAmount * slippageMultiplier) / BigInt(10000);
+					minMaticStr = formatEther(minMaticWei);
+					console.log("[OnChainTrading] Sell with minMatic:", {
+						expectedMatic: formatEther(maticAmount),
+						slippage: slippage + "%",
+						minMatic: minMaticStr,
+					});
+				}
+
 				const hash = await sell({
 					bondingCurveAddress,
 					tokenAddress,
 					tokenAmount: amount,
+					minMatic: minMaticStr,
 					slippageBps: slippage * 100,
 				});
 				if (hash) {
@@ -459,50 +538,50 @@ export function OnChainTradingPanel({
 	return (
 		<div
 			className={cn(
-				"bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl overflow-hidden",
+				"bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl overflow-hidden w-full max-w-full",
 				className,
 			)}
 		>
 			{/* Trade Type Tabs */}
-			<div className="p-4">
+			<div className="p-3 sm:p-4">
 				<div className="flex bg-background/50 rounded-lg p-1 gap-1">
 					<button
 						onClick={() => setTradeType("buy")}
 						className={cn(
-							"flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md font-medium transition-all",
+							"flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2 sm:px-4 rounded-md font-medium transition-all text-sm sm:text-base",
 							tradeType === "buy"
 								? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/20"
 								: "text-muted-foreground hover:text-foreground",
 						)}
 					>
-						<ArrowUpCircle className="h-4 w-4" />
+						<ArrowUpCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
 						Buy
 					</button>
 					<button
 						onClick={() => setTradeType("sell")}
 						className={cn(
-							"flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md font-medium transition-all",
+							"flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2 sm:px-4 rounded-md font-medium transition-all text-sm sm:text-base",
 							tradeType === "sell"
 								? "bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg shadow-red-500/20"
 								: "text-muted-foreground hover:text-foreground",
 						)}
 					>
-						<ArrowDownCircle className="h-4 w-4" />
+						<ArrowDownCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
 						Sell
 					</button>
 				</div>
 			</div>
 
 			{/* Amount Input */}
-			<div className="px-4 pb-4">
+			<div className="px-3 sm:px-4 pb-3 sm:pb-4">
 				<div className="mb-3">
-					<div className="flex justify-between items-center mb-1.5">
-						<label className="text-xs text-muted-foreground">
+					<div className="flex justify-between items-center mb-1.5 gap-2">
+						<label className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
 							{tradeType === "buy"
 								? "You Pay (MATIC)"
 								: `You Sell (${tokenSymbol})`}
 						</label>
-						<span className="text-xs text-muted-foreground">
+						<span className="text-[10px] sm:text-xs text-muted-foreground truncate">
 							Balance:{" "}
 							{tradeType === "buy"
 								? `${nativeBalance?.value ? formatNumber(formatEther(nativeBalance.value)) : "0"} MATIC`
@@ -515,16 +594,16 @@ export function OnChainTradingPanel({
 							placeholder="0.00"
 							value={amount}
 							onChange={(e) => setAmount(e.target.value)}
-							className="pr-16 text-lg font-medium bg-background/50"
+							className="pr-14 sm:pr-16 text-base sm:text-lg font-medium bg-background/50"
 						/>
-						<div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+						<div className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-muted-foreground">
 							{tradeType === "buy" ? "MATIC" : tokenSymbol}
 						</div>
 					</div>
 				</div>
 
 				{/* Quick Amount Buttons */}
-				<div className="flex gap-2 mb-4">
+				<div className="flex gap-1.5 sm:gap-2 mb-3 sm:mb-4">
 					{quickAmounts.map((qa) => (
 						<button
 							key={qa}
@@ -657,75 +736,83 @@ export function OnChainTradingPanel({
 				</div>
 
 				{/* Execute Button */}
-				{isAuthenticated ? (
-					<>
-						{/* Approval Button (for sell) */}
-						{tradeType === "sell" && needsApproval && (
-							<Button
-								onClick={handleApprove}
-								disabled={isApproving || isApproveConfirming}
-								className="w-full h-12 mb-2 bg-gradient-to-r from-purple-500 to-pink-500"
-							>
-								{isApproving || isApproveConfirming ? (
-									<>
-										<Loader2 className="h-5 w-5 mr-2 animate-spin" />
-										Approving...
-									</>
-								) : (
-									<>
-										<Zap className="h-5 w-5 mr-2" />
-										Approve {tokenSymbol}
-									</>
-								)}
-							</Button>
-						)}
 
-						{/* Trade Button */}
+				<>
+					{/* Approval Button (for sell) */}
+					{tradeType === "sell" && needsApproval && (
 						<Button
-							onClick={handleTrade}
-							disabled={
-								!amount ||
-								parseFloat(amount) <= 0 ||
-								isLoading ||
-								isConfirming ||
-								(tradeType === "sell" && needsApproval)
-							}
-							className={cn(
-								"w-full h-12 text-base font-semibold",
-								tradeType === "buy"
-									? "bg-gradient-to-r from-green-500 to-emerald-500 hover:opacity-90"
-									: "bg-gradient-to-r from-red-500 to-rose-500 hover:opacity-90",
-							)}
+							onClick={handleApprove}
+							disabled={isApproving || isApproveConfirming}
+							className="w-full h-12 mb-2 bg-gradient-to-r from-purple-500 to-pink-500"
 						>
-							{isLoading ? (
+							{isApproving || isApproveConfirming ? (
 								<>
 									<Loader2 className="h-5 w-5 mr-2 animate-spin" />
-									Confirm in Wallet...
-								</>
-							) : isConfirming ? (
-								<>
-									<Loader2 className="h-5 w-5 mr-2 animate-spin" />
-									Confirming...
+									Approving...
 								</>
 							) : (
 								<>
-									{tradeType === "buy" ? (
-										<TrendingUp className="h-5 w-5 mr-2" />
-									) : (
-										<TrendingDown className="h-5 w-5 mr-2" />
-									)}
-									{tradeType === "buy" ? "Buy" : "Sell"}{" "}
-									{tokenSymbol}
+									<Zap className="h-5 w-5 mr-2" />
+									Approve {tokenSymbol}
 								</>
 							)}
 						</Button>
-					</>
-				) : (
-					<Button disabled className="w-full h-12 bg-muted">
-						<Wallet className="h-5 w-5 mr-2" />
-						Connect Wallet to Trade
+					)}
+
+					{/* Trade Button */}
+					<Button
+						onClick={handleTrade}
+						disabled={
+							isAuthenticated
+								? !amount ||
+									parseFloat(amount) <= 0 ||
+									isLoading ||
+									isConfirming ||
+									(tradeType === "sell" && needsApproval)
+								: false
+						}
+						className={cn(
+							"w-full h-12 text-base font-semibold cursor-pointer transition-all duration-200",
+							tradeType === "buy"
+								? "bg-gradient-to-r from-green-500 to-emerald-500 hover:opacity-90"
+								: "bg-gradient-to-r from-red-500 to-rose-500 hover:opacity-90 text-gray-100",
+						)}
+					>
+						{!isAuthenticated ? (
+							<>Connect Wallet to Trade</>
+						) : isLoading ? (
+							<>
+								<Loader2 className="h-5 w-5 mr-2 animate-spin" />
+								Confirm in Wallet...
+							</>
+						) : isConfirming ? (
+							<>
+								<Loader2 className="h-5 w-5 mr-2 animate-spin" />
+								Confirming...
+							</>
+						) : isConfirmed && txHash ? (
+							<>
+								<CheckCircle2 className="h-5 w-5 mr-2 text-white" />
+								Transaction Confirmed!
+							</>
+						) : isFailed && txHash ? (
+							<>
+								<XCircle className="h-5 w-5 mr-2 text-white" />
+								Transaction Failed
+							</>
+						) : (
+							<>
+								{tradeType === "buy" ? (
+									<TrendingUp className="h-5 w-5 mr-2" />
+								) : (
+									<TrendingDown className="h-5 w-5 mr-2" />
+								)}
+								{tradeType === "buy" ? "Buy" : "Sell"}{" "}
+								{tokenSymbol}
+							</>
+						)}
 					</Button>
-				)}
+				</>
 
 				{/* Transaction Link */}
 				<AnimatePresence>
@@ -734,13 +821,40 @@ export function OnChainTradingPanel({
 							initial={{ opacity: 0, y: 10 }}
 							animate={{ opacity: 1, y: 0 }}
 							exit={{ opacity: 0, y: -10 }}
-							className="mt-4 p-3 rounded-lg bg-primary/10 border border-primary/30"
+							className={cn(
+								"mt-4 p-3 rounded-lg border",
+								isFailed
+									? "bg-destructive/10 border-destructive/30"
+									: isConfirmed
+										? "bg-green-500/10 border-green-500/30"
+										: "bg-primary/10 border-primary/30",
+							)}
 						>
 							<div className="flex items-center justify-between">
 								<div className="flex items-center gap-2">
-									<CheckCircle2 className="h-5 w-5 text-primary" />
-									<span className="text-sm font-medium">
-										Transaction Submitted
+									{isFailed ? (
+										<XCircle className="h-5 w-5 text-destructive" />
+									) : isConfirmed ? (
+										<CheckCircle2 className="h-5 w-5 text-green-500" />
+									) : isConfirming ? (
+										<Loader2 className="h-5 w-5 text-primary animate-spin" />
+									) : (
+										<CheckCircle2 className="h-5 w-5 text-primary" />
+									)}
+									<span
+										className={cn(
+											"text-sm font-medium",
+											isFailed && "text-destructive",
+											isConfirmed && "text-green-500",
+										)}
+									>
+										{isFailed
+											? "Transaction Failed"
+											: isConfirmed
+												? "Transaction Confirmed"
+												: isConfirming
+													? "Confirming..."
+													: "Transaction Submitted"}
 									</span>
 								</div>
 								<a

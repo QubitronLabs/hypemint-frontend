@@ -88,22 +88,12 @@ export default function RootLayout({
 									<Header />
 
 									{/* Main Content */}
-									<main className="ml-[70px] w-[calc(100vw-70px)] max-w-[calc(100vw-90px)] mx-auto pt-16 min-h-screen overflow-x-clip">
+									<main className="md:ml-[70px] w-full md:w-[calc(100vw-70px)] md:max-w-[calc(100vw-90px)] mx-auto pt-14 md:pt-16 min-h-screen overflow-x-clip px-3 md:px-0">
 										{children}
 									</main>
 
 									{/* Toast Notifications */}
-									<Toaster
-										richColors
-										position="bottom-right"
-										toastOptions={{
-											style: {
-												background: "#111",
-												border: "1px solid #222",
-												color: "#fafafa",
-											},
-										}}
-									/>
+									<Toaster richColors position="top-right" />
 								</UsernamePromptProvider>
 							</WebSocketProvider>
 						</DynamicProvider>

@@ -167,19 +167,23 @@ function StatsCard({
 	trend?: number;
 }) {
 	return (
-		<div className="bg-card/40 backdrop-blur-sm border border-border/50 rounded-xl p-4">
-			<div className="flex items-center gap-3">
-				<div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-					<Icon className="h-5 w-5 text-primary" />
+		<div className="bg-card/40 backdrop-blur-sm border border-border/50 rounded-xl p-3 sm:p-4">
+			<div className="flex items-center gap-2 sm:gap-3">
+				<div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+					<Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
 				</div>
-				<div>
-					<p className="text-2xl font-bold">{value}</p>
-					<p className="text-xs text-muted-foreground">{label}</p>
+				<div className="min-w-0">
+					<p className="text-lg sm:text-2xl font-bold truncate">
+						{value}
+					</p>
+					<p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+						{label}
+					</p>
 				</div>
 				{trend !== undefined && (
 					<div
 						className={cn(
-							"ml-auto text-xs font-medium px-2 py-1 rounded",
+							"ml-auto text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 sm:py-1 rounded shrink-0",
 							trend >= 0
 								? "bg-green-500/10 text-green-500"
 								: "bg-red-500/10 text-red-500",
@@ -344,33 +348,27 @@ function HomePage() {
 
 	return (
 		<main className="min-h-screen pb-20">
-			<div className=" mx-auto px-4 md:px-6 py-6">
+			<div className="mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
 				{/* Hero Section - Clean and Minimal */}
 				<motion.div
 					initial={{ opacity: 0, y: 20 }}
 					animate={{ opacity: 1, y: 0 }}
-					className="mb-8"
+					className="mb-6 sm:mb-8"
 				>
-					<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+					<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4">
 						<div>
-							<h1 className="text-3xl md:text-4xl font-bold mb-2">
+							<h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2">
 								<span className="bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
 									Discover Tokens
 								</span>
 							</h1>
-							<p className="text-muted-foreground">
+							<p className="text-sm sm:text-base text-muted-foreground">
 								Find the next moonshot or launch your own
 							</p>
 						</div>
 
-						<div className="flex items-center gap-3">
+						<div className="flex items-center gap-2 sm:gap-3">
 							{/* <LiveIndicator isConnected={wsConnected} /> */}
-							<Link href="/create">
-								<Button className="gap-2 bg-gradient-to-r from-primary to-purple-600 hover:opacity-90">
-									<Plus className="h-4 w-4" />
-									Create Token
-								</Button>
-							</Link>
 						</div>
 					</div>
 				</motion.div>
@@ -380,7 +378,7 @@ function HomePage() {
 					initial={{ opacity: 0, y: 20 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ delay: 0.1 }}
-					className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
+					className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-6 sm:mb-8"
 				>
 					<StatsCard
 						icon={Rocket}
@@ -418,7 +416,7 @@ function HomePage() {
 				</motion.div>
 
 				{/* Main Content Grid */}
-				<div className="grid lg:grid-cols-[1fr_300px] gap-6">
+				<div className="grid lg:grid-cols-[1fr_300px] gap-4 sm:gap-6">
 					{/* Left Column - Token Grid */}
 					<div>
 						{/* Filter & Search Bar */}
@@ -426,56 +424,59 @@ function HomePage() {
 							initial={{ opacity: 0 }}
 							animate={{ opacity: 1 }}
 							transition={{ delay: 0.2 }}
-							className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6"
+							className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6"
 						>
 							{/* Filter Tabs */}
-							<div className="flex bg-card/60 backdrop-blur-md p-1 rounded-xl border border-border/60 overflow-x-auto">
-								{FILTER_TABS.map((tab) => {
-									const Icon = tab.icon;
-									const isActive = activeFilter === tab.id;
-									return (
-										<button
-											key={tab.id}
-											onClick={() =>
-												setActiveFilter(tab.id)
-											}
-											className={cn(
-												"relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap",
-												isActive
-													? "text-primary-foreground"
-													: "text-muted-foreground hover:text-foreground",
-											)}
-										>
-											{isActive && (
-												<motion.div
-													layoutId="activeFilter"
-													className="absolute inset-0 bg-primary rounded-lg"
-													transition={{
-														type: "spring",
-														bounce: 0.2,
-														duration: 0.5,
-													}}
-												/>
-											)}
-											<span className="relative z-10 flex items-center gap-1.5">
-												<Icon className="w-3.5 h-3.5" />
-												{tab.label}
-											</span>
-										</button>
-									);
-								})}
+							<div className="w-full sm:w-auto overflow-x-auto scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
+								<div className="flex bg-card/60 backdrop-blur-md p-0.5 sm:p-1 rounded-lg sm:rounded-xl border border-border/60 w-max">
+									{FILTER_TABS.map((tab) => {
+										const Icon = tab.icon;
+										const isActive =
+											activeFilter === tab.id;
+										return (
+											<button
+												key={tab.id}
+												onClick={() =>
+													setActiveFilter(tab.id)
+												}
+												className={cn(
+													"relative flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg text-[11px] sm:text-sm font-medium transition-all whitespace-nowrap",
+													isActive
+														? "text-primary-foreground"
+														: "text-muted-foreground hover:text-foreground",
+												)}
+											>
+												{isActive && (
+													<motion.div
+														layoutId="activeFilter"
+														className="absolute inset-0 bg-primary rounded-md sm:rounded-lg"
+														transition={{
+															type: "spring",
+															bounce: 0.2,
+															duration: 0.5,
+														}}
+													/>
+												)}
+												<span className="relative z-10 flex items-center gap-1 sm:gap-1.5">
+													<Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+													{tab.label}
+												</span>
+											</button>
+										);
+									})}
+								</div>
 							</div>
 
 							{/* Search */}
 							<div className="relative w-full sm:w-64">
-								<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+								<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
 								<Input
 									placeholder="Search tokens..."
 									value={searchQuery}
 									onChange={(e) =>
 										setSearchQuery(e.target.value)
 									}
-									className="pl-9 h-10 bg-card/60 backdrop-blur border-border/50 focus:border-primary/50"
+									className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm bg-card/60 backdrop-blur border-border/50 focus:border-primary/50"
 								/>
 							</div>
 						</motion.div>
@@ -488,24 +489,24 @@ function HomePage() {
 									initial={{ opacity: 0 }}
 									animate={{ opacity: 1 }}
 									exit={{ opacity: 0 }}
-									className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"
+									className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4"
 								>
 									{Array.from({ length: 9 }).map((_, i) => (
 										<div
 											key={i}
-											className="bg-card/40 border border-border/50 rounded-xl p-4 space-y-3"
+											className="bg-card/40 border border-border/50 rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3"
 										>
-											<div className="flex items-center gap-3">
-												<Skeleton className="w-12 h-12 rounded-lg" />
-												<div className="flex-1 space-y-2">
-													<Skeleton className="h-4 w-24" />
-													<Skeleton className="h-3 w-16" />
+											<div className="flex items-center gap-2 sm:gap-3">
+												<Skeleton className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg" />
+												<div className="flex-1 space-y-1.5 sm:space-y-2">
+													<Skeleton className="h-3 sm:h-4 w-20 sm:w-24" />
+													<Skeleton className="h-2.5 sm:h-3 w-14 sm:w-16" />
 												</div>
 											</div>
-											<Skeleton className="h-8 w-full" />
+											<Skeleton className="h-6 sm:h-8 w-full" />
 											<div className="flex justify-between">
-												<Skeleton className="h-4 w-16" />
-												<Skeleton className="h-4 w-16" />
+												<Skeleton className="h-3 sm:h-4 w-14 sm:w-16" />
+												<Skeleton className="h-3 sm:h-4 w-14 sm:w-16" />
 											</div>
 										</div>
 									))}
@@ -515,15 +516,15 @@ function HomePage() {
 									key="empty"
 									initial={{ opacity: 0, scale: 0.95 }}
 									animate={{ opacity: 1, scale: 1 }}
-									className="flex flex-col items-center justify-center py-16 text-center"
+									className="flex flex-col items-center justify-center py-10 sm:py-16 text-center"
 								>
-									<div className="w-20 h-20 rounded-2xl bg-muted/30 flex items-center justify-center mb-4">
-										<Search className="w-8 h-8 text-muted-foreground" />
+									<div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-muted/30 flex items-center justify-center mb-3 sm:mb-4">
+										<Search className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground" />
 									</div>
-									<h3 className="text-lg font-semibold mb-2">
+									<h3 className="text-base sm:text-lg font-semibold mb-1.5 sm:mb-2">
 										No tokens found
 									</h3>
-									<p className="text-muted-foreground text-sm max-w-sm mb-4">
+									<p className="text-muted-foreground text-xs sm:text-sm max-w-sm mb-3 sm:mb-4 px-4">
 										{searchQuery
 											? `No tokens match "${searchQuery}"`
 											: "Be the first to launch a token!"}
@@ -531,9 +532,9 @@ function HomePage() {
 									<Link href="/create">
 										<Button
 											variant="outline"
-											className="gap-2"
+											className="gap-1.5 sm:gap-2 text-sm h-9"
 										>
-											<Plus className="h-4 w-4" />
+											<Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
 											Create Token
 										</Button>
 									</Link>
@@ -543,7 +544,7 @@ function HomePage() {
 									key="grid"
 									initial={{ opacity: 0 }}
 									animate={{ opacity: 1 }}
-									className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"
+									className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4"
 								>
 									{filteredTokens.map((token, index) => (
 										<motion.div
@@ -590,13 +591,13 @@ function HomePage() {
 										Create New Token
 									</Button>
 								</Link>
-								<Link href="/portfolio" className="block">
+								<Link href="/profile" className="block">
 									<Button
 										variant="ghost"
 										className="w-full justify-start gap-2 h-10"
 									>
 										<BarChart3 className="h-4 w-4" />
-										View Portfolio
+										View Profile
 									</Button>
 								</Link>
 							</div>
@@ -626,17 +627,23 @@ function HomePage() {
 function HomePageSkeleton() {
 	return (
 		<main className="min-h-screen pb-20">
-			<div className=" mx-auto px-4 md:px-6 py-6">
-				<div className="space-y-6">
-					<Skeleton className="h-16 w-64" />
-					<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+			<div className="mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
+				<div className="space-y-4 sm:space-y-6">
+					<Skeleton className="h-12 sm:h-16 w-48 sm:w-64" />
+					<div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
 						{[1, 2, 3, 4].map((i) => (
-							<Skeleton key={i} className="h-24 rounded-xl" />
+							<Skeleton
+								key={i}
+								className="h-16 sm:h-24 rounded-xl"
+							/>
 						))}
 					</div>
-					<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+					<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
 						{[1, 2, 3, 4, 5, 6].map((i) => (
-							<Skeleton key={i} className="h-64 rounded-xl" />
+							<Skeleton
+								key={i}
+								className="h-48 sm:h-64 rounded-xl"
+							/>
 						))}
 					</div>
 				</div>

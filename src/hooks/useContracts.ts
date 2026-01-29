@@ -53,6 +53,7 @@ export interface SellParams {
 	bondingCurveAddress: Address;
 	tokenAddress: Address;
 	tokenAmount: string; // in tokens (not wei)
+	minMatic?: string; // minimum MATIC to receive (calculated from quote with slippage)
 	slippageBps?: number;
 }
 
@@ -412,10 +413,17 @@ export function useBuyTokens() {
 
 	const { writeContractAsync } = useWriteContract();
 
-	const { isLoading: isConfirming, isSuccess: isConfirmed } =
-		useWaitForTransactionReceipt({
-			hash: txHash,
-		});
+	const {
+		isLoading: isConfirming,
+		isSuccess: isConfirmed,
+		isError: isConfirmError,
+		data: receipt,
+	} = useWaitForTransactionReceipt({
+		hash: txHash,
+	});
+
+	// Transaction was reverted on-chain
+	const isFailed = isConfirmError || receipt?.status === "reverted";
 
 	const buy = useCallback(
 		async (params: BuyParams): Promise<Hash | null> => {
@@ -479,6 +487,7 @@ export function useBuyTokens() {
 		isBuying,
 		isConfirming,
 		isConfirmed,
+		isFailed,
 		txHash,
 		error,
 		reset: () => {
@@ -497,10 +506,17 @@ export function useSellTokens() {
 
 	const { writeContractAsync } = useWriteContract();
 
-	const { isLoading: isConfirming, isSuccess: isConfirmed } =
-		useWaitForTransactionReceipt({
-			hash: txHash,
-		});
+	const {
+		isLoading: isConfirming,
+		isSuccess: isConfirmed,
+		isError: isConfirmError,
+		data: receipt,
+	} = useWaitForTransactionReceipt({
+		hash: txHash,
+	});
+
+	// Transaction was reverted on-chain
+	const isFailed = isConfirmError || receipt?.status === "reverted";
 
 	const sell = useCallback(
 		async (params: SellParams): Promise<Hash | null> => {
@@ -514,10 +530,18 @@ export function useSellTokens() {
 
 			try {
 				const tokenWei = parseEther(params.tokenAmount);
-				const slippage = params.slippageBps || DEFAULT_SLIPPAGE_BPS;
+				// Use provided minMatic (with slippage already applied) or 0 for no slippage protection
+				const minMatic = params.minMatic
+					? parseEther(params.minMatic)
+					: BigInt(0);
 
-				// For simplicity, set minMatic to 0 (could calculate properly with quote)
-				const minMatic = BigInt(0);
+				console.log("[useSellTokens] Sell params:", {
+					bondingCurveAddress: params.bondingCurveAddress,
+					tokenAmount: params.tokenAmount,
+					tokenWei: tokenWei.toString(),
+					minMatic: minMatic.toString(),
+					chainId: ACTIVE_CHAIN_ID,
+				});
 
 				const hash = await writeContractAsync({
 					address: params.bondingCurveAddress,
@@ -552,6 +576,7 @@ export function useSellTokens() {
 		isSelling,
 		isConfirming,
 		isConfirmed,
+		isFailed,
 		txHash,
 		error,
 		reset: () => {

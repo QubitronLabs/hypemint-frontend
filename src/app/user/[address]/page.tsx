@@ -108,17 +108,20 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
 	// This prevents flash of "User Not Found" while data is still loading
 	if (isLoading || (!profileData && !error)) {
 		return (
-			<div className="max-w-4xlw-full mx-auto p-6">
-				<div className="flex items-center gap-4 mb-8">
-					<Skeleton className="w-20 h-20 rounded-full" />
+			<div className="max-w-4xlw-full mx-auto p-3 sm:p-4 lg:p-6">
+				<div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
+					<Skeleton className="w-14 h-14 sm:w-20 sm:h-20 rounded-full" />
 					<div className="flex-1">
-						<Skeleton className="h-8 w-48 mb-2" />
-						<Skeleton className="h-4 w-32" />
+						<Skeleton className="h-6 sm:h-8 w-32 sm:w-48 mb-2" />
+						<Skeleton className="h-3 sm:h-4 w-24 sm:w-32" />
 					</div>
 				</div>
-				<div className="flex gap-8 mb-8">
+				<div className="grid grid-cols-2 sm:flex sm:gap-8 gap-4 mb-6 sm:mb-8">
 					{[1, 2, 3, 4].map((i) => (
-						<Skeleton key={i} className="h-16 w-24" />
+						<Skeleton
+							key={i}
+							className="h-14 sm:h-16 w-full sm:w-24"
+						/>
 					))}
 				</div>
 				<Skeleton className="h-[300px] rounded-xl" />
@@ -129,7 +132,7 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
 	// Error or not found - only show if there's an actual error or data was fetched but user doesn't exist
 	if (error || (profileData && !user)) {
 		return (
-			<div className="max-w-4xlw-full mx-auto p-6">
+			<div className="max-w-4xlw-full mx-auto p-3 sm:p-4 lg:p-6">
 				<div className="text-center py-16">
 					<div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
 						<Users className="h-8 w-8 text-muted-foreground" />
@@ -154,7 +157,7 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
 	if (!user) return null;
 
 	return (
-		<div className="max-w-4xlw-full mx-auto p-6">
+		<div className="max-w-4xlw-full mx-auto p-3 sm:p-4 lg:p-6">
 			{/* Back button */}
 			<motion.div
 				initial={{ opacity: 0, x: -20 }}
@@ -174,10 +177,10 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
 			<motion.div
 				initial={{ opacity: 0, y: 20 }}
 				animate={{ opacity: 1, y: 0 }}
-				className="flex items-start justify-between mb-8"
+				className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 sm:mb-8"
 			>
-				<div className="flex items-center gap-4">
-					<Avatar className="w-20 h-20 border-2 border-border">
+				<div className="flex items-center gap-3 sm:gap-4">
+					<Avatar className="w-14 h-14 sm:w-20 sm:h-20 border-2 border-border">
 						<AvatarImage
 							src={user.avatarUrl || undefined}
 							alt={displayName || shortAddress}
@@ -187,9 +190,9 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
 						</AvatarFallback>
 					</Avatar>
 
-					<div>
+					<div className="min-w-0">
 						<div className="flex items-center gap-2">
-							<h1 className="text-2xl font-bold">
+							<h1 className="text-xl sm:text-2xl font-bold truncate">
 								{displayName || shortAddress}
 							</h1>
 							{user.isVerified && (
@@ -297,31 +300,39 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
 				initial={{ opacity: 0, y: 20 }}
 				animate={{ opacity: 1, y: 0 }}
 				transition={{ delay: 0.1 }}
-				className="flex items-center gap-8 mb-8"
+				className="grid grid-cols-2 sm:flex sm:items-center gap-4 sm:gap-8 mb-6 sm:mb-8"
 			>
 				<div className="text-center">
-					<p className="text-2xl font-bold tabular-nums">
+					<p className="text-xl sm:text-2xl font-bold tabular-nums">
 						{user.followersCount}
 					</p>
-					<p className="text-sm text-muted-foreground">Followers</p>
+					<p className="text-xs sm:text-sm text-muted-foreground">
+						Followers
+					</p>
 				</div>
 				<div className="text-center">
-					<p className="text-2xl font-bold tabular-nums">
+					<p className="text-xl sm:text-2xl font-bold tabular-nums">
 						{user.followingCount}
 					</p>
-					<p className="text-sm text-muted-foreground">Following</p>
+					<p className="text-xs sm:text-sm text-muted-foreground">
+						Following
+					</p>
 				</div>
 				<div className="text-center">
-					<p className="text-2xl font-bold tabular-nums">
+					<p className="text-xl sm:text-2xl font-bold tabular-nums">
 						{user.tokensCreated}
 					</p>
-					<p className="text-sm text-muted-foreground">Coins</p>
+					<p className="text-xs sm:text-sm text-muted-foreground">
+						Coins
+					</p>
 				</div>
 				<div className="text-center">
-					<p className="text-2xl font-bold tabular-nums">
+					<p className="text-xl sm:text-2xl font-bold tabular-nums">
 						{user.tradesCount ?? 0}
 					</p>
-					<p className="text-sm text-muted-foreground">Trades</p>
+					<p className="text-xs sm:text-sm text-muted-foreground">
+						Trades
+					</p>
 				</div>
 			</motion.div>
 
@@ -332,29 +343,48 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
 				transition={{ delay: 0.2 }}
 			>
 				<Tabs value={activeTab} onValueChange={setActiveTab}>
-					<TabsList className="bg-card border border-border">
-						<TabsTrigger value="tokens" className="gap-2">
-							<Coins className="h-4 w-4" />
-							Created ({user.tokensCreated})
+					<TabsList className="bg-card border border-border w-full overflow-x-auto flex justify-start sm:justify-center">
+						<TabsTrigger
+							value="tokens"
+							className="gap-1.5 sm:gap-2 text-xs sm:text-sm"
+						>
+							<Coins className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+							<span className="hidden sm:inline">Created</span> (
+							{user.tokensCreated})
 						</TabsTrigger>
-						<TabsTrigger value="followers" className="gap-2">
-							<Users className="h-4 w-4" />
-							Followers ({user.followersCount})
+						<TabsTrigger
+							value="followers"
+							className="gap-1.5 sm:gap-2 text-xs sm:text-sm"
+						>
+							<Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+							<span className="hidden sm:inline">
+								Followers
+							</span>{" "}
+							({user.followersCount})
 						</TabsTrigger>
-						<TabsTrigger value="following" className="gap-2">
-							<Users className="h-4 w-4" />
-							Following ({user.followingCount})
+						<TabsTrigger
+							value="following"
+							className="gap-1.5 sm:gap-2 text-xs sm:text-sm"
+						>
+							<Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+							<span className="hidden sm:inline">
+								Following
+							</span>{" "}
+							({user.followingCount})
 						</TabsTrigger>
-						<TabsTrigger value="activity" className="gap-2">
-							<Activity className="h-4 w-4" />
-							Activity
+						<TabsTrigger
+							value="activity"
+							className="gap-1.5 sm:gap-2 text-xs sm:text-sm"
+						>
+							<Activity className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+							<span className="hidden sm:inline">Activity</span>
 						</TabsTrigger>
 					</TabsList>
 
 					{/* Created Tokens */}
-					<TabsContent value="tokens" className="mt-6">
+					<TabsContent value="tokens" className="mt-4 sm:mt-6">
 						{tokensData?.tokens && tokensData.tokens.length > 0 ? (
-							<div className="grid md:grid-cols-2 gap-4">
+							<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
 								{tokensData.tokens.map((token) => (
 									<TokenCard key={token.id} token={token} />
 								))}
