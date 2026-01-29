@@ -37,7 +37,7 @@ import {
 	TradingPanel,
 	OnChainTradingPanel,
 } from "@/components/trade";
-import { BondingCurveProgress, TokenChat } from "@/components/token";
+import { BondingCurveProgress, TokenChat, VestingCard } from "@/components/token";
 import { useToken, tokenKeys, useTokenHolders } from "@/hooks/useTokens";
 import { useTokenTrades, tradeKeys } from "@/hooks/useTrades";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -692,33 +692,45 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 					</motion.div>
 				</div>
 
-				{/* Sidebar */}
-				<div className="min-w-0 w-full lg:sticky lg:top-22 lg:self-start space-y-4 sm:space-y-6 overflow-hidden lg:max-h-[calc(100vh-2rem)]">
-					{/* Trading Panel - On-Chain or Centralized */}
-					<motion.div
-						initial={{ opacity: 0, x: 20 }}
-						animate={{ opacity: 1, x: 0 }}
-					>
-						{token.bondingCurveAddress && token.contractAddress ? (
-							<OnChainTradingPanel
-								tokenAddress={token.contractAddress as Address}
-								bondingCurveAddress={
-									token.bondingCurveAddress as Address
-								}
-								tokenSymbol={token.symbol || "TOKEN"}
-								tokenName={token.name || "Unknown Token"}
-								currentPrice={token.currentPrice || "0.00001"}
-							/>
-						) : (
-							<TradingPanel
-								tokenId={id}
-								tokenSymbol={token.symbol || "TOKEN"}
-								tokenName={token.name || "Unknown Token"}
-								currentPrice={token.currentPrice || "0.00001"}
-								totalSupply={token.totalSupply || "1000000000"}
-							/>
-						)}
-					</motion.div>
+        {/* Sidebar */}
+     <div className="min-w-0 w-full lg:sticky lg:top-22 lg:self-start space-y-4 sm:space-y-6 overflow-hidden lg:max-h-[calc(100vh-2rem)]">
+          {/* Vesting Panel (Only if HypeBoost is enabled) */}
+          {token.hypeBoostEnabled && token.bondingCurveAddress && (
+            <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="mb-6"
+            >
+                <VestingCard 
+                    bondingCurveAddress={token.bondingCurveAddress as Address} 
+                    symbol={token.symbol} 
+                />
+            </motion.div>
+          )}
+
+          {/* Trading Panel - On-Chain or Centralized */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+          >
+            {token.bondingCurveAddress && token.contractAddress ? (
+              <OnChainTradingPanel
+                tokenAddress={token.contractAddress as Address}
+                bondingCurveAddress={token.bondingCurveAddress as Address}
+                tokenSymbol={token.symbol || "TOKEN"}
+                tokenName={token.name || "Unknown Token"}
+                currentPrice={token.currentPrice || "0.00001"}
+              />
+            ) : (
+              <TradingPanel
+                tokenId={id}
+                tokenSymbol={token.symbol || "TOKEN"}
+                tokenName={token.name || "Unknown Token"}
+                currentPrice={token.currentPrice || "0.00001"}
+                totalSupply={token.totalSupply || "1000000000"}
+              />
+            )}
+          </motion.div>
 
 					{/* Bonding Curve */}
 					<motion.div

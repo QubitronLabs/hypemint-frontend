@@ -14,6 +14,8 @@ export const HYPE_FACTORY_ABI = [
       { name: "imageURI", type: "string", internalType: "string" },
       { name: "description", type: "string", internalType: "string" },
       { name: "hypeBoostEnabled", type: "bool", internalType: "bool" },
+      { name: "slope", type: "uint256", internalType: "uint256" },
+      { name: "basePrice", type: "uint256", internalType: "uint256" },
     ],
     outputs: [
       { name: "tokenAddress", type: "address", internalType: "address" },
@@ -226,7 +228,24 @@ export const HYPE_BONDING_CURVE_ABI = [
     type: "function",
     name: "getClaimableVested",
     inputs: [{ name: "user", type: "address", internalType: "address" }],
-    outputs: [{ name: "amount", type: "uint256", internalType: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getVestingInfo",
+    inputs: [{ name: "user", type: "address", internalType: "address" }],
+    outputs: [
+      {
+        name: "info",
+        type: "tuple",
+        internalType: "struct IHypeBondingCurve.VestingInfo",
+        components: [
+          { name: "totalAmount", type: "uint256", internalType: "uint256" },
+          { name: "claimedAmount", type: "uint256", internalType: "uint256" },
+          { name: "startTime", type: "uint256", internalType: "uint256" },
+        ],
+      },
+    ],
     stateMutability: "view",
   },
   {

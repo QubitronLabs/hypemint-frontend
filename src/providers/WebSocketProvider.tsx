@@ -89,11 +89,11 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
     }
 
     try {
-      console.log("[WS] Connecting to:", wsUrl);
+      // console.log("[WS] Connecting to:", wsUrl);
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        console.log("[WS] Connected!");
+        // console.log("[WS] Connected!");
         setIsConnected(true);
         reconnectAttemptsRef.current = 0;
         lastPongRef.current = Date.now();
@@ -147,7 +147,6 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
       };
 
       ws.onclose = (event) => {
-        console.log("[WS] Disconnected:", event.code, event.reason);
         setIsConnected(false);
         cleanup();
 
@@ -160,9 +159,7 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
             BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttemptsRef.current),
             MAX_RECONNECT_DELAY,
           );
-          console.log(
-            `[WS] Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1})`,
-          );
+        
 
           reconnectTimeoutRef.current = setTimeout(() => {
             reconnectAttemptsRef.current++;

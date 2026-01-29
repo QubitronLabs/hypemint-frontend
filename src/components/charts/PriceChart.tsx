@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
 	createChart,
 	ColorType,
@@ -28,38 +28,79 @@ interface CandleData {
 	volume: number;
 }
 
+// Helper to get candle interval in seconds
+function getIntervalSeconds(timeRange: TimeRange): number {
+  switch (timeRange) {
+    case "1m": return 60;
+    case "5m": return 300;
+    case "15m": return 900;
+    case "1h": return 3600;
+    case "4h": return 14400;
+    case "1D": return 86400;
+    default: return 3600;
+  }
+}
+
 /**
  * PriceChart - Real-time animated price chart
  */
 export function PriceChart({ tokenId, className }: PriceChartProps) {
-	const containerRef = useRef<HTMLDivElement>(null);
-	const chartRef = useRef<IChartApi | null>(null);
-	const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-	const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
-	const [timeRange, setTimeRange] = useState<TimeRange>("1h");
-	const [isLoading, setIsLoading] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const [timeRange, setTimeRange] = useState<TimeRange>("1h");
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Track current candle data for proper OHLC updates
+  const currentCandleRef = useRef<{
+    time: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+  } | null>(null);
 
 	// Listen for real-time updates
 	useTokenPriceUpdates(tokenId, (update) => {
 		if (!candleSeriesRef.current || !volumeSeriesRef.current) return;
 
-		// Backend now sends price as decimal number (already divided by 1e18)
-		const price = parseFloat(update.price);
-		if (isNaN(price) || !isFinite(price)) return;
+    // Backend now sends price as decimal number (already divided by 1e18)
+    const price = parseFloat(update.price);
+    if (isNaN(price) || !isFinite(price) || price <= 0) return;
 
-		const currentTime = Math.floor(Date.now() / 1000) as unknown as any;
+    // Get the current time bucket based on interval
+    const intervalSeconds = getIntervalSeconds(timeRange);
+    const now = Math.floor(Date.now() / 1000);
+    const candleTime = Math.floor(now / intervalSeconds) * intervalSeconds;
 
-		// Update the last candle with new price data
-		const currentData = {
-			time: currentTime,
-			open: price,
-			high: price,
-			low: price,
-			close: price,
-		};
+    const currentCandle = currentCandleRef.current;
 
-		candleSeriesRef.current.update(currentData);
-	});
+    // Check if we need to start a new candle or update existing one
+    if (!currentCandle || currentCandle.time !== candleTime) {
+      // New candle period - start fresh with this price as open
+      const newCandle = {
+        time: candleTime as unknown as any,
+        open: price,
+        high: price,
+        low: price,
+        close: price,
+      };
+      currentCandleRef.current = newCandle;
+      candleSeriesRef.current.update(newCandle);
+    } else {
+      // Same candle period - update high, low, and close
+      const updatedCandle = {
+        time: candleTime as unknown as any,
+        open: currentCandle.open, // Keep original open
+        high: Math.max(currentCandle.high, price), // Update high if new price is higher
+        low: Math.min(currentCandle.low, price), // Update low if new price is lower
+        close: price, // Always update close to latest price
+      };
+      currentCandleRef.current = updatedCandle;
+      candleSeriesRef.current.update(updatedCandle);
+    }
+  });
 
 	// Initialize chart
 	useEffect(() => {
@@ -180,24 +221,38 @@ export function PriceChart({ tokenId, className }: PriceChartProps) {
 					}));
 					candleSeriesRef.current.setData(data);
 
-					const volData = chartData.map((d: any) => ({
-						time: d.time as unknown as any,
-						value: d.volume,
-						color:
-							d.close >= d.open
-								? "rgba(0, 255, 136, 0.3)"
-								: "rgba(255, 68, 68, 0.3)",
-					}));
-					volumeSeriesRef.current.setData(volData);
-				}
-			} catch (error) {
-				console.error("Failed to load chart:", error);
-			} finally {
-				setIsLoading(false);
-			}
-		};
-		loadData();
-	}, [tokenId, timeRange]);
+          // Initialize currentCandleRef with the last candle for proper real-time updates
+          if (data.length > 0) {
+            const lastCandle = data[data.length - 1];
+            currentCandleRef.current = {
+              time: lastCandle.time,
+              open: lastCandle.open,
+              high: lastCandle.high,
+              low: lastCandle.low,
+              close: lastCandle.close,
+            };
+          } else {
+            currentCandleRef.current = null;
+          }
+
+          const volData = chartData.map((d: any) => ({
+            time: d.time as unknown as any,
+            value: d.volume,
+            color:
+              d.close >= d.open
+                ? "rgba(0, 255, 136, 0.3)"
+                : "rgba(255, 68, 68, 0.3)",
+          }));
+          volumeSeriesRef.current.setData(volData);
+        }
+      } catch (error) {
+        console.error("Failed to load chart:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadData();
+  }, [tokenId, timeRange]);
 
 	const timeRanges: TimeRange[] = ["1m", "5m", "15m", "1h", "4h", "1D"];
 
