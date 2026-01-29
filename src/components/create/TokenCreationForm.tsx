@@ -72,6 +72,8 @@ import {
 	Coins,
 	Clock,
 	Sparkles,
+	ChevronDown,
+	ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -362,6 +364,11 @@ export function TokenCreationForm() {
 	const [websiteUrl, setWebsiteUrl] = useState("");
 	const [twitterUrl, setTwitterUrl] = useState("");
 	const [telegramUrl, setTelegramUrl] = useState("");
+
+    // Advanced Settings
+    const [initialPrice, setInitialPrice] = useState("0.000001"); // Default 1e-6
+    const [curveSlope, setCurveSlope] = useState("0.00000001"); // Default 1e-8
+    const [showAdvanced, setShowAdvanced] = useState(false);
 
 	// ========================================================================
 	// INITIAL BUY (DEV BUY) STATE
@@ -662,6 +669,8 @@ export function TokenCreationForm() {
 				imageURI: finalImageUrl || "",
 				description: description || "",
 				hypeBoostEnabled,
+                slope: parseEther(curveSlope || "0"), // Convert to Wei (using 18 decimals)
+                basePrice: parseEther(initialPrice || "0"),
 			});
 
 			if (result) {
@@ -1308,6 +1317,66 @@ export function TokenCreationForm() {
 								</div>
 							</div>
 						</div>
+
+
+                        {/* Advanced Settings */}
+                        <div className="pt-2 border-t border-border">
+                           <button 
+                                type="button" 
+                                onClick={() => setShowAdvanced(!showAdvanced)}
+                                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+                           >
+                               {showAdvanced ? (
+                                   <ChevronUp className="h-4 w-4" />
+                               ) : (
+                                   <ChevronDown className="h-4 w-4" />
+                               )}
+                               Advanced Settings
+                           </button>
+                           
+                           <AnimatePresence>
+                               {showAdvanced && (
+                                   <motion.div
+                                       initial={{ height: 0, opacity: 0 }}
+                                       animate={{ height: "auto", opacity: 1 }}
+                                       exit={{ height: 0, opacity: 0 }}
+                                       className="overflow-hidden"
+                                   >
+                                       <div className="pt-2 pb-4 space-y-4">
+                                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                               {/* Initial Price */}
+                                               <div className="space-y-2">
+                                                   <label className="text-sm font-medium">Initial Price ({nativeSymbol})</label>
+                                                   <Input
+                                                       type="number"
+                                                       placeholder="0.000001"
+                                                       step="0.00000001"
+                                                       value={initialPrice}
+                                                       onChange={(e) => setInitialPrice(e.target.value)}
+                                                   />
+                                               </div>
+                                               
+                                               {/* Curve Slope */}
+                                               <div className="space-y-2">
+                                                   <label className="text-sm font-medium">Curve Slope</label>
+                                                    <Input
+                                                       type="number"
+                                                       placeholder="0.00000001"
+                                                       step="0.000000001"
+                                                       value={curveSlope}
+                                                       onChange={(e) => setCurveSlope(e.target.value)}
+                                                   />
+                                               </div>
+                                           </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                Adjust the starting price and how fast the price increases as people buy.
+                                                Higher slope = faster price increase.
+                                            </p>
+                                       </div>
+                                   </motion.div>
+                               )}
+                           </AnimatePresence>
+                        </div>
 
 						{/* Launch Info */}
 						{isAuthenticated && (

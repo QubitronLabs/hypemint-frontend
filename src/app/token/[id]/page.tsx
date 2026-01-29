@@ -37,7 +37,7 @@ import {
   TradingPanel,
   OnChainTradingPanel,
 } from "@/components/trade";
-import { BondingCurveProgress, TokenChat } from "@/components/token";
+import { BondingCurveProgress, TokenChat, VestingCard } from "@/components/token";
 import { useToken, tokenKeys, useTokenHolders } from "@/hooks/useTokens";
 import { useTokenTrades, tradeKeys } from "@/hooks/useTrades";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -63,13 +63,12 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
 
-  const { data: token, isLoading, error } = useToken(id);
+  const { data: token, isLoading, error } = useToken(id); 
   const { data: tradesData } = useTokenTrades(id);
 
   // Ensure trades is always an array, even if data is undefined
   const trades = tradesData || [];
 
-  console.log({ trades });
   const { data: holdersData, isLoading: holdersLoading } = useTokenHolders(id);
   const { sync: syncWithBlockchain, isSyncing } = useManualSync(id);
   const queryClient = useQueryClient();
@@ -383,6 +382,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
                 </span>
               </div>
               <div className="flex items-baseline gap-3 mt-1">
+                
                 <span className="text-3xl font-bold">
                   {formatMarketCap(token.marketCap)}
                 </span>
@@ -613,6 +613,20 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 
         {/* Sidebar */}
         <div className="space-y-6">
+          {/* Vesting Panel (Only if HypeBoost is enabled) */}
+          {token.hypeBoostEnabled && token.bondingCurveAddress && (
+            <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="mb-6"
+            >
+                <VestingCard 
+                    bondingCurveAddress={token.bondingCurveAddress as Address} 
+                    symbol={token.symbol} 
+                />
+            </motion.div>
+          )}
+
           {/* Trading Panel - On-Chain or Centralized */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}

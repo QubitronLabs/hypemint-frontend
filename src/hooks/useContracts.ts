@@ -33,6 +33,8 @@ export interface CreateTokenParams {
 	imageURI: string;
 	description: string;
 	hypeBoostEnabled: boolean;
+	slope?: bigint;
+	basePrice?: bigint;
 }
 
 export interface CreateTokenResult {
@@ -163,6 +165,8 @@ export function useCreateToken() {
 						params.imageURI,
 						params.description,
 						params.hypeBoostEnabled,
+						params.slope || BigInt(0),
+						params.basePrice || BigInt(0),
 					],
 					value: fee,
 					chainId: ACTIVE_CHAIN_ID,
@@ -660,4 +664,106 @@ export function useTokenAllowance(
 			enabled: !!tokenAddress && !!ownerAddress && !!spenderAddress,
 		},
 	});
+}
+
+// Hook: Get vesting info
+export function useVestingInfo(bondingCurveAddress: Address | undefined) {
+	const { walletAddress } = useAuth();
+
+	const { data: vestingInfo } = useReadContract({
+		address: bondingCurveAddress,
+		abi: HYPE_BONDING_CURVE_ABI,
+		functionName: "getVestingInfo",
+		args: walletAddress ? [walletAddress] : undefined,
+		chainId: ACTIVE_CHAIN_ID,
+		query: {
+			enabled: !!bondingCurveAddress && !!walletAddress,
+		},
+	});
+
+    const { data: claimableAmount } = useReadContract({
+		address: bondingCurveAddress,
+		abi: HYPE_BONDING_CURVE_ABI,
+		functionName: "getClaimableVested",
+		args: walletAddress ? [walletAddress] : undefined,
+		chainId: ACTIVE_CHAIN_ID,
+		query: {
+			enabled: !!bondingCurveAddress && !!walletAddress,
+		},
+	});
+
+    return {
+        vestingInfo: vestingInfo as {
+            totalAmount: bigint;
+            claimedAmount: bigint;
+            startTime: bigint;
+        } | undefined,
+        claimableAmount: claimableAmount as bigint | undefined,
+    };
+}
+
+// Hook: Claim vested tokens
+export function useClaimVested() {
+	const { walletAddress: address } = useAuth();
+	const [txHash, setTxHash] = useState<Hash | undefined>();
+	const [isClaiming, setIsClaiming] = useState(false);
+	const [error, setError] = useState<Error | null>(null);
+
+	const { writeContractAsync } = useWriteContract();
+
+	const { isLoading: isConfirming, isSuccess: isConfirmed } =
+		useWaitForTransactionReceipt({
+			hash: txHash,
+		});
+
+	const claim = useCallback(
+		async (bondingCurveAddress: Address): Promise<Hash | null> => {
+			if (!address) {
+				setError(new Error("Wallet not connected"));
+				return null;
+			}
+
+			setIsClaiming(true);
+			setError(null);
+
+			try {
+				const hash = await writeContractAsync({
+					address: bondingCurveAddress,
+					abi: HYPE_BONDING_CURVE_ABI,
+					functionName: "claimVested",
+					chainId: ACTIVE_CHAIN_ID,
+                    // Set higher gas price for Polygon Amoy testnet
+					maxFeePerGas: BigInt(50000000000), // 50 gwei
+					maxPriorityFeePerGas: BigInt(30000000000), // 30 gwei
+				});
+
+				setTxHash(hash);
+				return hash;
+			} catch (err) {
+				console.error("Failed to claim tokens:", err);
+				setError(
+					err instanceof Error
+						? err
+						: new Error("Failed to claim tokens"),
+				);
+				return null;
+			} finally {
+				setIsClaiming(false);
+			}
+		},
+		[address, writeContractAsync],
+	);
+
+	return {
+		claim,
+		isClaiming,
+		isConfirming,
+		isConfirmed,
+		txHash,
+		error,
+		reset: () => {
+			setTxHash(undefined);
+			setError(null);
+		},
+	};
 }

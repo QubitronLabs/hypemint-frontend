@@ -38,6 +38,9 @@ import { getTxUrl } from "@/lib/wagmi";
 import { recordOnChainTrade } from "@/lib/api/trades";
 import { toast } from "sonner";
 
+// Note: Trade recording is now handled by backend blockchain event listener
+// Frontend only needs to display confirmation UI
+
 interface OnChainTradingPanelProps {
 	tokenAddress: Address;
 	bondingCurveAddress: Address;
@@ -117,21 +120,21 @@ export function OnChainTradingPanel({
 	} = useTokenBalance(tokenAddress);
 
 	// Debug logging for balance
-	useEffect(() => {
-		console.log("[OnChainTrading] Token balance data:", {
-			tokenAddress,
-			bondingCurveAddress,
-			userAddress: address,
-			tokenBalance: tokenBalance?.toString(),
-			isLoadingBalance,
-		});
-	}, [
-		tokenAddress,
-		bondingCurveAddress,
-		address,
-		tokenBalance,
-		isLoadingBalance,
-	]);
+	// useEffect(() => {
+	// 	console.log("[OnChainTrading] Token balance data:", {
+	// 		tokenAddress,
+	// 		bondingCurveAddress,
+	// 		userAddress: address,
+	// 		tokenBalance: tokenBalance?.toString(),
+	// 		isLoadingBalance,
+	// 	});
+	// }, [
+	// 	tokenAddress,
+	// 	bondingCurveAddress,
+	// 	address,
+	// 	tokenBalance,
+	// 	isLoadingBalance,
+	// ]);
 
 	// Quotes
 	const { data: buyQuote, isLoading: isBuyQuoteLoading } = useBuyQuote(
@@ -180,11 +183,13 @@ export function OnChainTradingPanel({
 	} = useApproveToken();
 
 	// Computed values
+	// Note: Trades are now recorded automatically by backend blockchain event listener
 	const isLoading = isBuying || isSelling || isApproving;
 	const isConfirming =
 		isBuyConfirming || isSellConfirming || isApproveConfirming;
 	const txHash = buyTxHash || sellTxHash;
 	const error = buyError || sellError || approveError;
+
 
 	// Check if needs approval for sell
 	const needsApproval = useMemo(() => {
@@ -282,7 +287,7 @@ export function OnChainTradingPanel({
 					tokenAmount: "0", // Will be extracted from blockchain
 					txHash: hash,
 				});
-				console.log("[OnChainTrading] Trade synced to backend:", hash);
+				// console.log("[OnChainTrading] Trade synced to backend:", hash);
 			} catch (err) {
 				console.error(
 					"[OnChainTrading] Failed to sync trade to backend:",
@@ -295,9 +300,10 @@ export function OnChainTradingPanel({
 	);
 
 	// Refetch balances and sync when trades are confirmed
+	// Note: Backend event listener also records the trade independently
 	useEffect(() => {
 		if (isBuyConfirmed && buyTxHash) {
-			console.log("[OnChainTrading] Buy trade confirmed:", buyTxHash);
+			// console.log("[OnChainTrading] Buy trade confirmed:", buyTxHash);
 			syncTradeToBackend(buyTxHash, "buy");
 			// Refetch balances after confirmed trade
 			setTimeout(() => {
@@ -316,7 +322,7 @@ export function OnChainTradingPanel({
 	// Sync sell trade when confirmed
 	useEffect(() => {
 		if (isSellConfirmed && sellTxHash) {
-			console.log("[OnChainTrading] Sell trade confirmed:", sellTxHash);
+			// console.log("[OnChainTrading] Sell trade confirmed:", sellTxHash);
 			syncTradeToBackend(sellTxHash, "sell");
 			// Refetch balances after confirmed trade
 			setTimeout(() => {
@@ -335,7 +341,7 @@ export function OnChainTradingPanel({
   // Refetch allowance when approve is confirmed
   useEffect(() => {
     if (isApproveConfirmed) {
-      console.log("[OnChainTrading] Approve confirmed, refetching allowance");
+      // console.log("[OnChainTrading] Approve confirmed, refetching allowance");
       setTimeout(() => {
         refetchAllowance();
       }, 2000); // Wait 2s for blockchain state to update
@@ -362,6 +368,7 @@ export function OnChainTradingPanel({
   };
 
 	// Handle trade execution
+	// Note: Backend event listener will automatically record trades from blockchain events
 	const handleTrade = async () => {
 		if (!amount || parseFloat(amount) <= 0 || !isAuthenticated) return;
 

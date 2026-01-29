@@ -34,6 +34,8 @@ export {
 	useTokenBalance,
 	useApproveToken,
 	useTokenAllowance,
+	useVestingInfo,
+	useClaimVested,
 } from "./useContracts";
 export type {
 	CreateTokenParams as OnChainCreateTokenParams,

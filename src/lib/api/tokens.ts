@@ -94,13 +94,30 @@ export async function getToken(id: string): Promise<Token | null> {
       curve.graduationSupply || "1000000000000000000000000000",
     ); // ~1B tokens default
 
+    const graduationThreshold = BigInt(
+      curve.graduationThreshold || curve.graduationMarketCap || "69000000000000000000000" // 69k * 1e18
+    ); 
+
     let progress = 0;
     if (curve.isGraduated) {
       progress = 100;
-    } else if (graduationSupply > 0n) {
-      // Calculate percentage safely
-      const p = Number((currentSupply * 10000n) / graduationSupply) / 100;
-      progress = Math.min(99, Math.max(0, p));
+    } else {
+      // Calculate based on Market Cap (preferred) or Supply as backup
+      // Backend provides token.marketCap as DECIMAL string
+      // graduationThreshold is WEI string
+      
+      const marketCapDecimal = parseFloat(token.marketCap || "0");
+      const graduationThresholdDecimal = Number(graduationThreshold) / 1e18;
+
+      if (graduationThresholdDecimal > 0) {
+        progress = (marketCapDecimal / graduationThresholdDecimal) * 100;
+      } else if (graduationSupply > 0n) {
+        // Backup: Supply-based
+        const currentSupplySafe = BigInt(curve.currentSupply || "0");
+        progress = Number((currentSupplySafe * 10000n) / graduationSupply) / 100;
+      }
+      
+      progress = Math.min(99, Math.max(0, progress));
     }
 
     // Use token.currentPrice which is already converted to decimal by backend
@@ -110,10 +127,20 @@ export async function getToken(id: string): Promise<Token | null> {
     // Market cap is also already converted to decimal by backend
     const marketCap = token.marketCap || "0";
 
+    // Volume24h is already converted to decimal by backend
+    const volume24h = token.volume24h || "0";
+
+    // Convert circulatingSupply from Wei to decimal
+    const circulatingSupplyDecimal = curve.currentSupply 
+      ? (Number(BigInt(curve.currentSupply)) / 1e18).toString()
+      : "0";
+
     return {
       ...token,
       currentPrice,
       marketCap,
+      volume24h,
+      circulatingSupply: circulatingSupplyDecimal,
       bondingCurveAddress: curve.contractAddress || undefined,
       bondingCurveProgress: progress,
       graduationTarget: curve.graduationMarketCap || "69000", // Default target

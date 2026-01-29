@@ -23,13 +23,13 @@ export const CONTRACT_ADDRESSES = {
 		bondingCurveImplementation:
 			"0x0000000000000000000000000000000000000000" as `0x${string}`,
 	},
-	// Polygon Amoy Testnet - Deployed 2025-01-17
+	// Polygon Amoy Testnet - Deployed 2025-01-29
 	[POLYGON_AMOY_CHAIN_ID]: {
-		factory: "0xa024e8aeFb2047D1060212b15CaD0bC24b10e576" as `0x${string}`,
+		factory: "0xA29101b150cF7b77b1ffFf7f736d01289E5E0bB7" as `0x${string}`,
 		tokenImplementation:
-			"0x138e1806ecc55B373e9905Af4CD1a1E710b20487" as `0x${string}`,
+			"0x9B19609D2641575123756b352895034868076AC4" as `0x${string}`,
 		bondingCurveImplementation:
-			"0xBf1db253e60D268545aF0c3c5f11F98BFD7Bcff2" as `0x${string}`,
+			"0x98e025257E19f7900C092CFb80102f3275855b62" as `0x${string}`,
 	},
 } as const;
 
