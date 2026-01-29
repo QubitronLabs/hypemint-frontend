@@ -5,28 +5,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-	Globe,
-	Twitter,
-	Share2,
-	Star,
-	Copy,
-	Check,
-	TrendingUp,
-	TrendingDown,
-	MessageCircle,
-	ExternalLink,
-	Shield,
-	Activity,
-	Users,
-	BarChart3,
-	Clock,
-	Info,
-	ChevronDown,
-	ChevronUp,
-	Loader2,
-	// RefreshCw,
-} from "lucide-react";
+import { Star, Copy, Check, Shield, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -37,12 +16,17 @@ import {
 	TradingPanel,
 	OnChainTradingPanel,
 } from "@/components/trade";
-import { BondingCurveProgress, TokenChat, VestingCard } from "@/components/token";
+import {
+	BondingCurveProgress,
+	TokenChat,
+	VestingCard,
+} from "@/components/token";
 import { useToken, tokenKeys, useTokenHolders } from "@/hooks/useTokens";
 import { useTokenTrades, tradeKeys } from "@/hooks/useTrades";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useManualSync } from "@/hooks/useBlockchainSync";
 import { usePersistedTabs } from "@/hooks/usePersistedTabs";
+import { useNativeCurrencySymbol } from "@/hooks";
 import {
 	cn,
 	formatMarketCap,
@@ -60,8 +44,8 @@ interface TokenDetailPageProps {
 export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 	const { id } = use(params);
 	const [copied, setCopied] = useState(false);
-	const [showFullDescription, setShowFullDescription] = useState(false);
 	const [isStarred, setIsStarred] = useState(false);
+	const nativeSymbol = useNativeCurrencySymbol();
 
 	const { data: token, isLoading, error } = useToken(id);
 	const { data: tradesData } = useTokenTrades(id);
@@ -69,17 +53,16 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 	// Ensure trades is always an array, even if data is undefined
 	const trades = tradesData || [];
 
-	console.log({ trades });
 	const { data: holdersData, isLoading: holdersLoading } =
 		useTokenHolders(id);
-	const { sync: syncWithBlockchain, isSyncing } = useManualSync(id);
+	useManualSync(id);
 	const queryClient = useQueryClient();
 
-	// Tab persistence with URL sync
+	// Tab persistence with URL sync - now only comments and trades
 	const { activeTab, setActiveTab } = usePersistedTabs({
 		key: "tab",
-		defaultTab: "trades" as const,
-		validTabs: ["trades", "comments", "holders"] as const,
+		defaultTab: "comments" as const,
+		validTabs: ["comments", "trades"] as const,
 	});
 
 	// Get holders from blockchain data
@@ -237,18 +220,19 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 
 	return (
 		<div className="w-full mx-auto p-3 sm:p-4 lg:p-6 relative overflow-x-clip">
-			<div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_350px] relative gap-4 lg:gap-6">
+			<div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] relative gap-4 lg:gap-6">
 				{/* Main Content */}
 				<div className="min-w-0 space-y-4 sm:space-y-6">
-					{/* Token Header */}
+					{/* Section 1: Token Header Card - Simplified as per screenshot 1 */}
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
-						className="bg-card border border-border rounded-xl p-4 sm:p-6"
+						className="bg-card border border-border rounded-xl p-4"
 					>
-						<div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-							<div className="flex items-center gap-3 sm:gap-4">
-								<div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-muted overflow-hidden shrink-0">
+						<div className="flex items-center justify-between gap-4">
+							{/* Left side: Image, Name, Symbol, Creator, Time */}
+							<div className="flex items-center gap-3 min-w-0">
+								<div className="w-12 h-12 rounded-lg bg-muted overflow-hidden shrink-0">
 									{token.imageUrl ? (
 										<Image
 											src={token.imageUrl.replace(
@@ -262,483 +246,301 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 											className="object-cover w-full h-full"
 										/>
 									) : (
-										<div className="w-full h-full flex items-center justify-center text-2xl font-bold text-muted-foreground">
+										<div className="w-full h-full flex items-center justify-center text-lg font-bold text-muted-foreground">
 											{token.symbol?.slice(0, 2) || "??"}
 										</div>
 									)}
 								</div>
 
 								<div className="min-w-0">
-									<div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-										<h1 className="text-lg sm:text-xl font-bold truncate">
+									<div className="flex items-center gap-2">
+										<h1 className="text-lg font-bold truncate">
 											{token.name}
 										</h1>
-										<Badge
-											variant="outline"
-											className="text-xs"
-										>
+										<span className="text-sm text-muted-foreground">
 											{token.symbol}
-										</Badge>
-										{token.status === "active" && (
-											<Badge className="bg-primary/20 text-primary text-xs">
-												Live
-											</Badge>
-										)}
-									</div>
-									<div className="flex items-center gap-2 mt-1">
-										<span className="text-xs text-muted-foreground">
-											Created by
 										</span>
+									</div>
+									<div className="flex items-center gap-2 text-xs text-muted-foreground">
 										<Link
 											href={`/user/${token.creator?.walletAddress || ""}`}
-											className="text-xs text-primary hover:underline"
+											className="hover:text-primary flex items-center gap-1"
 										>
+											<div className="w-4 h-4 rounded-full bg-muted overflow-hidden">
+												{token.creator?.avatarUrl ? (
+													<Image
+														src={
+															token.creator
+																.avatarUrl
+														}
+														alt=""
+														width={16}
+														height={16}
+														className="object-cover"
+													/>
+												) : null}
+											</div>
 											{token.creator?.displayName ||
 												token.creator?.username ||
 												(token.creator?.walletAddress
 													? `${token.creator.walletAddress.slice(0, 6)}...`
 													: "Unknown")}
 										</Link>
-										<span className="text-xs text-muted-foreground">
-											{token.createdAt
-												? new Date(
-														token.createdAt,
-													).toLocaleDateString()
-												: ""}
-										</span>
-										
-										{/* hypebost badge */}
-										{token.hypeBoostEnabled && (
-											<Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs gap-1">
-												<Shield className="h-3 w-3" />
-												HypeBoost
-											</Badge>
-										)}
+										<span>·</span>
+										<span>{getTimeSinceCreation()}</span>
 									</div>
 								</div>
 							</div>
 
+							{/* Right side: Share, Copy, Star buttons */}
 							<div className="flex items-center gap-2 shrink-0">
-								{/* <Button
-									variant="outline"
-									size="icon"
-									className="h-8 w-8 sm:h-9 sm:w-9"
-									onClick={() => syncWithBlockchain()}
-									disabled={isSyncing}
-									title="Sync with blockchain"
+								<Button
+									onClick={handleShare}
+									size="sm"
+									className="bg-primary hover:bg-primary/90 text-primary-foreground"
 								>
-									<RefreshCw
-										className={cn(
-											"h-3.5 w-3.5 sm:h-4 sm:w-4",
-											isSyncing && "animate-spin",
-										)}
-									/>
-								</Button> */}
+									Share
+								</Button>
 								<Button
 									variant="outline"
-									size="icon"
-									className="h-8 w-8 sm:h-9 sm:w-9"
-									onClick={handleShare}
+									size="sm"
+									onClick={handleCopy}
+									className="gap-1.5"
 								>
-									<Share2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+									{copied ? (
+										<Check className="h-3.5 w-3.5 text-green-500" />
+									) : (
+										<Copy className="h-3.5 w-3.5" />
+									)}
+									{formatAddress(token.id)}
 								</Button>
 								<Button
 									variant="outline"
 									size="icon"
 									className={cn(
-										"h-8 w-8 sm:h-9 sm:w-9",
+										"h-8 w-8",
 										isStarred ? "text-yellow-500" : "",
 									)}
 									onClick={() => setIsStarred(!isStarred)}
 								>
 									<Star
 										className={cn(
-											"h-3.5 w-3.5 sm:h-4 sm:w-4",
+											"h-4 w-4",
 											isStarred && "fill-current",
 										)}
 									/>
 								</Button>
 							</div>
 						</div>
-
-						{/* Token Badges */}
-						<div className="flex flex-wrap items-center gap-2 mt-4">
-							{token.hypeBoostEnabled && (
-								<Badge className="bg-lienar-to-r from-purple-500 to-pink-500 text-white text-xs gap-1">
-									<Shield className="h-3 w-3" />
-									HypeBoost
-								</Badge>
-							)}
-							<Badge variant="outline" className="text-xs gap-1">
-								<Clock className="h-3 w-3" />
-								{getTimeSinceCreation()}
-							</Badge>
-							{token.id && (
-								<a
-									href={getExplorerUrl(token.id)}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="inline-flex"
-								>
-									<Badge
-										variant="outline"
-										className="text-xs gap-1 hover:bg-muted cursor-pointer"
-									>
-										<ExternalLink className="h-3 w-3" />
-										{formatAddress(token.id)}
-									</Badge>
-								</a>
-							)}
-						</div>
-
-						{/* Description */}
-						{token.description && (
-							<div className="mt-4">
-								<p
-									className={cn(
-										"text-sm text-muted-foreground",
-										!showFullDescription && "line-clamp-2",
-									)}
-								>
-									{token.description}
-								</p>
-								{token.description.length > 150 && (
-									<button
-										onClick={() =>
-											setShowFullDescription(
-												!showFullDescription,
-											)
-										}
-										className="text-xs text-primary hover:underline mt-1 flex items-center gap-1"
-									>
-										{showFullDescription ? (
-											<>
-												Show less{" "}
-												<ChevronUp className="h-3 w-3" />
-											</>
-										) : (
-											<>
-												Show more{" "}
-												<ChevronDown className="h-3 w-3" />
-											</>
-										)}
-									</button>
-								)}
-							</div>
-						)}
-
-						{/* Price Stats */}
-						<div className="mt-6">
-							<div className="flex items-baseline gap-2">
-								<span className="text-muted-foreground text-sm">
-									Market Cap
-								</span>
-							</div>
-							<div className="flex flex-wrap items-baseline gap-2 sm:gap-3 mt-1">
-								<span className="text-2xl sm:text-3xl font-bold">
-									{formatMarketCap(token.marketCap)}
-								</span>
-								<span
-									className={cn(
-										"text-sm font-medium flex items-center gap-1",
-										pricePositive
-											? "text-[#00ff88]"
-											: "text-destructive",
-									)}
-								>
-									{pricePositive ? (
-										<TrendingUp className="h-4 w-4" />
-									) : (
-										<TrendingDown className="h-4 w-4" />
-									)}
-									{pricePositive ? "+" : ""}
-									{(token.priceChange24h ?? 0).toFixed(2)}%
-									24hr
-								</span>
-							</div>
-						</div>
-
-						{/* Quick Stats */}
-						<div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-border">
-							<div>
-								<p className="text-xs text-muted-foreground">
-									Vol 24h
-								</p>
-								<p className="font-semibold tabular-nums">
-									{formatVolume(token.volume24h)}
-								</p>
-							</div>
-							<div>
-								<p className="text-xs text-muted-foreground">
-									Price
-								</p>
-								<p className="font-semibold tabular-nums">
-									{formatPrice(token.currentPrice)}
-								</p>
-							</div>
-							<div>
-								<p className="text-xs text-muted-foreground">
-									Holders
-								</p>
-								<p className="font-semibold tabular-nums">
-									{holdersData?.totalHolders ?? 0}
-								</p>
-							</div>
-							<div>
-								<p className="text-xs text-muted-foreground">
-									Trades
-								</p>
-								<p className="font-semibold tabular-nums">
-									{token.tradesCount ?? 0}
-								</p>
-							</div>
-						</div>
-
-						{/* Social Links */}
-						<div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-border">
-							{token.websiteUrl && (
-								<a
-									href={token.websiteUrl}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-								>
-									<Globe className="h-3.5 w-3.5" />
-									Website
-								</a>
-							)}
-							{token.twitterUrl && (
-								<a
-									href={token.twitterUrl}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-								>
-									<Twitter className="h-3.5 w-3.5" />
-									Twitter
-								</a>
-							)}
-							{token.telegramUrl && (
-								<a
-									href={token.telegramUrl}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-								>
-									<MessageCircle className="h-3.5 w-3.5" />
-									Telegram
-								</a>
-							)}
-							<Button
-								variant="ghost"
-								size="sm"
-								onClick={handleCopy}
-								className="h-7 text-xs gap-1.5 rounded-full"
-							>
-								{copied ? (
-									<Check className="h-3.5 w-3.5 text-green-500" />
-								) : (
-									<Copy className="h-3.5 w-3.5" />
-								)}
-								{copied ? "Copied!" : "Copy Address"}
-							</Button>
-						</div>
 					</motion.div>
 
-					{/* Price Chart */}
+					{/* Section 2: Price Chart with Market Cap Header - as per screenshot 2 */}
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ delay: 0.1 }}
+						className="bg-card border border-border rounded-xl overflow-hidden"
 					>
-						<PriceChart tokenId={id} />
+						{/* Market Cap Header */}
+						<div className="p-4 border-b border-border">
+							<div className="flex items-start justify-between">
+								<div>
+									<p className="text-xs text-muted-foreground mb-1">
+										Market Cap
+									</p>
+									<p className="text-2xl sm:text-3xl font-bold">
+										{formatMarketCap(token.marketCap)}
+									</p>
+									<p
+										className={cn(
+											"text-sm flex items-center gap-1 mt-1",
+											pricePositive
+												? "text-[#00ff88]"
+												: "text-destructive",
+										)}
+									>
+										{pricePositive ? "+" : ""}
+										{(token.priceChange24h ?? 0).toFixed(2)}
+										% 24hr
+									</p>
+								</div>
+								<div className="text-right">
+									<p className="text-xs text-muted-foreground">
+										ATH
+									</p>
+									<p className="text-sm font-medium text-primary">
+										{formatMarketCap(
+											(token as any).athMarketCap ||
+												token.marketCap,
+										)}
+									</p>
+								</div>
+							</div>
+						</div>
+
+						{/* Price Chart */}
+						<PriceChart
+							tokenId={id}
+							className="border-none rounded-none"
+						/>
 					</motion.div>
 
-					{/* Comments / Trades / Holders Tabs */}
+					{/* Section 3: Metrics Row - 5 cards as per screenshot 2 bottom */}
+					<motion.div
+						initial={{ opacity: 0, y: 20 }}
+						animate={{ opacity: 1, y: 0 }}
+						transition={{ delay: 0.15 }}
+						className="grid grid-cols-2 sm:grid-cols-5 gap-2"
+					>
+						<div className="bg-card border border-border rounded-lg p-3 text-center">
+							<p className="text-xs text-muted-foreground mb-1">
+								Vol 24h
+							</p>
+							<p className="font-semibold tabular-nums">
+								{formatVolume(token.volume24h)}
+							</p>
+						</div>
+						<div className="bg-card border border-border rounded-lg p-3 text-center">
+							<p className="text-xs text-muted-foreground mb-1">
+								Price
+							</p>
+							<p className="font-semibold tabular-nums">
+								{formatPrice(token.currentPrice)}
+							</p>
+						</div>
+						<div className="bg-card border border-border rounded-lg p-3 text-center">
+							<p className="text-xs text-muted-foreground mb-1">
+								5m
+							</p>
+							<p className="font-semibold tabular-nums text-destructive">
+								-7.46%
+							</p>
+						</div>
+						<div className="bg-card border border-border rounded-lg p-3 text-center">
+							<p className="text-xs text-muted-foreground mb-1">
+								1h
+							</p>
+							<p className="font-semibold tabular-nums text-[#00ff88]">
+								+1,188.82%
+							</p>
+						</div>
+						<div className="bg-card border border-border rounded-lg p-3 text-center col-span-2 sm:col-span-1">
+							<p className="text-xs text-muted-foreground mb-1">
+								6h
+							</p>
+							<p className="font-semibold tabular-nums text-[#00ff88]">
+								+1,188.82%
+							</p>
+						</div>
+					</motion.div>
+
+					{/* Section 4 & 5: Comments / Trades Tabs - matching screenshot exactly */}
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ delay: 0.2 }}
+						className="bg-card border border-border rounded-xl overflow-hidden"
 					>
 						<Tabs
 							value={activeTab}
 							onValueChange={(value) =>
-								setActiveTab(
-									value as "trades" | "comments" | "holders",
-								)
+								setActiveTab(value as "comments" | "trades")
 							}
+							className="w-full"
 						>
-							<TabsList className="w-full bg-card border border-border">
-								<TabsTrigger
-									value="trades"
-									className="flex-1 gap-1.5"
-								>
-									<BarChart3 className="h-3.5 w-3.5" />
-									Trades
-								</TabsTrigger>
-								<TabsTrigger
+							{/* Tab Headers */}
+							<TabsList className=" h-auto bg-transparent border-0 p-0 gap-6 px-4 pt-4">
+								{/* <TabsTrigger
+								
 									value="comments"
-									className="flex-1 gap-1.5"
+									className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground data-[state=active]:text-foreground border-b-2 border-transparent data-[state=active]:border-foreground rounded-none  pb-2 text-sm font-medium "
 								>
-									<MessageCircle className="h-3.5 w-3.5" />
 									Comments
 								</TabsTrigger>
 								<TabsTrigger
-									value="holders"
-									className="flex-1 gap-1.5"
+									value="trades"
+									className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground data-[state=active]:text-foreground border-b-2 border-transparent data-[state=active]:border-foreground rounded-none pb-2 text-sm font-medium "
 								>
-									<Users className="h-3.5 w-3.5" />
-									Holders{" "}
-									{holdersData?.totalHolders
-										? `(${holdersData.totalHolders})`
-										: ""}
+									Trades
+								</TabsTrigger> */}
+								<TabsTrigger
+									value="comments"
+									className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:shadow-[0_2px_8px_rgba(var(--primary),0.5)] border-b-2 border-transparent rounded-sm pb-2 text-sm font-medium"
+								>
+									Comments
+								</TabsTrigger>
+								<TabsTrigger
+									value="trades"
+									className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:shadow-[0_2px_8px_rgba(var(--primary),0.5)] border-b-2 border-transparent rounded-sm pb-2 text-sm font-medium"
+								>
+									Trades
 								</TabsTrigger>
 							</TabsList>
-							<TabsContent value="trades" className="mt-4">
-								<TradeTape
-									tokenId={id}
-									initialTrades={trades}
-								/>
-							</TabsContent>
-							<TabsContent value="comments" className="mt-4">
+
+							<TabsContent
+								value="comments"
+								className="mt-0 border-0"
+							>
 								<TokenChat
 									tokenId={id}
-									className="min-h-87.5"
+									className="min-h-100 border-0 rounded-none"
 								/>
 							</TabsContent>
-							<TabsContent value="holders" className="mt-4">
-								<div className="bg-card border border-border rounded-xl p-6">
-									{holdersLoading ? (
-										<div className="text-center py-12">
-											<Loader2 className="h-12 w-12 mx-auto text-primary animate-spin mb-4" />
-											<p className="text-muted-foreground">
-												Loading holders from
-												blockchain...
-											</p>
-											<p className="text-xs text-muted-foreground mt-1">
-												Scanning Transfer events
-											</p>
-										</div>
-									) : holders.length > 0 ? (
-										<div className="space-y-3">
-											{holders.map((holder, index) => (
-												<div
-													key={holder.address}
-													className="flex items-center justify-between py-2 border-b border-border/50 last:border-0"
-												>
-													<div className="flex items-center gap-3">
-														<span
-															className={cn(
-																"w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
-																index === 0
-																	? "bg-yellow-500/20 text-yellow-500"
-																	: index ===
-																		  1
-																		? "bg-gray-400/20 text-gray-400"
-																		: index ===
-																			  2
-																			? "bg-orange-500/20 text-orange-500"
-																			: "bg-muted text-muted-foreground",
-															)}
-														>
-															{index + 1}
-														</span>
-														<div>
-															<Link
-																href={`/user/${holder.address}`}
-																className="font-mono text-sm hover:text-primary"
-															>
-																{formatAddress(
-																	holder.address,
-																)}
-															</Link>
-															<p className="text-xs text-muted-foreground">
-																{holder.balanceFormatted.toLocaleString(
-																	undefined,
-																	{
-																		maximumFractionDigits: 2,
-																	},
-																)}{" "}
-																tokens
-															</p>
-														</div>
-													</div>
-													<div className="text-right">
-														<span className="font-semibold tabular-nums">
-															{holder.percentage.toFixed(
-																2,
-															)}
-															%
-														</span>
-														<div className="w-20 h-1.5 bg-muted rounded-full mt-1">
-															<div
-																className="h-full bg-primary rounded-full"
-																style={{
-																	width: `${Math.min(holder.percentage, 100)}%`,
-																}}
-															/>
-														</div>
-													</div>
-												</div>
-											))}
-										</div>
-									) : (
-										<div className="text-center py-12">
-											<Users className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-											<p className="text-muted-foreground">
-												No holders data available yet
-											</p>
-											<p className="text-xs text-muted-foreground mt-1">
-												Holder data will appear after
-												trading begins
-											</p>
-										</div>
-									)}
-								</div>
+							<TabsContent value="trades" className="mt-0">
+								<TradeTape
+									tokenId={id}
+									tokenSymbol={token.symbol}
+									initialTrades={trades}
+									className="border-0 rounded-none"
+								/>
 							</TabsContent>
 						</Tabs>
 					</motion.div>
 				</div>
 
-        {/* Sidebar */}
-     <div className="min-w-0 w-full lg:sticky lg:top-22 lg:self-start space-y-4 sm:space-y-6 overflow-hidden lg:max-h-[calc(100vh-2rem)]">
-          {/* Vesting Panel (Only if HypeBoost is enabled) */}
-          {token.hypeBoostEnabled && token.bondingCurveAddress && (
-            <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="mb-6"
-            >
-                <VestingCard 
-                    bondingCurveAddress={token.bondingCurveAddress as Address} 
-                    symbol={token.symbol} 
-                />
-            </motion.div>
-          )}
+				{/* Sidebar */}
+				<div className="min-w-0 w-full lg:sticky lg:top-22 lg:self-start space-y-4 sm:space-y-6 overflow-hidden lg:max-h-[calc(100vh-2rem)]">
+					{/* Vesting Panel (Only if HypeBoost is enabled) */}
+					{token.hypeBoostEnabled && token.bondingCurveAddress && (
+						<motion.div
+							initial={{ opacity: 0, x: 20 }}
+							animate={{ opacity: 1, x: 0 }}
+							className="mb-6"
+						>
+							<VestingCard
+								bondingCurveAddress={
+									token.bondingCurveAddress as Address
+								}
+								symbol={token.symbol}
+							/>
+						</motion.div>
+					)}
 
-          {/* Trading Panel - On-Chain or Centralized */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-          >
-            {token.bondingCurveAddress && token.contractAddress ? (
-              <OnChainTradingPanel
-                tokenAddress={token.contractAddress as Address}
-                bondingCurveAddress={token.bondingCurveAddress as Address}
-                tokenSymbol={token.symbol || "TOKEN"}
-                tokenName={token.name || "Unknown Token"}
-                currentPrice={token.currentPrice || "0.00001"}
-              />
-            ) : (
-              <TradingPanel
-                tokenId={id}
-                tokenSymbol={token.symbol || "TOKEN"}
-                tokenName={token.name || "Unknown Token"}
-                currentPrice={token.currentPrice || "0.00001"}
-                totalSupply={token.totalSupply || "1000000000"}
-              />
-            )}
-          </motion.div>
+					{/* Trading Panel - On-Chain or Centralized */}
+					<motion.div
+						initial={{ opacity: 0, x: 20 }}
+						animate={{ opacity: 1, x: 0 }}
+					>
+						{token.bondingCurveAddress && token.contractAddress ? (
+							<OnChainTradingPanel
+								tokenAddress={token.contractAddress as Address}
+								bondingCurveAddress={
+									token.bondingCurveAddress as Address
+								}
+								tokenSymbol={token.symbol || "TOKEN"}
+								tokenName={token.name || "Unknown Token"}
+								currentPrice={token.currentPrice || "0.00001"}
+							/>
+						) : (
+							<TradingPanel
+								tokenId={id}
+								tokenSymbol={token.symbol || "TOKEN"}
+								tokenName={token.name || "Unknown Token"}
+								currentPrice={token.currentPrice || "0.00001"}
+								totalSupply={token.totalSupply || "1000000000"}
+							/>
+						)}
+					</motion.div>
 
 					{/* Bonding Curve */}
 					<motion.div
@@ -796,7 +598,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 									{fromWei(
 										token.currentBondingAmount || "0",
 									).toFixed(4)}{" "}
-									POL
+									{nativeSymbol}
 								</span>
 							</div>
 							<div className="flex items-center justify-between">
@@ -838,37 +640,72 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						</div>
 					</motion.div>
 
-					{/* Quick Stats - Activity Section */}
+					{/* Section 4: Top Holders - as per screenshot 3 */}
 					<motion.div
 						initial={{ opacity: 0, x: 20 }}
 						animate={{ opacity: 1, x: 0 }}
 						transition={{ delay: 0.3 }}
 						className="bg-card border border-border rounded-xl p-4"
 					>
-						<div className="flex items-center gap-2 mb-4">
-							<Activity className="h-4 w-4 text-muted-foreground" />
+						<div className="flex items-center justify-between mb-4">
 							<span className="font-semibold text-sm">
-								Activity
+								Top holders
 							</span>
+							<Button
+								variant="outline"
+								size="sm"
+								className="text-xs h-7"
+							>
+								Generate bubble map
+							</Button>
 						</div>
-						<div className="grid grid-cols-2 gap-3">
-							<div className="bg-muted/30 rounded-lg p-3 text-center">
-								<p className="text-2xl font-bold tabular-nums">
-									{holdersData?.totalHolders ?? 0}
-								</p>
+						{holdersLoading ? (
+							<div className="space-y-2">
+								{[...Array(10)].map((_, i) => (
+									<div
+										key={i}
+										className="flex items-center justify-between"
+									>
+										<Skeleton className="h-4 w-24" />
+										<Skeleton className="h-4 w-12" />
+									</div>
+								))}
+							</div>
+						) : holders.length > 0 ? (
+							<div className="space-y-1">
+								{holders.slice(0, 20).map((holder, index) => (
+									<div
+										key={holder.address}
+										className="flex items-center justify-between py-1"
+									>
+										<Link
+											href={`/user/${holder.address}`}
+											className="font-mono text-sm hover:text-primary text-muted-foreground"
+										>
+											{index === 0 ? (
+												<span className="flex items-center gap-1.5">
+													Liquidity pool{" "}
+													<span className="text-blue-400">
+														💧
+													</span>
+												</span>
+											) : (
+												`${holder.address.slice(0, 4)}...${holder.address.slice(-4)}`
+											)}
+										</Link>
+										<span className="text-sm tabular-nums">
+											{holder.percentage.toFixed(2)}%
+										</span>
+									</div>
+								))}
+							</div>
+						) : (
+							<div className="text-center py-6">
 								<p className="text-xs text-muted-foreground">
-									Holders
+									No holders data available yet
 								</p>
 							</div>
-							<div className="bg-muted/30 rounded-lg p-3 text-center">
-								<p className="text-2xl font-bold tabular-nums">
-									{token.tradesCount ?? 0}
-								</p>
-								<p className="text-xs text-muted-foreground">
-									Trades
-								</p>
-							</div>
-						</div>
+						)}
 					</motion.div>
 				</div>
 			</div>

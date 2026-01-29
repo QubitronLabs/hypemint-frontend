@@ -235,28 +235,71 @@ function HomePage() {
 	);
 
 	// Trending tokens (for "trending" tab)
-	const { data: trendingTokens = [], isLoading: trendingLoading } =
-		useTrendingTokens(undefined, {
-			enabled: isHydrated && activeFilter === "trending",
-		});
+	const {
+		data: trendingTokens = [],
+		isLoading: trendingLoading,
+		refetch: refetchTrending,
+	} = useTrendingTokens(undefined, {
+		enabled: isHydrated && activeFilter === "trending",
+	});
 
 	// New tokens (for "new" tab)
-	const { data: newTokens = [], isLoading: newLoading } = useNewTokens(
-		undefined,
-		{ enabled: isHydrated && activeFilter === "new" },
-	);
+	const {
+		data: newTokens = [],
+		isLoading: newLoading,
+		refetch: refetchNew,
+	} = useNewTokens(undefined, {
+		enabled: isHydrated && activeFilter === "new",
+	});
 
 	// Live tokens (for "live" tab)
-	const { data: liveTokens = [], isLoading: liveLoading } = useLiveTokens(
-		undefined,
-		{ enabled: isHydrated && activeFilter === "live" },
-	);
+	const {
+		data: liveTokens = [],
+		isLoading: liveLoading,
+		refetch: refetchLive,
+	} = useLiveTokens(undefined, {
+		enabled: isHydrated && activeFilter === "live",
+	});
 
 	// Graduated tokens (for "graduated" tab)
-	const { data: graduatedTokens = [], isLoading: graduatedLoading } =
-		useGraduatedTokens(undefined, {
-			enabled: isHydrated && activeFilter === "graduated",
-		});
+	const {
+		data: graduatedTokens = [],
+		isLoading: graduatedLoading,
+		refetch: refetchGraduated,
+	} = useGraduatedTokens(undefined, {
+		enabled: isHydrated && activeFilter === "graduated",
+	});
+
+	// Refetch data when tab changes
+	useEffect(() => {
+		if (!isHydrated) return;
+
+		switch (activeFilter) {
+			case "all":
+				refetchAll();
+				break;
+			case "trending":
+				refetchTrending();
+				break;
+			case "new":
+				refetchNew();
+				break;
+			case "live":
+				refetchLive();
+				break;
+			case "graduated":
+				refetchGraduated();
+				break;
+		}
+	}, [
+		activeFilter,
+		isHydrated,
+		refetchAll,
+		refetchTrending,
+		refetchNew,
+		refetchLive,
+		refetchGraduated,
+	]);
 
 	// WebSocket: Listen for new tokens
 	useNewTokenFeed(
@@ -628,23 +671,106 @@ function HomePageSkeleton() {
 	return (
 		<main className="min-h-screen pb-20">
 			<div className="mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
-				<div className="space-y-4 sm:space-y-6">
-					<Skeleton className="h-12 sm:h-16 w-48 sm:w-64" />
-					<div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
-						{[1, 2, 3, 4].map((i) => (
-							<Skeleton
-								key={i}
-								className="h-16 sm:h-24 rounded-xl"
-							/>
-						))}
+				{/* Hero Section Skeleton */}
+				<div className="mb-6 sm:mb-8">
+					<Skeleton className="h-8 sm:h-10 md:h-12 w-48 sm:w-64 mb-2" />
+					<Skeleton className="h-4 sm:h-5 w-64 sm:w-80" />
+				</div>
+
+				{/* Stats Row Skeleton */}
+				<div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-6 sm:mb-8">
+					{[1, 2, 3, 4].map((i) => (
+						<div
+							key={i}
+							className="bg-card/40 border border-border/50 rounded-xl p-3 sm:p-4"
+						>
+							<div className="flex items-center gap-2 sm:gap-3">
+								<Skeleton className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg shrink-0" />
+								<div className="flex-1 space-y-1.5">
+									<Skeleton className="h-5 sm:h-7 w-12 sm:w-16" />
+									<Skeleton className="h-2.5 sm:h-3 w-16 sm:w-20" />
+								</div>
+							</div>
+						</div>
+					))}
+				</div>
+
+				{/* Main Content Grid */}
+				<div className="grid lg:grid-cols-[1fr_300px] gap-4 sm:gap-6">
+					{/* Left Column - Token Grid */}
+					<div>
+						{/* Filter & Search Bar Skeleton */}
+						<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+							<Skeleton className="h-10 sm:h-11 w-full sm:w-80 rounded-lg sm:rounded-xl" />
+							<Skeleton className="h-9 sm:h-10 w-full sm:w-64 rounded-lg" />
+						</div>
+
+						{/* Token Grid Skeleton */}
+						<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+							{Array.from({ length: 9 }).map((_, i) => (
+								<div
+									key={i}
+									className="bg-card/40 border border-border/50 rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3"
+								>
+									<div className="flex items-center gap-2 sm:gap-3">
+										<Skeleton className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg" />
+										<div className="flex-1 space-y-1.5 sm:space-y-2">
+											<Skeleton className="h-3 sm:h-4 w-20 sm:w-24" />
+											<Skeleton className="h-2.5 sm:h-3 w-14 sm:w-16" />
+										</div>
+									</div>
+									<Skeleton className="h-6 sm:h-8 w-full" />
+									<div className="flex justify-between">
+										<Skeleton className="h-3 sm:h-4 w-14 sm:w-16" />
+										<Skeleton className="h-3 sm:h-4 w-14 sm:w-16" />
+									</div>
+								</div>
+							))}
+						</div>
 					</div>
-					<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-						{[1, 2, 3, 4, 5, 6].map((i) => (
-							<Skeleton
-								key={i}
-								className="h-48 sm:h-64 rounded-xl"
-							/>
-						))}
+
+					{/* Right Column - Activity Feed Skeleton */}
+					<div className="hidden lg:block space-y-4">
+						{/* Activity Feed Skeleton */}
+						<div className="bg-card/40 border border-border/50 rounded-xl p-4">
+							<div className="flex items-center gap-2 mb-3">
+								<Skeleton className="h-4 w-4 rounded" />
+								<Skeleton className="h-4 w-24" />
+							</div>
+							<div className="space-y-3">
+								{[1, 2, 3].map((i) => (
+									<div
+										key={i}
+										className="flex items-center gap-3 py-2"
+									>
+										<Skeleton className="w-8 h-8 rounded-lg shrink-0" />
+										<div className="flex-1 space-y-1.5">
+											<Skeleton className="h-3.5 w-full" />
+											<Skeleton className="h-2.5 w-16" />
+										</div>
+									</div>
+								))}
+							</div>
+						</div>
+
+						{/* Quick Actions Skeleton */}
+						<div className="bg-card/40 border border-border/50 rounded-xl p-4">
+							<Skeleton className="h-4 w-28 mb-3" />
+							<div className="space-y-2">
+								<Skeleton className="h-10 w-full rounded-lg" />
+								<Skeleton className="h-10 w-full rounded-lg" />
+							</div>
+						</div>
+
+						{/* Tips Skeleton */}
+						<div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
+							<div className="flex items-center gap-2 mb-2">
+								<Skeleton className="h-4 w-4 rounded" />
+								<Skeleton className="h-4 w-16" />
+							</div>
+							<Skeleton className="h-3 w-full" />
+							<Skeleton className="h-3 w-3/4 mt-1" />
+						</div>
 					</div>
 				</div>
 			</div>

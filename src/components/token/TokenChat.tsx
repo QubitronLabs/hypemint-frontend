@@ -1,17 +1,36 @@
 "use client";
 
 /**
- * Token Chat Component
- * Real-time chat for token pages using Native WebSocket
+ * Token Chat Component - Redesigned
+ * Real-time chat with sorting, likes, and comment popup
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Loader2, MessageCircle } from "lucide-react";
+import {
+	Loader2,
+	MessageCircle,
+	Heart,
+	SlidersHorizontal,
+	X,
+	ImageIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useAuthStore } from "@/lib/auth";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { apiClient } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -20,7 +39,10 @@ import { useAuth } from "@/hooks";
 interface Comment {
 	id: string;
 	content: string;
+	imageUrl?: string | null;
 	createdAt: string;
+	likesCount?: number;
+	isLiked?: boolean;
 	user: {
 		id: string;
 		username: string | null;
@@ -34,11 +56,18 @@ interface TokenChatProps {
 	className?: string;
 }
 
+type SortOption = "newest" | "oldest";
+
 export function TokenChat({ tokenId, className }: TokenChatProps) {
 	const [comments, setComments] = useState<Comment[]>([]);
-	const [message, setMessage] = useState("");
 	const [sending, setSending] = useState(false);
 	const [loading, setLoading] = useState(true);
+	const [sortBy, setSortBy] = useState<SortOption>("newest");
+	const [showCommentDialog, setShowCommentDialog] = useState(false);
+	const [dialogMessage, setDialogMessage] = useState("");
+	const [selectedImage, setSelectedImage] = useState<File | null>(null);
+	const [imagePreview, setImagePreview] = useState<string | null>(null);
+	const fileInputRef = useRef<HTMLInputElement>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 
 	const { isAuthenticated, setShowAuthFlow } = useAuth();
@@ -72,7 +101,6 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			) {
 				const newComment = msg.data as Comment;
 				setComments((prev) => {
-					// Prevent duplicates
 					if (prev.find((c) => c.id === newComment.id)) return prev;
 					return [newComment, ...prev];
 				});
@@ -87,54 +115,95 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 		}
 	}, [tokenId, isConnected, subscribe, unsubscribe]);
 
-	// Auto-scroll on new messages
-	// We only scroll if we were already relatively close to bottom or it's my message
-	// But for this simple chat, usually new messages appear at TOP or BOTTOM?
-	// UI shows `[...comments].reverse().map` so latest is at BOTTOM?
-	// Let's check logic: `setComments(prev => [newComment, ...prev])` adds to START.
-	// UI maps `reverse()`, so first item in array is rendered LAST (at bottom).
-	// So newComment (index 0) becomes last element. Yes.
+	// Sort comments
+	const sortedComments = [...comments].sort((a, b) => {
+		const dateA = new Date(a.createdAt).getTime();
+		const dateB = new Date(b.createdAt).getTime();
+		return sortBy === "newest" ? dateB - dateA : dateA - dateB;
+	});
 
-	useEffect(() => {
-		// Scroll to bottom when comments change
-		// Simple behavior: just scroll
-		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, [comments]);
+	// Handle image selection
+	const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (file) {
+			setSelectedImage(file);
+			const reader = new FileReader();
+			reader.onloadend = () => {
+				setImagePreview(reader.result as string);
+			};
+			reader.readAsDataURL(file);
+		}
+	};
 
-	// Send message
-	const handleSend = async () => {
-		if (!message.trim() || !isAuthenticated || sending) return;
+	// Clear selected image
+	const clearImage = () => {
+		setSelectedImage(null);
+		setImagePreview(null);
+		if (fileInputRef.current) {
+			fileInputRef.current.value = "";
+		}
+	};
+
+	// Handle like
+	const handleLike = async (commentId: string) => {
+		if (!isAuthenticated) {
+			setShowAuthFlow(true);
+			return;
+		}
+
+		try {
+			const response = await apiClient.post(
+				`/api/v1/comments/${commentId}/like`,
+			);
+			if (response.data?.success) {
+				setComments((prev) =>
+					prev.map((c) =>
+						c.id === commentId
+							? {
+									...c,
+									isLiked: !c.isLiked,
+									likesCount: c.isLiked
+										? (c.likesCount || 1) - 1
+										: (c.likesCount || 0) + 1,
+								}
+							: c,
+					),
+				);
+			}
+		} catch (error) {
+			console.error("Failed to like comment:", error);
+		}
+	};
+
+	// Send message from dialog
+	const handleDialogSend = async () => {
+		if (!dialogMessage.trim() || !isAuthenticated || sending) return;
 
 		setSending(true);
 		try {
+			const formData = new FormData();
+			formData.append("content", dialogMessage.trim());
+			if (selectedImage) {
+				formData.append("image", selectedImage);
+			}
+
 			const response = await apiClient.post(
 				`/api/v1/comments/token/${tokenId}`,
-				{
-					content: message.trim(),
-				},
+				selectedImage ? formData : { content: dialogMessage.trim() },
+				selectedImage
+					? { headers: { "Content-Type": "multipart/form-data" } }
+					: undefined,
 			);
 
 			if (response.data?.success) {
-				setMessage("");
-				// Success - wait for WS to deliver the message
+				setDialogMessage("");
+				clearImage();
+				setShowCommentDialog(false);
 			}
 		} catch (error) {
 			console.error("Failed to send comment:", error);
 		} finally {
 			setSending(false);
-		}
-	};
-
-	// Handle auth flow
-	const handleAuthFlow = () => {
-		setShowAuthFlow(true);
-	};
-
-	// Handle Enter key press
-	const handleKeyPress = (e: React.KeyboardEvent) => {
-		if (e.key === "Enter" && !e.shiftKey) {
-			e.preventDefault();
-			handleSend();
 		}
 	};
 
@@ -146,59 +215,68 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 		const mins = Math.floor(diff / 60000);
 
 		if (mins < 1) return "Just now";
-		if (mins < 60) return `${mins}m ago`;
-		if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;
-		return date.toLocaleDateString();
+		if (mins < 60) return `${mins}m`;
+		if (mins < 1440) return `${Math.floor(mins / 60)}h`;
+		return `${Math.floor(mins / 1440)}d`;
+	};
+
+	// Open dialog when input is clicked
+	const handleInputClick = () => {
+		if (!isAuthenticated) {
+			setShowAuthFlow(true);
+			return;
+		}
+		setShowCommentDialog(true);
 	};
 
 	return (
-		<div
-			className={cn(
-				"flex flex-col bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl",
-				className,
-			)}
-		>
-			{/* Header */}
-			<div className="flex items-center justify-between p-4 border-b border-border/50">
-				<div className="flex items-center gap-2">
-					<MessageCircle className="h-5 w-5 text-primary" />
-					<h3 className="font-semibold">Live Chat</h3>
-					<span className="text-xs text-muted-foreground">
-						({comments.length})
-					</span>
-				</div>
-				<div className="flex items-center gap-1.5">
-					<div
-						className={cn(
-							"w-2 h-2 rounded-full",
-							isConnected
-								? "bg-green-500 animate-pulse"
-								: "bg-muted",
-						)}
-					/>
-					<span className="text-xs text-muted-foreground">
-						{isConnected ? "Live" : "Connecting..."}
-					</span>
-				</div>
+		<div className={cn("flex flex-col", className)}>
+			{/* Header with Input and Sort */}
+			<div className="flex items-center gap-3 p-4 border-b border-border">
+				<Avatar className="w-8 h-8 shrink-0">
+					<AvatarFallback className="bg-muted text-xs">
+						👤
+					</AvatarFallback>
+				</Avatar>
+				<Input
+					placeholder="Add a comment..."
+					onClick={handleInputClick}
+					readOnly
+					className="flex-1 bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+				/>
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button variant="outline" size="sm" className="gap-2">
+							<SlidersHorizontal className="h-3.5 w-3.5" />
+							{sortBy === "newest" ? "Newest" : "Oldest"}
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end">
+						<DropdownMenuItem onClick={() => setSortBy("newest")}>
+							Newest
+						</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => setSortBy("oldest")}>
+							Oldest
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
 			</div>
 
 			{/* Messages */}
-			<div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[400px] min-h-[200px]">
+			<div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[500px] min-h-[300px]">
 				{loading ? (
 					<div className="flex items-center justify-center h-full">
 						<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
 					</div>
-				) : comments.length === 0 ? (
+				) : sortedComments.length === 0 ? (
 					<div className="flex flex-col items-center justify-center h-full text-muted-foreground">
 						<MessageCircle className="h-10 w-10 mb-2 opacity-50" />
-						<p className="text-sm">No messages yet</p>
-						<p className="text-xs">
-							Be the first to say something!
-						</p>
+						<p className="text-sm">No comments yet</p>
+						<p className="text-xs">Be the first to comment!</p>
 					</div>
 				) : (
 					<AnimatePresence mode="popLayout">
-						{[...comments].reverse().map((comment) => (
+						{sortedComments.map((comment) => (
 							<motion.div
 								key={comment.id}
 								initial={{ opacity: 0, y: 10 }}
@@ -212,7 +290,7 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 											comment.user.avatarUrl || undefined
 										}
 									/>
-									<AvatarFallback className="bg-primary/20 text-xs">
+									<AvatarFallback className="bg-muted text-xs">
 										{(
 											comment.user.displayName ||
 											comment.user.username ||
@@ -223,20 +301,55 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 									</AvatarFallback>
 								</Avatar>
 								<div className="flex-1 min-w-0">
-									<div className="flex items-baseline gap-2 mb-0.5">
-										<span className="font-medium text-sm truncate">
+									<div className="flex items-baseline gap-2 mb-1">
+										<span className="font-medium text-sm">
 											{comment.user.displayName ||
 												comment.user.username ||
 												"Anonymous"}
 										</span>
-										<span className="text-xs text-muted-foreground flex-shrink-0">
+										<span className="text-xs text-muted-foreground">
 											{formatTime(comment.createdAt)}
 										</span>
 									</div>
+
+									{/* Image if present */}
+									{comment.imageUrl && (
+										<div className="mb-2 rounded-lg overflow-hidden max-w-[200px]">
+											<img
+												src={comment.imageUrl}
+												alt="Comment attachment"
+												className="w-full h-auto"
+											/>
+										</div>
+									)}
+
 									<p className="text-sm text-foreground/90 break-words">
 										{comment.content}
 									</p>
+
+									{/* Reply link */}
+									<button className="text-xs text-muted-foreground hover:text-foreground mt-1">
+										Reply
+									</button>
 								</div>
+
+								{/* Like button */}
+								<button
+									onClick={() => handleLike(comment.id)}
+									className="flex flex-col items-center gap-0.5 shrink-0"
+								>
+									<Heart
+										className={cn(
+											"h-4 w-4 transition-colors",
+											comment.isLiked
+												? "fill-red-500 text-red-500"
+												: "text-muted-foreground hover:text-foreground",
+										)}
+									/>
+									<span className="text-xs text-muted-foreground">
+										{comment.likesCount || 0}
+									</span>
+								</button>
 							</motion.div>
 						))}
 					</AnimatePresence>
@@ -244,42 +357,106 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 				<div ref={messagesEndRef} />
 			</div>
 
-			{/* Input */}
-			<div className="p-4 border-t border-border/50">
-				{isAuthenticated ? (
-					<div className="flex gap-2">
-						<Input
-							placeholder="Type a message..."
-							value={message}
-							onChange={(e) => setMessage(e.target.value)}
-							onKeyPress={handleKeyPress}
-							disabled={sending}
-							className="flex-1 bg-background/50"
+			{/* Comment Dialog */}
+			<Dialog
+				open={showCommentDialog}
+				onOpenChange={setShowCommentDialog}
+			>
+				<DialogContent className="sm:max-w-md">
+					<DialogHeader>
+						<DialogTitle>Add a comment</DialogTitle>
+					</DialogHeader>
+					<div className="space-y-4">
+						<Textarea
+							placeholder="comment"
+							value={dialogMessage}
+							onChange={(e) => setDialogMessage(e.target.value)}
+							className="min-h-[100px] bg-muted/50 resize-none"
 							maxLength={500}
 						/>
-						<Button
-							onClick={handleSend}
-							disabled={!message.trim() || sending}
-							size="icon"
-							className="bg-gradient-to-r from-primary to-purple-600 hover:opacity-90"
-						>
-							{sending ? (
-								<Loader2 className="h-4 w-4 animate-spin" />
+
+						{/* Image upload section */}
+						<div>
+							<p className="text-sm text-muted-foreground mb-2">
+								Image (optional)
+							</p>
+							<input
+								ref={fileInputRef}
+								type="file"
+								accept="image/*"
+								onChange={handleImageSelect}
+								className="hidden"
+							/>
+
+							{imagePreview ? (
+								<div className="relative inline-block">
+									<img
+										src={imagePreview}
+										alt="Preview"
+										className="max-w-full max-h-[150px] rounded-lg"
+									/>
+									<button
+										onClick={clearImage}
+										className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center"
+									>
+										<X className="h-3 w-3" />
+									</button>
+								</div>
 							) : (
-								<Send className="h-4 w-4" />
+								<div
+									onClick={() =>
+										fileInputRef.current?.click()
+									}
+									className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-muted-foreground transition-colors"
+								>
+									<ImageIcon className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+									<p className="text-sm text-muted-foreground">
+										Select image to upload
+									</p>
+									<p className="text-xs text-muted-foreground">
+										or drag and drop it here
+									</p>
+									<Button
+										variant="outline"
+										size="sm"
+										className="mt-3"
+										onClick={(e) => {
+											e.stopPropagation();
+											fileInputRef.current?.click();
+										}}
+									>
+										Select file
+									</Button>
+								</div>
 							)}
-						</Button>
+						</div>
+
+						{/* Action buttons */}
+						<div className="flex justify-end gap-2">
+							<Button
+								variant="ghost"
+								onClick={() => {
+									setShowCommentDialog(false);
+									setDialogMessage("");
+									clearImage();
+								}}
+							>
+								Cancel
+							</Button>
+							<Button
+								onClick={handleDialogSend}
+								disabled={!dialogMessage.trim() || sending}
+								className="bg-primary hover:bg-primary/90"
+							>
+								{sending ? (
+									<Loader2 className="h-4 w-4 animate-spin mr-2" />
+								) : null}
+								Post reply
+							</Button>
+						</div>
 					</div>
-				) : (
-					<Button
-						variant={"default"}
-						onClick={handleAuthFlow}
-						className="text-center h-auto py-2"
-					>
-						Connect wallet to chat
-					</Button>
-				)}
-			</div>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

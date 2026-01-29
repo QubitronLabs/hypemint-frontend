@@ -173,6 +173,7 @@ export interface PriceUpdate {
 export interface TradeEvent {
 	tokenId: string;
 	trade?: Trade;
+	txHash?: string;
 	// Flattened fields from backend event
 	tradeId?: string;
 	userId?: string;
