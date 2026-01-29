@@ -491,22 +491,31 @@ function HomePage() {
 									exit={{ opacity: 0 }}
 									className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4"
 								>
-									{Array.from({ length: 9 }).map((_, i) => (
+									{Array.from({ length: 12 }).map((_, i) => (
 										<div
 											key={i}
-											className="bg-card/40 border border-border/50 rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3"
+											className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3 flex gap-3"
 										>
-											<div className="flex items-center gap-2 sm:gap-3">
-												<Skeleton className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg" />
-												<div className="flex-1 space-y-1.5 sm:space-y-2">
-													<Skeleton className="h-3 sm:h-4 w-20 sm:w-24" />
-													<Skeleton className="h-2.5 sm:h-3 w-14 sm:w-16" />
+											{/* Square image skeleton */}
+											<Skeleton className="w-[88px] h-[88px] rounded-lg shrink-0" />
+											{/* Content */}
+											<div className="flex-1 min-w-0 flex flex-col gap-1.5">
+												{/* Row 1: Name + Progress bar */}
+												<div className="flex items-center justify-between gap-2">
+													<Skeleton className="h-4 w-24" />
+													<Skeleton className="h-[10px] w-[150px] rounded-full" />
 												</div>
-											</div>
-											<Skeleton className="h-6 sm:h-8 w-full" />
-											<div className="flex justify-between">
-												<Skeleton className="h-3 sm:h-4 w-14 sm:w-16" />
-												<Skeleton className="h-3 sm:h-4 w-14 sm:w-16" />
+												{/* Row 2: Symbol */}
+												<Skeleton className="h-3.5 w-12" />
+												{/* Row 3: Creator + Time */}
+												<Skeleton className="h-3 w-32" />
+												{/* Row 4: MC + Price Change */}
+												<div className="flex items-center justify-between gap-2">
+													<Skeleton className="h-4 w-20" />
+													<Skeleton className="h-3.5 w-14" />
+												</div>
+												{/* Row 5: Description */}
+												<Skeleton className="h-3 w-full" />
 											</div>
 										</div>
 									))}
