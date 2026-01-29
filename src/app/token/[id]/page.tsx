@@ -25,7 +25,7 @@ import {
 	ChevronDown,
 	ChevronUp,
 	Loader2,
-	RefreshCw,
+	// RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -306,12 +306,20 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 													).toLocaleDateString()
 												: ""}
 										</span>
+										
+										{/* hypebost badge */}
+										{token.hypeBoostEnabled && (
+											<Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs gap-1">
+												<Shield className="h-3 w-3" />
+												HypeBoost
+											</Badge>
+										)}
 									</div>
 								</div>
 							</div>
 
 							<div className="flex items-center gap-2 shrink-0">
-								<Button
+								{/* <Button
 									variant="outline"
 									size="icon"
 									className="h-8 w-8 sm:h-9 sm:w-9"
@@ -325,7 +333,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 											isSyncing && "animate-spin",
 										)}
 									/>
-								</Button>
+								</Button> */}
 								<Button
 									variant="outline"
 									size="icon"

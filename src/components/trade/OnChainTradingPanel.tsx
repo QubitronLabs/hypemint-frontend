@@ -580,7 +580,10 @@ export function OnChainTradingPanel({
 			if (qa === "25%") percentage = 0.25;
 			else if (qa === "50%") percentage = 0.5;
 			else if (qa === "75%") percentage = 0.75;
-			else if (qa === "MAX") percentage = 1;
+
+			// else if (qa === "MAX") 0.99
+			else if (qa === "MAX") percentage = 0.9999999;
+
 			setAmount((balance * percentage).toFixed(6));
 		}
 	};
