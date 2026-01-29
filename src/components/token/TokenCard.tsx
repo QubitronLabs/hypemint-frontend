@@ -3,9 +3,10 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { TrendingUp, TrendingDown, Users, Activity, Zap } from "lucide-react";
+import { Zap } from "lucide-react";
 import { cn, fromWei, formatNumber } from "@/lib/utils";
 import { TokenImage } from "@/components/ui/token-image";
+import { formatRelativeTime } from "@/lib/formatters";
 import type { Token } from "@/types";
 
 interface TokenCardProps {
@@ -14,7 +15,7 @@ interface TokenCardProps {
 }
 
 /**
- * TokenCard - Clean, minimal token display with bonding curve progress
+ * TokenCard - Pump.fun style token card with image, creator info, and bonding curve progress
  */
 export function TokenCard({ token, className }: TokenCardProps) {
 	// Add null safety for priceChange24h
@@ -22,7 +23,6 @@ export function TokenCard({ token, className }: TokenCardProps) {
 	const priceChangePositive = priceChange >= 0;
 
 	const formattedMarketCap = useMemo(() => {
-		// Convert from Wei if needed, then format
 		const mcap = fromWei(token.marketCap);
 		if (isNaN(mcap) || mcap === 0) return "$0";
 		return `$${formatNumber(mcap)}`;
@@ -32,20 +32,48 @@ export function TokenCard({ token, className }: TokenCardProps) {
 		if (priceChange === 0) return "0.00%";
 		const change = Math.abs(priceChange);
 		if (isNaN(change)) return "0.00%";
-		return `${priceChangePositive ? "" : "-"}${change.toFixed(2)}%`;
-	}, [priceChange, priceChangePositive]);
+		return `${change.toFixed(2)}%`;
+	}, [priceChange]);
 
-	// Bonding curve progress (0-100)
-	const bondingProgress = token.bondingCurveProgress ?? 0;
-	const showBondingCurve = token.status === "active" && bondingProgress < 100;
+	// Bonding curve progress (0-100) - from backend API
+	const bondingProgress = useMemo(() => {
+		const progress = token.bondingCurveProgress ?? 0;
+		// Ensure it's a valid number between 0-100
+		return Math.min(100, Math.max(0, progress));
+	}, [token.bondingCurveProgress]);
+
+	// Format creator display name
+	const creatorDisplay = useMemo(() => {
+		if (!token.creator) return null;
+		if (token.creator.displayName) return token.creator.displayName;
+		if (token.creator.username) return token.creator.username;
+		if (token.creator.walletAddress) {
+			return `${token.creator.walletAddress.slice(0, 6)}`;
+		}
+		return null;
+	}, [token.creator]);
+
+	// Format relative time
+	const timeAgo = useMemo(() => {
+		if (!token.createdAt) return "";
+		const date = new Date(token.createdAt);
+		return formatRelativeTime(date);
+	}, [token.createdAt]);
+
+	// Truncate description
+	const truncatedDescription = useMemo(() => {
+		if (!token.description) return "";
+		if (token.description.length <= 50) return token.description;
+		return token.description.slice(0, 47) + "...";
+	}, [token.description]);
 
 	return (
 		<Link href={`/token/${token.id}`}>
 			<motion.div
 				initial={{ opacity: 0, y: 10 }}
 				animate={{ opacity: 1, y: 0 }}
-				whileHover={{ scale: 1.02, y: -2 }}
-				whileTap={{ scale: 0.98 }}
+				// whileHover={{ scale: 1.01 }}
+				whileTap={{ scale: 0.99 }}
 				transition={{
 					type: "spring",
 					stiffness: 400,
@@ -53,131 +81,88 @@ export function TokenCard({ token, className }: TokenCardProps) {
 					opacity: { duration: 0.2 },
 				}}
 				className={cn(
-					"bg-card/80 backdrop-blur-sm border border-border/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 cursor-pointer",
-					"shadow-sm hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20",
-					"transition-shadow duration-300",
+					"bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3 cursor-pointer",
+					"hover:bg-[#1e1e1e] hover:border-[#3a3a3a] transition-all duration-200",
+					"flex gap-3",
 					className,
 				)}
 			>
-				{/* Header */}
-				<div className="flex items-start gap-2 sm:gap-3">
+				{/* Token Image - Square */}
+				<div className="shrink-0">
 					<TokenImage
 						src={token.imageUrl}
 						alt={token.name}
 						symbol={token.symbol}
-						size={40}
-						className="ring-1 ring-border/50 shrink-0 w-10 h-10 sm:w-12 sm:h-12"
+						size={88}
+						className="rounded-lg w-[88px] h-[88px] object-cover"
 					/>
-
-					<div className="flex-1 min-w-0">
-						<div className="flex items-center gap-1.5 sm:gap-2">
-							<h3 className="font-semibold text-sm sm:text-base text-foreground truncate">
-								{token.name}
-							</h3>
-							<span className="text-[10px] sm:text-xs text-muted-foreground uppercase shrink-0">
-								{token.symbol}
-							</span>
-							{/* HypeBoost Badge */}
-							{token.hypeBoostEnabled && (
-								<span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[9px] sm:text-[10px] font-medium shrink-0">
-									<Zap className="h-2.5 w-2.5 fill-amber-400" />
-									HYPE
-								</span>
-							)}
-						</div>
-
-						{token.creator && (
-							<p className="text-[10px] sm:text-xs text-muted-foreground truncate mt-0.5">
-								by{" "}
-								{token.creator.displayName ||
-									token.creator.username ||
-									`${token.creator.walletAddress.slice(0, 4)}...${token.creator.walletAddress.slice(-4)}`}
-							</p>
-						)}
-					</div>
 				</div>
 
-				{/* Market Cap & Bonding Curve Progress (Inline like reference) */}
-				<div className="mt-3 sm:mt-4">
+				{/* Content */}
+				<div className="flex-1 min-w-0 flex flex-col">
+					{/* Row 1: Name + HYPE badge + Progress bar at end */}
 					<div className="flex items-center gap-2">
-						<span className="text-[10px] sm:text-xs text-muted-foreground">MC</span>
-						<span className="text-xs sm:text-sm font-semibold text-primary tabular-nums">
+						<h3 className="font-bold text-white text-[15px] leading-tight truncate">
+							{token.name}
+						</h3>
+						{token.hypeBoostEnabled && (
+							<span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[10px] font-medium shrink-0">
+								<Zap className="h-2.5 w-2.5 fill-amber-400" />
+								HYPE
+							</span>
+						)}
+						{/* Progress Bar - at the end of first row */}
+						<div className="ml-auto flex items-center gap-1.5 shrink-0">
+							<div className="w-[150px] h-[10px] bg-[#333] rounded-full overflow-hidden">
+								<motion.div
+									initial={{ width: 0 }}
+									animate={{ width: `${bondingProgress}%` }}
+									transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+									className="h-full rounded-full bg-gradient-to-r from-[#00ff88] to-[#00cc6a]"
+								/>
+							</div>
+							<span className="text-[10px] text-[#888] font-medium">
+								{bondingProgress.toFixed(1)}%
+							</span>
+						</div>
+					</div>
+
+					{/* Row 2: Symbol */}
+					<p className="text-[#888] text-sm font-medium">{token.symbol}</p>
+
+					{/* Row 3: Creator + Time */}
+					<div className="flex items-center gap-1.5 mt-1 text-xs">
+						{/* <span className="text-sm">🐸</span> */}
+						{creatorDisplay && (
+							<span className="text-[#6b8afd] font-medium">{creatorDisplay}</span>
+						)}
+						{timeAgo && <span className="text-[#666]">{timeAgo}</span>}
+					</div>
+
+					{/* Row 4: Market Cap + Price Change */}
+					<div className="flex items-center gap-2 mt-1.5">
+						<span className="text-[#777] text-xs font-medium shrink-0">MC</span>
+						<span className="text-[#00ff88] text-sm font-bold shrink-0">
 							{formattedMarketCap}
 						</span>
-						
-						{/* Inline Bonding Curve Progress Bar */}
-						{showBondingCurve && (
-							<>
-								<div className="flex-1 h-1.5 sm:h-2 bg-muted/30 rounded-full overflow-hidden">
-									<motion.div
-										initial={{ width: 0 }}
-										animate={{ width: `${bondingProgress}%` }}
-										transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
-										className="h-full rounded-full bg-gradient-to-r from-amber-400 via-yellow-500 to-orange-500"
-										style={{
-											boxShadow: "0 0 8px rgba(251, 191, 36, 0.4)",
-										}}
-									/>
-								</div>
-								<span className={cn(
-									"text-[10px] sm:text-xs font-medium tabular-nums shrink-0",
-									priceChangePositive ? "text-[#00ff88]" : "text-destructive"
-								)}>
-									{bondingProgress.toFixed(1)}%
-								</span>
-							</>
-						)}
-						
-						{/* Show 24h change if no bonding curve */}
-						{!showBondingCurve && (
-							<div className="ml-auto flex items-center gap-1">
-								<span
-									className={cn(
-										"text-xs sm:text-sm font-semibold tabular-nums flex items-center gap-0.5",
-										priceChangePositive ? "text-[#00ff88]" : "text-destructive",
-									)}
-								>
-									{priceChangePositive ? "↑" : "↓"}
-									{formattedPriceChange}
-								</span>
-							</div>
-						)}
-					</div>
-				</div>
 
-				{/* Bottom Stats */}
-				<div className="flex items-center justify-between mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-border/50">
-					<div className="flex items-center gap-3 sm:gap-4">
-						<div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground">
-							<Activity className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-							<span className="tabular-nums">{token.tradesCount}</span>
-							<span>trades</span>
-						</div>
-						<div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground">
-							<Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-							<span className="tabular-nums">{token.holdersCount}</span>
-							<span>holders</span>
-						</div>
+						{/* Price Change at end */}
+						<span
+							className={cn(
+								"text-xs font-semibold shrink-0 ml-auto",
+								priceChangePositive ? "text-[#00ff88]" : "text-[#ff4444]"
+							)}
+						>
+							{priceChangePositive ? "↑" : "↓"}
+							{formattedPriceChange}
+						</span>
 					</div>
-					
-					{/* 24h change on right when bonding curve is shown */}
-					{showBondingCurve && (
-						<div className="flex items-center gap-1">
-							<span className="text-[10px] sm:text-xs text-muted-foreground">24h</span>
-							<span
-								className={cn(
-									"text-[10px] sm:text-xs font-semibold tabular-nums flex items-center gap-0.5",
-									priceChangePositive ? "text-[#00ff88]" : "text-destructive",
-								)}
-							>
-								{priceChangePositive ? (
-									<TrendingUp className="h-2.5 w-2.5" />
-								) : (
-									<TrendingDown className="h-2.5 w-2.5" />
-								)}
-								{formattedPriceChange}
-							</span>
-						</div>
+
+					{/* Row 5: Description */}
+					{truncatedDescription && (
+						<p className="text-[#666] text-xs mt-1 leading-relaxed line-clamp-1">
+							{truncatedDescription}
+						</p>
 					)}
 				</div>
 			</motion.div>

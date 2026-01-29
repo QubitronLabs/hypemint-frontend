@@ -228,6 +228,7 @@ export const HYPE_BONDING_CURVE_ABI = [
     type: "function",
     name: "getClaimableVested",
     inputs: [{ name: "user", type: "address", internalType: "address" }],
+    outputs: [{ name: "claimable", type: "uint256", internalType: "uint256" }],
     stateMutability: "view",
   },
   {
