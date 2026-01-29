@@ -101,7 +101,7 @@ export function Sidebar() {
 					{isOpen && (
 						<Button
 							onClick={close}
-							className="md:hidden h-auto p-2! bg-card/95 text-muted-foreground hover:text-foreground transition-colors rounded-full border-r"
+							className="md:hidden h-auto p-2! bg-card/95 text-muted-foreground hover:text-foreground transition-colors rounded-full border-r border-"
 						>
 							<X className="h-5 w-5" />
 						</Button>

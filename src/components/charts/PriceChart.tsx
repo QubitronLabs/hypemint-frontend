@@ -161,7 +161,7 @@ export function PriceChart({ tokenId, className }: PriceChartProps) {
 				);
 				const response = await res.json();
 
-				let chartData = response.data || [];
+				const chartData = response.data || [];
 
 				if (chartData.length === 0) {
 					// If no data, maybe show just the current price line or empty

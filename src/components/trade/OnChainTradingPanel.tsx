@@ -5,7 +5,7 @@
  * Real blockchain trading interface using Wagmi/Viem
  */
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatEther, parseEther, type Address } from "viem";
 import {
@@ -34,6 +34,7 @@ import {
 	useApproveToken,
 	useTokenAllowance,
 	useAuth,
+	useNativeCurrencySymbol,
 } from "@/hooks";
 import { getTxUrl } from "@/lib/wagmi";
 import { recordOnChainTrade } from "@/lib/api/trades";
@@ -65,9 +66,9 @@ function formatNumber(num: number | string): string {
 }
 
 // Format price with better precision for small values
-function formatPrice(num: number): string {
+function formatPriceDisplay(num: number, symbol: string = "POL"): string {
 	if (isNaN(num) || !isFinite(num)) return "0";
-	if (num >= 1e9) return ">999M MATIC";
+	if (num >= 1e9) return `>999M`;
 	if (num >= 1e6) return (num / 1e6).toFixed(2) + "M";
 	if (num >= 1e3) return (num / 1e3).toFixed(2) + "K";
 	if (num >= 1) return num.toFixed(4);
@@ -111,6 +112,9 @@ export function OnChainTradingPanel({
 	const [tradeType, setTradeType] = useState<TradeType>("buy");
 	const [amount, setAmount] = useState("");
 	const [slippage, setSlippage] = useState(5); // 5% default
+
+	// Get dynamic native currency symbol
+	const nativeSymbol = useNativeCurrencySymbol();
 
 	// Balances - with refetch capability
 	const { data: nativeBalance, refetch: refetchNativeBalance } =
@@ -185,6 +189,12 @@ export function OnChainTradingPanel({
 		error: approveError,
 		reset: resetApprove,
 	} = useApproveToken();
+
+	// Refs to track if we've already handled success/fail states (prevents re-triggering on focus)
+	const handledBuyConfirmedRef = useRef<string | null>(null);
+	const handledBuyFailedRef = useRef<string | null>(null);
+	const handledSellConfirmedRef = useRef<string | null>(null);
+	const handledSellFailedRef = useRef<string | null>(null);
 
 	// Computed values
 	const isLoading = isBuying || isSelling || isApproving;
@@ -305,7 +315,12 @@ export function OnChainTradingPanel({
 
 	// Refetch balances and sync when trades are confirmed
 	useEffect(() => {
-		if (isBuyConfirmed && buyTxHash) {
+		if (
+			isBuyConfirmed &&
+			buyTxHash &&
+			handledBuyConfirmedRef.current !== buyTxHash
+		) {
+			handledBuyConfirmedRef.current = buyTxHash;
 			console.log("[OnChainTrading] Buy trade confirmed:", buyTxHash);
 			toast.success("Buy transaction confirmed!", {
 				id: "trade-result",
@@ -316,11 +331,18 @@ export function OnChainTradingPanel({
 				},
 			});
 			syncTradeToBackend(buyTxHash, "buy");
+			// Clear amount immediately
+			setAmount("");
 			// Refetch balances after confirmed trade
 			setTimeout(() => {
 				refetchNativeBalance();
 				refetchTokenBalance();
-			}, 2000); // Wait 2s for blockchain state to update
+			}, 2000);
+			// Auto-reset button state after 2 seconds
+			setTimeout(() => {
+				resetBuy();
+				handledBuyConfirmedRef.current = null;
+			}, 2000);
 		}
 	}, [
 		isBuyConfirmed,
@@ -332,7 +354,12 @@ export function OnChainTradingPanel({
 
 	// Show toast for failed buy trades
 	useEffect(() => {
-		if (isBuyFailed && buyTxHash) {
+		if (
+			isBuyFailed &&
+			buyTxHash &&
+			handledBuyFailedRef.current !== buyTxHash
+		) {
+			handledBuyFailedRef.current = buyTxHash;
 			console.log("[OnChainTrading] Buy trade failed:", buyTxHash);
 			toast.error("Buy transaction failed!", {
 				id: "trade-result",
@@ -342,12 +369,24 @@ export function OnChainTradingPanel({
 					onClick: () => window.open(getTxUrl(buyTxHash), "_blank"),
 				},
 			});
+			// Clear amount immediately
+			setAmount("");
+			// Auto-reset button state after 2 seconds
+			setTimeout(() => {
+				resetBuy();
+				handledBuyFailedRef.current = null;
+			}, 2000);
 		}
 	}, [isBuyFailed, buyTxHash]);
 
 	// Sync sell trade when confirmed
 	useEffect(() => {
-		if (isSellConfirmed && sellTxHash) {
+		if (
+			isSellConfirmed &&
+			sellTxHash &&
+			handledSellConfirmedRef.current !== sellTxHash
+		) {
+			handledSellConfirmedRef.current = sellTxHash;
 			console.log("[OnChainTrading] Sell trade confirmed:", sellTxHash);
 			toast.success("Sell transaction confirmed!", {
 				id: "trade-result",
@@ -358,11 +397,18 @@ export function OnChainTradingPanel({
 				},
 			});
 			syncTradeToBackend(sellTxHash, "sell");
+			// Clear amount immediately
+			setAmount("");
 			// Refetch balances after confirmed trade
 			setTimeout(() => {
 				refetchNativeBalance();
 				refetchTokenBalance();
-			}, 2000); // Wait 2s for blockchain state to update
+			}, 2000);
+			// Auto-reset button state after 2 seconds
+			setTimeout(() => {
+				resetSell();
+				handledSellConfirmedRef.current = null;
+			}, 2000);
 		}
 	}, [
 		isSellConfirmed,
@@ -374,7 +420,12 @@ export function OnChainTradingPanel({
 
 	// Show toast for failed sell trades
 	useEffect(() => {
-		if (isSellFailed && sellTxHash) {
+		if (
+			isSellFailed &&
+			sellTxHash &&
+			handledSellFailedRef.current !== sellTxHash
+		) {
+			handledSellFailedRef.current = sellTxHash;
 			console.log("[OnChainTrading] Sell trade failed:", sellTxHash);
 			toast.error("Sell transaction failed!", {
 				id: "trade-result",
@@ -384,6 +435,13 @@ export function OnChainTradingPanel({
 					onClick: () => window.open(getTxUrl(sellTxHash), "_blank"),
 				},
 			});
+			// Clear amount immediately
+			setAmount("");
+			// Auto-reset button state after 2 seconds
+			setTimeout(() => {
+				resetSell();
+				handledSellFailedRef.current = null;
+			}, 2000);
 		}
 	}, [isSellFailed, sellTxHash]);
 
@@ -571,13 +629,13 @@ export function OnChainTradingPanel({
 					<div className="flex justify-between items-center mb-1.5 gap-2">
 						<label className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
 							{tradeType === "buy"
-								? "You Pay (MATIC)"
+								? `You Pay (${nativeSymbol})`
 								: `You Sell (${tokenSymbol})`}
 						</label>
 						<span className="text-[10px] sm:text-xs text-muted-foreground truncate">
 							Balance:{" "}
 							{tradeType === "buy"
-								? `${nativeBalance?.value ? formatNumber(formatEther(nativeBalance.value)) : "0"} MATIC`
+								? `${nativeBalance?.value ? formatNumber(formatEther(nativeBalance.value)) : "0"} ${nativeSymbol}`
 								: `${tokenBalance ? formatNumber(formatEther(tokenBalance as bigint)) : "0"} ${tokenSymbol}`}
 						</span>
 					</div>
@@ -590,7 +648,7 @@ export function OnChainTradingPanel({
 							className="pr-14 sm:pr-16 text-base sm:text-lg font-medium bg-background/50"
 						/>
 						<div className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-muted-foreground">
-							{tradeType === "buy" ? "MATIC" : tokenSymbol}
+							{tradeType === "buy" ? nativeSymbol : tokenSymbol}
 						</div>
 					</div>
 				</div>
@@ -648,7 +706,7 @@ export function OnChainTradingPanel({
 												)}{" "}
 												{tradeType === "buy"
 													? tokenSymbol
-													: "MATIC"}
+													: nativeSymbol}
 											</>
 										)}
 									</span>
@@ -660,10 +718,11 @@ export function OnChainTradingPanel({
 									<span className="font-medium">
 										{tradeMetrics.isUnreasonable
 											? "--"
-											: formatPrice(
+											: formatPriceDisplay(
 													tradeMetrics.effectivePrice,
+													nativeSymbol,
 												)}{" "}
-										MATIC
+										{nativeSymbol}
 									</span>
 								</div>
 								<div className="flex justify-between text-sm">
@@ -676,7 +735,7 @@ export function OnChainTradingPanel({
 											: formatNumber(
 													tradeMetrics.fees,
 												)}{" "}
-										MATIC
+										{nativeSymbol}
 									</span>
 								</div>
 								<div className="flex justify-between text-sm">

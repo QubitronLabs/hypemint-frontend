@@ -2,12 +2,13 @@
 
 import { motion } from "framer-motion";
 import { cn, fromWei, formatNumber } from "@/lib/utils";
+import { useNativeCurrencySymbol } from "@/hooks";
 
 interface BondingCurveProgressProps {
-  progress: number;
-  currentAmount: string;
-  targetAmount: string;
-  className?: string;
+	progress: number;
+	currentAmount: string;
+	targetAmount: string;
+	className?: string;
 }
 
 /**
@@ -16,67 +17,70 @@ interface BondingCurveProgressProps {
  * Shows progress toward moving from bonding curve to DEX liquidity
  */
 export function BondingCurveProgress({
-  progress,
-  currentAmount,
-  targetAmount,
-  className,
+	progress,
+	currentAmount,
+	targetAmount,
+	className,
 }: BondingCurveProgressProps) {
-  const formattedProgress = Math.min(progress, 100);
+	const formattedProgress = Math.min(progress, 100);
+	const nativeSymbol = useNativeCurrencySymbol();
 
-  const formatAmount = (amount: string) => {
-    // Convert from Wei if needed
-    const num = fromWei(amount);
-    return formatNumber(num);
-  };
+	const formatAmount = (amount: string) => {
+		// Convert from Wei if needed
+		const num = fromWei(amount);
+		return formatNumber(num);
+	};
 
-  return (
-    <div className={cn("space-y-2", className)}>
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">Bonding Curve Progress</span>
-        <span className="font-semibold text-primary tabular-nums">
-          {formattedProgress.toFixed(1)}%
-        </span>
-      </div>
+	return (
+		<div className={cn("space-y-2", className)}>
+			<div className="flex items-center justify-between text-sm">
+				<span className="text-muted-foreground">
+					Bonding Curve Progress
+				</span>
+				<span className="font-semibold text-primary tabular-nums">
+					{formattedProgress.toFixed(1)}%
+				</span>
+			</div>
 
-      {/* Progress Bar */}
-      <div className="relative h-3 bg-muted rounded-full overflow-hidden">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${formattedProgress}%` }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary/80 to-primary rounded-full"
-        />
+			{/* Progress Bar */}
+			<div className="relative h-3 bg-muted rounded-full overflow-hidden">
+				<motion.div
+					initial={{ width: 0 }}
+					animate={{ width: `${formattedProgress}%` }}
+					transition={{ duration: 0.8, ease: "easeOut" }}
+					className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary/80 to-primary rounded-full"
+				/>
 
-        {/* Glow effect */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="absolute inset-y-0 left-0 bg-primary/30 rounded-full blur-sm"
-          style={{ width: `${formattedProgress}%` }}
-        />
-      </div>
+				{/* Glow effect */}
+				<motion.div
+					initial={{ opacity: 0 }}
+					animate={{ opacity: [0.5, 1, 0.5] }}
+					transition={{ duration: 2, repeat: Infinity }}
+					className="absolute inset-y-0 left-0 bg-primary/30 rounded-full blur-sm"
+					style={{ width: `${formattedProgress}%` }}
+				/>
+			</div>
 
-      {/* Amount labels */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span className="tabular-nums">
-          {formatAmount(currentAmount)} MATIC in curve
-        </span>
-        <span className="tabular-nums">
-          {formatAmount(targetAmount)} MATIC to graduate
-        </span>
-      </div>
+			{/* Amount labels */}
+			<div className="flex items-center justify-between text-xs text-muted-foreground">
+				<span className="tabular-nums">
+					{formatAmount(currentAmount)} {nativeSymbol} in curve
+				</span>
+				<span className="tabular-nums">
+					{formatAmount(targetAmount)} {nativeSymbol} to graduate
+				</span>
+			</div>
 
-      {/* Graduation message */}
-      {formattedProgress >= 100 && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center text-sm text-primary font-medium"
-        >
-          🎉 Graduated to DEX!
-        </motion.div>
-      )}
-    </div>
-  );
+			{/* Graduation message */}
+			{formattedProgress >= 100 && (
+				<motion.div
+					initial={{ opacity: 0, y: 10 }}
+					animate={{ opacity: 1, y: 0 }}
+					className="text-center text-sm text-primary font-medium"
+				>
+					🎉 Graduated to DEX!
+				</motion.div>
+			)}
+		</div>
+	);
 }

@@ -207,7 +207,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						<Skeleton className="h-[35.99px] rounded-xl" />
 						<Skeleton className="h-[347.31px] rounded-xl" />
 					</div>
-					<div className="space-y-6">
+					<div className="lg:sticky lg:top-4 lg:self-start space-y-6 lg:max-h-[calc(100vh-2rem)]">
 						<Skeleton className="h-[322.26px] rounded-xl" />
 						<Skeleton className="h-[98.14px] rounded-xl" />
 						<Skeleton className="h-[188.32px] rounded-xl" />
@@ -356,7 +356,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						{/* Token Badges */}
 						<div className="flex flex-wrap items-center gap-2 mt-4">
 							{token.hypeBoostEnabled && (
-								<Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs gap-1">
+								<Badge className="bg-lienar-to-r from-purple-500 to-pink-500 text-white text-xs gap-1">
 									<Shield className="h-3 w-3" />
 									HypeBoost
 								</Badge>
@@ -595,7 +595,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							<TabsContent value="comments" className="mt-4">
 								<TokenChat
 									tokenId={id}
-									className="min-h-[350px]"
+									className="min-h-87.5"
 								/>
 							</TabsContent>
 							<TabsContent value="holders" className="mt-4">
@@ -693,7 +693,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 				</div>
 
 				{/* Sidebar */}
-				<div className="min-w-0 w-full sticky top-30 space-y-4 sm:space-y-6 overflow-hidden">
+				<div className="min-w-0 w-full lg:sticky lg:top-22 lg:self-start space-y-4 sm:space-y-6 overflow-hidden lg:max-h-[calc(100vh-2rem)]">
 					{/* Trading Panel - On-Chain or Centralized */}
 					<motion.div
 						initial={{ opacity: 0, x: 20 }}
