@@ -614,7 +614,6 @@ export function TokenCreationForm() {
 		}
 	}, [imageFile, imageUrl]);
 
-
 	// ========================================================================
 	// FORM SUBMISSION
 	// ========================================================================
@@ -1360,7 +1359,7 @@ export function TokenCreationForm() {
 						)}
 
 						{/* Errors */}
-						{!hasEnoughBalance && (
+						{isAuthenticated && !hasEnoughBalance && (
 							<div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-500">
 								<AlertCircle className="h-4 w-4 flex-shrink-0" />
 								<span className="text-sm">
@@ -1370,7 +1369,7 @@ export function TokenCreationForm() {
 							</div>
 						)}
 
-						{contractError && (
+						{isAuthenticated && contractError && (
 							<div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-500">
 								<AlertCircle className="h-4 w-4 flex-shrink-0" />
 								<span className="text-sm">
@@ -1379,7 +1378,7 @@ export function TokenCreationForm() {
 							</div>
 						)}
 
-						{txHash && (
+						{isAuthenticated && txHash && (
 							<div className="p-3 bg-primary/10 border border-primary/20 rounded-lg flex items-center justify-between">
 								<div>
 									<p className="text-sm font-medium">
