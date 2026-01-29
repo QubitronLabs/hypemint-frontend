@@ -26,11 +26,13 @@ import {
 	useTokens,
 	useLiveTokens,
 	useGraduatedTokens,
+	tokenKeys,
 } from "@/hooks/useTokens";
 import { usePersistedTabs } from "@/hooks/usePersistedTabs";
-import { useNewTokenFeed, useGlobalTradeFeed } from "@/hooks/useWebSocket";
+import { useNewTokenFeed, useGlobalTradeFeed, useTokenGraduations } from "@/hooks/useWebSocket";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Token } from "@/types";
 
 // Filter tabs configuration
@@ -225,35 +227,39 @@ function HomePage() {
 
 	// Fetch data - ONLY call API for the active tab
 	// All tokens (for "all" tab)
+	// Query Client for cache updates
+	const queryClient = useQueryClient();
+
+	// Fetch data - ONLY call API for the active tab
+	// All tokens (for "all" tab)
 	const {
 		data: allTokens = [],
 		isLoading: allLoading,
-		refetch: refetchAll,
 	} = useTokens(
 		{ page: 1, pageSize: 50 },
 		{ enabled: isHydrated && activeFilter === "all" },
 	);
 
 	// Trending tokens (for "trending" tab)
-	const { data: trendingTokens = [], isLoading: trendingLoading, refetch: refetchTrending } =
+	const { data: trendingTokens = [], isLoading: trendingLoading } =
 		useTrendingTokens(undefined, {
 			enabled: isHydrated && activeFilter === "trending",
 		});
 
 	// New tokens (for "new" tab)
-	const { data: newTokens = [], isLoading: newLoading, refetch: refetchNew } = useNewTokens(
+	const { data: newTokens = [], isLoading: newLoading } = useNewTokens(
 		undefined,
 		{ enabled: isHydrated && activeFilter === "new" },
 	);
 
 	// Live tokens (for "live" tab)
-	const { data: liveTokens = [], isLoading: liveLoading, refetch: refetchLive } = useLiveTokens(
+	const { data: liveTokens = [], isLoading: liveLoading } = useLiveTokens(
 		undefined,
 		{ enabled: isHydrated && activeFilter === "live" },
 	);
 
 	// Graduated tokens (for "graduated" tab)
-	const { data: graduatedTokens = [], isLoading: graduatedLoading, refetch: refetchGraduated } =
+	const { data: graduatedTokens = [], isLoading: graduatedLoading } =
 		useGraduatedTokens(undefined, {
 			enabled: isHydrated && activeFilter === "graduated",
 		});
@@ -261,7 +267,7 @@ function HomePage() {
 	// WebSocket: Listen for new tokens
 	useNewTokenFeed(
 		useCallback(
-			(newToken) => {
+			(newToken: any) => {
 				// setWsConnected(true);
 
 				// Add to activity feed
@@ -276,14 +282,53 @@ function HomePage() {
 
 				setActivityFeed((prev) => [activity, ...prev].slice(0, 20));
 
-				// Refetch tokens after a small delay
-				setTimeout(() => refetchAll(), 1000);
+				// Optimistically add new token to lists without refetching
+				// @ts-ignore - The WS data structure is slightly different but compatible for critical fields
+				const formattedToken: Token = {
+					id: newToken.id || newToken.tokenId,
+					name: newToken.name,
+					symbol: newToken.symbol,
+					imageUrl: newToken.imageUrl,
+					description: newToken.description,
+					creatorId: newToken.creatorId,
+					creator: newToken.creator, // Now populated from backend
+					chainId: newToken.chainId,
+					status: "active",
+					hypeBoostEnabled: newToken.hypeBoostEnabled || false,
+					createdAt: newToken.createdAt || new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+					
+					// Defaults for new token
+					currentPrice: "0",
+					initialPrice: "0",
+					marketCap: "0",
+					volume24h: "0",
+					priceChange24h: 0,
+					bondingCurveProgress: 0,
+					graduationTarget: "69000000000000000000000",
+					currentBondingAmount: "0",
+					holdersCount: 0,
+					tradesCount: 0,
+					totalSupply: "1000000000000000000000000000",
+				} as Token;
+
+				const prependToken = (oldData: any) => {
+					if (!oldData || !Array.isArray(oldData)) return oldData;
+					// Avoid duplicate
+					if (oldData.some((t: Token) => t.id === formattedToken.id)) return oldData;
+					
+					return [formattedToken, ...oldData];
+				};
+
+				// Prepend to All and New lists
+				queryClient.setQueriesData({ queryKey: tokenKeys.lists() }, prependToken);
+				queryClient.setQueriesData({ queryKey: tokenKeys.new() }, prependToken);
 			},
-			[refetchAll],
+			[queryClient],
 		),
 	);
 
-	// WebSocket: Listen for trades - refetch tokens to update graduation line
+	// WebSocket: Listen for trades - update token data in cache directly without refetch
 	useGlobalTradeFeed(
 		useCallback((trade) => {
 			// setWsConnected(true);
@@ -298,29 +343,81 @@ function HomePage() {
 
 			setActivityFeed((prev) => [activity, ...prev].slice(0, 20));
 
-			// Refetch token list after trade to update graduation progress
-			// Use small delay to let backend update the data
-			setTimeout(() => {
-				// Refetch based on active tab
-				switch (activeFilter) {
-					case "all":
-						refetchAll();
-						break;
-					case "trending":
-						refetchTrending();
-						break;
-					case "new":
-						refetchNew();
-						break;
-					case "live":
-						refetchLive();
-						break;
-					case "graduated":
-						refetchGraduated();
-						break;
-				}
-			}, 500);
-		}, [activeFilter, refetchAll, refetchTrending, refetchNew, refetchLive, refetchGraduated]),
+			// Optimistically update cache with new data from WS (bondingCurveProgress, marketCap)
+			// This avoids refetching the API repeatedly
+			const updateTokenInCache = (oldData: any) => {
+				if (!oldData || !Array.isArray(oldData)) return oldData;
+				
+				return oldData.map((token: Token) => {
+					if (token.id === trade.tokenId) {
+						// Merge existing token with new data from WebSocket
+						// trade object now contains computed bondingCurveProgress and marketCap from backend
+						// @ts-ignore - trade object has extra fields from backend
+						const wsProgress = trade.bondingCurveProgress;
+						// @ts-ignore
+						const wsMarketCap = trade.marketCap;
+						
+						return {
+							...token,
+							bondingCurveProgress: wsProgress !== undefined ? wsProgress : token.bondingCurveProgress,
+							marketCap: wsMarketCap !== undefined ? wsMarketCap : token.marketCap,
+							// Also update volume if provided or accumulate
+							// volume24h: ... (logic complex without full data, skipping for now as progress is priority)
+						};
+					}
+					return token;
+				});
+			};
+
+			// Update all relevant token list queries
+			queryClient.setQueriesData({ queryKey: tokenKeys.lists() }, updateTokenInCache);
+			queryClient.setQueriesData({ queryKey: tokenKeys.trending() }, updateTokenInCache);
+			queryClient.setQueriesData({ queryKey: tokenKeys.new() }, updateTokenInCache);
+			queryClient.setQueriesData({ queryKey: tokenKeys.live({}) }, updateTokenInCache); // Rough match
+			queryClient.setQueriesData({ queryKey: tokenKeys.graduated({}) }, updateTokenInCache);
+
+		}, [queryClient]),
+	);
+
+	// WebSocket: Listen for token graduations
+	useTokenGraduations(
+		useCallback(
+			(data) => {
+				const activity: ActivityItem = {
+					id: `graduation-${data.tokenId}-${Date.now()}`,
+					type: "trade", // Re-using trade type for icon consistency or generic
+					tokenSymbol: data.symbol,
+					message: `🎓 ${data.name} ($${data.symbol}) just GRADUATED!`,
+					timestamp: Date.now(),
+				};
+
+				setActivityFeed((prev) => [activity, ...prev].slice(0, 20));
+
+				// Update status in all lists to 'graduated'
+				const markAsGraduated = (oldData: any) => {
+					if (!oldData || !Array.isArray(oldData)) return oldData;
+					
+					return oldData.map((token: Token) => {
+						if (token.id === data.tokenId) {
+							return {
+								...token,
+								status: "graduated",
+								graduatedAt: new Date().toISOString(),
+								bondingCurveProgress: 100,
+							};
+						}
+						return token;
+					});
+				};
+
+				queryClient.setQueriesData({ queryKey: tokenKeys.lists() }, markAsGraduated);
+				queryClient.setQueriesData({ queryKey: tokenKeys.trending() }, markAsGraduated);
+				queryClient.setQueriesData({ queryKey: tokenKeys.new() }, markAsGraduated);
+				queryClient.setQueriesData({ queryKey: tokenKeys.live({}) }, markAsGraduated);
+				queryClient.setQueriesData({ queryKey: tokenKeys.graduated({}) }, markAsGraduated);
+			},
+			[queryClient]
+		)
 	);
 
 	// Determine display tokens based on active tab
