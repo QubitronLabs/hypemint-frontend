@@ -11,16 +11,34 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PriceChart } from "@/components/charts";
-import {
-	TradeTape,
-	TradingPanel,
-	OnChainTradingPanel,
-} from "@/components/trade";
-import {
-	BondingCurveProgress,
-	TokenChat,
-	VestingCard,
-} from "@/components/token";
+import dynamic from "next/dynamic";
+
+
+const TradeTape = dynamic(
+	() => import("@/components/trade").then((mod) => mod.TradeTape),
+	{ ssr: false, loading: () => <Skeleton className="h-[200px] rounded-xl" /> },
+);
+const TradingPanel = dynamic(
+	() => import("@/components/trade").then((mod) => mod.TradingPanel),
+	{ ssr: false, loading: () => <Skeleton className="h-[400px] rounded-xl" /> },
+);
+const OnChainTradingPanel = dynamic(
+	() => import("@/components/trade").then((mod) => mod.OnChainTradingPanel),
+	{ ssr: false, loading: () => <Skeleton className="h-[400px] rounded-xl" /> },
+);
+const BondingCurveProgress = dynamic(
+	() =>
+		import("@/components/token").then((mod) => mod.BondingCurveProgress),
+	{ ssr: false, loading: () => <Skeleton className="h-[100px] rounded-xl" /> },
+);
+const TokenChat = dynamic(
+	() => import("@/components/token").then((mod) => mod.TokenChat),
+	{ ssr: false, loading: () => <Skeleton className="h-[300px] rounded-xl" /> },
+);
+const VestingCard = dynamic(
+	() => import("@/components/token").then((mod) => mod.VestingCard),
+	{ ssr: false, loading: () => <Skeleton className="h-[150px] rounded-xl" /> },
+);
 import { useToken, tokenKeys, useTokenHolders } from "@/hooks/useTokens";
 import { useTokenTrades, tradeKeys } from "@/hooks/useTrades";
 import { useWebSocket } from "@/hooks/useWebSocket";
