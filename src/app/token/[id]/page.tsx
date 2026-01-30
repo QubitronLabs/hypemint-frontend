@@ -220,11 +220,14 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							tradesCount:
 								message.data.tradesCount ?? oldData.tradesCount,
 							priceChange5m:
-								message.data.priceChange5m ?? oldData.priceChange5m,
+								message.data.priceChange5m ??
+								oldData.priceChange5m,
 							priceChange1h:
-								message.data.priceChange1h ?? oldData.priceChange1h,
+								message.data.priceChange1h ??
+								oldData.priceChange1h,
 							priceChange6h:
-								message.data.priceChange6h ?? oldData.priceChange6h,
+								message.data.priceChange6h ??
+								oldData.priceChange6h,
 							bondingCurveProgress:
 								message.data.bondingCurveProgress ??
 								oldData.bondingCurveProgress,
@@ -712,7 +715,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 				</div>
 
 				{/* Sidebar */}
-				<div className="min-w-0 w-full lg:sticky lg:top-22 lg:self-start space-y-4 sm:space-y-6 overflow-hidden lg:max-h-[calc(100vh-2rem)]">
+				<div className="min-w-0 w-full lg:sticky lg:top-22 lg:self-start space-y-4 sm:space-y-6 overflow-y-scroll scroll-smooth lg:max-h-[calc(100vh-2rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 					{/* Vesting Panel (Only if HypeBoost is enabled) */}
 					{token.hypeBoostEnabled && token.bondingCurveAddress && (
 						<motion.div

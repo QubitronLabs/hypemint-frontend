@@ -466,7 +466,7 @@ export function OnChainTradingPanel({
 				"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
 			);
 			await approve(tokenAddress, bondingCurveAddress, maxApproval);
-			toast.success("Approval successful!");
+			toast.info("Approval request Sent!");
 		} catch (err) {
 			console.error("Approve failed:", err);
 			toast.error("Approval failed");

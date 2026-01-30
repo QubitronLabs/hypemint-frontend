@@ -676,7 +676,7 @@ function HomePage() {
 									onChange={(e) =>
 										setSearchQuery(e.target.value)
 									}
-									className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm bg-card/60 backdrop-blur border-border/50 focus:border-primary/50"
+									className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm bg-card/60 border-border/50 focus:border-primary/50"
 								/>
 							</div>
 						</motion.div>

@@ -461,8 +461,8 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 					variant="outline"
 					size="icon"
 					onClick={() => setShowImageDialog(true)}
-					disabled={sending}
-					className="shrink-0 h-8 w-8 text-muted-foreground hover:text-foreground"
+					disabled={sending || !isAuthenticated}
+					className="shrink-0 h-8 w-8 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed"
 				>
 					<Plus className="h-4 w-4" />
 				</Button>
@@ -473,7 +473,10 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 					size="sm"
 					onClick={handleSendComment}
 					disabled={sending || !isAuthenticated}
-					className="shrink-0 h-8 px-3"
+					className={cn(
+						"shrink-0 h-8 px-3",
+						"disabled:cursor-not-allowed",
+					)}
 				>
 					{sending ? (
 						<Loader2 className="h-4 w-4 animate-spin" />
@@ -536,8 +539,9 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			)}
 
 			{/* Reply indicator + Back to top */}
-			{replyingTo && (
-				<div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
+
+			<div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
+				{replyingTo && (
 					<div className="flex items-center gap-2">
 						<span className="text-sm text-muted-foreground">
 							Reply
@@ -549,15 +553,15 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 							<X className="h-3.5 w-3.5" />
 						</button>
 					</div>
-					<button
-						onClick={scrollToTop}
-						className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-					>
-						<ChevronUp className="h-4 w-4" />
-						Back to top
-					</button>
-				</div>
-			)}
+				)}
+				<button
+					onClick={scrollToTop}
+					className="flex ml-auto items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+				>
+					<ChevronUp className="h-4 w-4" />
+					Back to top
+				</button>
+			</div>
 
 			{/* Comments List */}
 			<div
