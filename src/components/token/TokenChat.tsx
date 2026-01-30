@@ -15,6 +15,7 @@ import {
 	ChevronUp,
 	X,
 	Plus,
+	FilterIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -253,7 +254,12 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 	};
 
 	const scrollToTop = () => {
-		topRef.current?.scrollIntoView({ behavior: "smooth" });
+		const commentsContainer = document.querySelector(
+			"[data-comments-container]",
+		);
+		if (commentsContainer) {
+			commentsContainer.scrollTo({ top: 0, behavior: "smooth" });
+		}
 	};
 
 	// Send comment
@@ -262,23 +268,43 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 
 		setSending(true);
 		try {
-			const formData = new FormData();
-			formData.append("content", inlineMessage.trim());
+			let imageUrl: string | undefined = undefined;
+
+			// 1. Upload image if selected
 			if (selectedImage) {
-				formData.append("image", selectedImage);
+				const formData = new FormData();
+				formData.append("file", selectedImage);
+
+				const uploadResponse = await apiClient.post(
+					"/api/v1/uploads/image",
+					formData,
+					{ headers: { "Content-Type": "multipart/form-data" } },
+				);
+
+				if (uploadResponse.data?.success) {
+					imageUrl = uploadResponse.data.data.url;
+				} else {
+					console.error("Image upload failed");
+				}
 			}
-			if (parentId) {
-				formData.append("parentId", parentId);
+
+			// 2. Create comment with imageUrl
+			const payload: {
+				content: string;
+				parentId: string | null;
+				imageUrl?: string;
+			} = {
+				content: inlineMessage.trim(),
+				parentId: parentId || null,
+			};
+
+			if (imageUrl) {
+				payload.imageUrl = imageUrl;
 			}
 
 			const response = await apiClient.post(
 				`/api/v1/comments/token/${tokenId}`,
-				selectedImage
-					? formData
-					: { content: inlineMessage.trim(), parentId },
-				selectedImage
-					? { headers: { "Content-Type": "multipart/form-data" } }
-					: undefined,
+				payload,
 			);
 
 			if (response.data?.success) {
@@ -430,43 +456,40 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 				/>
 
 				{/* Plus button for image */}
-				{inlineMessage.trim() && (
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						onClick={() => setShowImageDialog(true)}
-						disabled={sending}
-						className="shrink-0 h-8 w-8 text-muted-foreground hover:text-foreground"
-					>
-						<Plus className="h-4 w-4" />
-					</Button>
-				)}
+				<Button
+					type="button"
+					variant="outline"
+					size="icon"
+					onClick={() => setShowImageDialog(true)}
+					disabled={sending}
+					className="shrink-0 h-8 w-8 text-muted-foreground hover:text-foreground"
+				>
+					<Plus className="h-4 w-4" />
+				</Button>
 
 				{/* Send button - only show when there's text */}
-				{inlineMessage.trim() && (
-					<Button
-						type="button"
-						size="sm"
-						onClick={handleSendComment}
-						disabled={sending || !isAuthenticated}
-						className="shrink-0 h-8 px-3"
-					>
-						{sending ? (
-							<Loader2 className="h-4 w-4 animate-spin" />
-						) : (
-							"Post"
-						)}
-					</Button>
-				)}
+				<Button
+					type="button"
+					size="sm"
+					onClick={handleSendComment}
+					disabled={sending || !isAuthenticated}
+					className="shrink-0 h-8 px-3"
+				>
+					{sending ? (
+						<Loader2 className="h-4 w-4 animate-spin" />
+					) : (
+						"Post"
+					)}
+				</Button>
 
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button
-							variant="ghost"
+							variant="secondary"
 							size="sm"
 							className="shrink-0 gap-1.5 text-muted-foreground"
 						>
+							<FilterIcon className="h-4 w-4" />
 							<span className="text-sm">
 								{sortBy === "newest" ? "Newest" : "Oldest"}
 							</span>
@@ -482,6 +505,35 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</div>
+
+			{/* Image Preview */}
+			{imagePreview && (
+				<div className="px-4 py-3 border-b border-border bg-muted/20">
+					<div className="flex items-start gap-3">
+						<div className="relative group">
+							<img
+								src={imagePreview}
+								alt="Selected image"
+								className="h-16 w-16 object-cover rounded-lg border border-border"
+							/>
+							<button
+								onClick={clearImage}
+								className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center shadow-md hover:bg-destructive/90 transition-colors"
+							>
+								<X className="h-3 w-3" />
+							</button>
+						</div>
+						<div className="flex-1 min-w-0">
+							<p className="text-xs text-muted-foreground">
+								Image attached
+							</p>
+							<p className="text-xs text-muted-foreground/70 truncate">
+								{selectedImage?.name || "image"}
+							</p>
+						</div>
+					</div>
+				</div>
+			)}
 
 			{/* Reply indicator + Back to top */}
 			{replyingTo && (
@@ -508,7 +560,10 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			)}
 
 			{/* Comments List */}
-			<div className="flex-1 overflow-y-auto p-4 space-y-5 max-h-[500px] min-h-[300px]">
+			<div
+				data-comments-container
+				className="flex-1 overflow-y-auto p-4 space-y-5 max-h-[500px] min-h-[300px]"
+			>
 				{loading ? (
 					<div className="flex items-center justify-center h-full">
 						<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
