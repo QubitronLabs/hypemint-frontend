@@ -188,6 +188,8 @@ export interface TradeEvent {
 	price?: string;
 	totalValue?: string;
 	timestamp?: string;
+	bondingCurveProgress?: number;
+	marketCap?: string;
 }
 
 // Chain configuration

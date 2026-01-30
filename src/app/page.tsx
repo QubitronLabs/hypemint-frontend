@@ -9,12 +9,12 @@ import {
 	Search,
 	Rocket,
 	Flame,
-	TrendingUp,
+	// TrendingUp,
 	Clock,
 	Trophy,
 	Plus,
-	Wifi,
-	WifiOff,
+	// Wifi,
+	// WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,34 +70,34 @@ const VALID_TABS: readonly FilterTab[] = [
 ] as const;
 
 // Live activity indicator component
-function LiveIndicator({ isConnected }: { isConnected: boolean }) {
-	return (
-		<div
-			className={cn(
-				"flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all",
-				isConnected
-					? "bg-green-500/10 text-green-500 border border-green-500/20"
-					: "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20",
-			)}
-		>
-			{isConnected ? (
-				<>
-					<span className="relative flex h-2 w-2">
-						<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-						<span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-					</span>
-					<Wifi className="h-3 w-3" />
-					<span>Live</span>
-				</>
-			) : (
-				<>
-					<WifiOff className="h-3 w-3" />
-					<span>Connecting...</span>
-				</>
-			)}
-		</div>
-	);
-}
+// function LiveIndicator({ isConnected }: { isConnected: boolean }) {
+// 	return (
+// 		<div
+// 			className={cn(
+// 				"flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all",
+// 				isConnected
+// 					? "bg-green-500/10 text-green-500 border border-green-500/20"
+// 					: "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20",
+// 			)}
+// 		>
+// 			{isConnected ? (
+// 				<>
+// 					<span className="relative flex h-2 w-2">
+// 						<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+// 						<span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+// 					</span>
+// 					<Wifi className="h-3 w-3" />
+// 					<span>Live</span>
+// 				</>
+// 			) : (
+// 				<>
+// 					<WifiOff className="h-3 w-3" />
+// 					<span>Connecting...</span>
+// 				</>
+// 			)}
+// 		</div>
+// 	);
+// }
 
 // Recent activity feed item
 interface ActivityItem {
@@ -109,56 +109,56 @@ interface ActivityItem {
 	timestamp: number;
 }
 
-function ActivityFeed({ items }: { items: ActivityItem[] }) {
-	if (items.length === 0) return null;
+// function ActivityFeed({ items }: { items: ActivityItem[] }) {
+// 	if (items.length === 0) return null;
 
-	return (
-		<div className="bg-card/40 backdrop-blur-sm border border-border/50 rounded-xl p-4">
-			<div className="flex items-center gap-2 mb-3">
-				<Zap className="h-4 w-4 text-primary" />
-				<span className="text-sm font-medium">Live Activity</span>
-			</div>
-			<div className="space-y-2 max-h-[200px] overflow-y-auto">
-				<AnimatePresence mode="popLayout">
-					{items.slice(0, 5).map((item) => (
-						<motion.div
-							key={item.id}
-							initial={{ opacity: 0, x: -20, height: 0 }}
-							animate={{ opacity: 1, x: 0, height: "auto" }}
-							exit={{ opacity: 0, x: 20, height: 0 }}
-							className="flex items-center gap-3 text-sm py-2 border-b border-border/30 last:border-0"
-						>
-							<div
-								className={cn(
-									"w-8 h-8 rounded-lg flex items-center justify-center",
-									item.type === "new_token"
-										? "bg-primary/20 text-primary"
-										: "bg-green-500/20 text-green-500",
-								)}
-							>
-								{item.type === "new_token" ? (
-									<Sparkles className="h-4 w-4" />
-								) : (
-									<TrendingUp className="h-4 w-4" />
-								)}
-							</div>
-							<div className="flex-1 min-w-0">
-								<p className="text-foreground truncate">
-									{item.message}
-								</p>
-								<p className="text-xs text-muted-foreground">
-									{new Date(
-										item.timestamp,
-									).toLocaleTimeString()}
-								</p>
-							</div>
-						</motion.div>
-					))}
-				</AnimatePresence>
-			</div>
-		</div>
-	);
-}
+// 	return (
+// 		<div className="bg-card/40 backdrop-blur-sm border border-border/50 rounded-xl p-4">
+// 			<div className="flex items-center gap-2 mb-3">
+// 				<Zap className="h-4 w-4 text-primary" />
+// 				<span className="text-sm font-medium">Live Activity</span>
+// 			</div>
+// 			<div className="space-y-2 max-h-[200px] overflow-y-auto">
+// 				<AnimatePresence mode="popLayout">
+// 					{items.slice(0, 5).map((item) => (
+// 						<motion.div
+// 							key={item.id}
+// 							initial={{ opacity: 0, x: -20, height: 0 }}
+// 							animate={{ opacity: 1, x: 0, height: "auto" }}
+// 							exit={{ opacity: 0, x: 20, height: 0 }}
+// 							className="flex items-center gap-3 text-sm py-2 border-b border-border/30 last:border-0"
+// 						>
+// 							<div
+// 								className={cn(
+// 									"w-8 h-8 rounded-lg flex items-center justify-center",
+// 									item.type === "new_token"
+// 										? "bg-primary/20 text-primary"
+// 										: "bg-green-500/20 text-green-500",
+// 								)}
+// 							>
+// 								{item.type === "new_token" ? (
+// 									<Sparkles className="h-4 w-4" />
+// 								) : (
+// 									<TrendingUp className="h-4 w-4" />
+// 								)}
+// 							</div>
+// 							<div className="flex-1 min-w-0">
+// 								<p className="text-foreground truncate">
+// 									{item.message}
+// 								</p>
+// 								<p className="text-xs text-muted-foreground">
+// 									{new Date(
+// 										item.timestamp,
+// 									).toLocaleTimeString()}
+// 								</p>
+// 							</div>
+// 						</motion.div>
+// 					))}
+// 				</AnimatePresence>
+// 			</div>
+// 		</div>
+// 	);
+// }
 
 // Stats card component
 function StatsCard({
@@ -401,9 +401,7 @@ function HomePage() {
 						if (token.id === trade.tokenId) {
 							// Merge existing token with new data from WebSocket
 							// trade object now contains computed bondingCurveProgress and marketCap from backend
-							// @ts-expect-error - trade object has extra fields from backend
 							const wsProgress = trade.bondingCurveProgress;
-							// @ts-expect-error - trade object has extra fields from backend
 							const wsMarketCap = trade.marketCap;
 
 							return {
@@ -622,7 +620,7 @@ function HomePage() {
 				</motion.div>
 
 				{/* Main Content Grid */}
-				<div className="grid lg:grid-cols-[1fr_300px] gap-4 sm:gap-6">
+				<div className="grid  gap-4 sm:gap-6">
 					{/* Left Column - Token Grid */}
 					<div>
 						{/* Filter & Search Bar */}
@@ -783,7 +781,7 @@ function HomePage() {
 					</div>
 
 					{/* Right Column - Activity Feed */}
-					<motion.div
+					{/* <motion.div
 						initial={{ opacity: 0, x: 20 }}
 						animate={{ opacity: 1, x: 0 }}
 						transition={{ delay: 0.3 }}
@@ -791,7 +789,7 @@ function HomePage() {
 					>
 						<ActivityFeed items={activityFeed} />
 
-						{/* Quick Links */}
+						Quick Links
 						<div className="bg-card/40 backdrop-blur-sm border border-border/50 rounded-xl p-4">
 							<h3 className="text-sm font-medium mb-3">
 								Quick Actions
@@ -818,7 +816,7 @@ function HomePage() {
 							</div>
 						</div>
 
-						{/* Tips */}
+						Tips
 						<div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
 							<div className="flex items-center gap-2 mb-2">
 								<Sparkles className="h-4 w-4 text-primary" />
@@ -831,7 +829,7 @@ function HomePage() {
 								against bots and ensure fair distribution.
 							</p>
 						</div>
-					</motion.div>
+					</motion.div> */}
 				</div>
 			</div>
 		</main>

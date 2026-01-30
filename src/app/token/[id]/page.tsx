@@ -108,9 +108,18 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							// Update tradesCount in real-time
 							tradesCount:
 								message.data.tradesCount ?? oldData.tradesCount,
-              priceChange5m: message.data.priceChange5m ?? oldData.priceChange5m,
-              priceChange1h: message.data.priceChange1h ?? oldData.priceChange1h,
-              priceChange6h: message.data.priceChange6h ?? oldData.priceChange6h,
+							priceChange5m:
+								message.data.priceChange5m ?? oldData.priceChange5m,
+							priceChange1h:
+								message.data.priceChange1h ?? oldData.priceChange1h,
+							priceChange6h:
+								message.data.priceChange6h ?? oldData.priceChange6h,
+							bondingCurveProgress:
+								message.data.bondingCurveProgress ??
+								oldData.bondingCurveProgress,
+							currentBondingAmount:
+								message.data.currentBondingAmount ??
+								oldData.currentBondingAmount,
 						};
 					},
 				);
