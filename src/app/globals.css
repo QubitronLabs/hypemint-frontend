@@ -165,7 +165,7 @@
 	/* Custom scrollbar */
 	.scrollbar-thin {
 		scrollbar-width: thin;
-		scrollbar-color: #333 transparent;
+		scrollbar-color: var(--muted-foreground) transparent;
 	}
 
 	.scrollbar-thin::-webkit-scrollbar {
@@ -178,12 +178,12 @@
 	}
 
 	.scrollbar-thin::-webkit-scrollbar-thumb {
-		background: #333;
+		background: var(--primary);
 		border-radius: 9999px;
 	}
 
 	.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-		background: #444;
+				background: var(--primary);
 	}
 
 	.scrollbar-hide {

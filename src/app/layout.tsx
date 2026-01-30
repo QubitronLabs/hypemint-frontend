@@ -74,7 +74,7 @@ export default function RootLayout({
 	return (
 		<html lang="en" className="dark">
 			<body
-				className={`${primaryFont.variable} ${monoFont.variable} ${displayFont.variable} font-sans antialiased min-h-screen bg-background`}
+				className={`${primaryFont.variable} ${monoFont.variable} ${displayFont.variable} font-sans antialiased min-h-screen bg-background `}
 			>
 				<QueryProvider>
 					<WagmiProvider>

@@ -536,8 +536,9 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			)}
 
 			{/* Reply indicator + Back to top */}
-			{replyingTo && (
-				<div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
+
+			<div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
+				{replyingTo && (
 					<div className="flex items-center gap-2">
 						<span className="text-sm text-muted-foreground">
 							Reply
@@ -549,15 +550,15 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 							<X className="h-3.5 w-3.5" />
 						</button>
 					</div>
-					<button
-						onClick={scrollToTop}
-						className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-					>
-						<ChevronUp className="h-4 w-4" />
-						Back to top
-					</button>
-				</div>
-			)}
+				)}
+				<button
+					onClick={scrollToTop}
+					className="flex ml-auto items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+				>
+					<ChevronUp className="h-4 w-4" />
+					Back to top
+				</button>
+			</div>
 
 			{/* Comments List */}
 			<div
