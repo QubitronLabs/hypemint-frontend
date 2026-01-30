@@ -25,6 +25,36 @@ export interface User {
 	updatedAt?: string;
 }
 
+/**
+ * Response from successful follow operation
+ */
+export interface FollowUserResponse {
+	message: string;
+	user: {
+		id: string;
+		walletAddress: string;
+		username: string | null;
+		displayName: string | null;
+		avatarUrl: string | null;
+		followersCount: number;
+	};
+}
+
+/**
+ * Response from successful unfollow operation
+ */
+export interface UnfollowUserResponse {
+	message: string;
+	user: {
+		id: string;
+		walletAddress: string;
+		username: string | null;
+		displayName: string | null;
+		avatarUrl: string | null;
+		followersCount: number;
+	};
+}
+
 export interface Token {
 	id: string;
 	name: string;

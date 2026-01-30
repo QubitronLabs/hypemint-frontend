@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * Token Chat Component - Redesigned
- * Real-time chat with sorting, likes, and comment popup
+ * Token Chat Component
+ * Real-time chat with collapsible replies
+ * Features: Inline input, collapsed replies with "view X more reply", "@mention" display
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -11,13 +12,12 @@ import {
 	Loader2,
 	MessageCircle,
 	Heart,
-	SlidersHorizontal,
+	ChevronUp,
 	X,
-	ImageIcon,
+	Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
 	DropdownMenu,
@@ -25,12 +25,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { ImageUploadDialog } from "@/components/ui/image-upload-dialog";
 import { apiClient } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -43,6 +38,7 @@ interface Comment {
 	createdAt: string;
 	likesCount?: number;
 	isLiked?: boolean;
+	parentId?: string | null;
 	user: {
 		id: string;
 		username: string | null;
@@ -63,17 +59,20 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 	const [sending, setSending] = useState(false);
 	const [loading, setLoading] = useState(true);
 	const [sortBy, setSortBy] = useState<SortOption>("newest");
-	const [showCommentDialog, setShowCommentDialog] = useState(false);
-	const [dialogMessage, setDialogMessage] = useState("");
+	const [showImageDialog, setShowImageDialog] = useState(false);
+	const [inlineMessage, setInlineMessage] = useState("");
 	const [selectedImage, setSelectedImage] = useState<File | null>(null);
 	const [imagePreview, setImagePreview] = useState<string | null>(null);
-	const fileInputRef = useRef<HTMLInputElement>(null);
-	const messagesEndRef = useRef<HTMLDivElement>(null);
+	const [expandedReplies, setExpandedReplies] = useState<Set<string>>(
+		new Set(),
+	);
+	const inlineInputRef = useRef<HTMLInputElement>(null);
+	const topRef = useRef<HTMLDivElement>(null);
 
 	const [parentId, setParentId] = useState<string | null>(null);
 	const [replyingTo, setReplyingTo] = useState<string | null>(null);
 
-	const { isAuthenticated, setShowAuthFlow } = useAuth();
+	const { isAuthenticated, setShowAuthFlow, user } = useAuth();
 
 	// Initial fetch
 	useEffect(() => {
@@ -83,7 +82,6 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 					`/api/v1/comments/token/${tokenId}`,
 				);
 				if (response.data?.success) {
-					// We need to deduplicate because websocket might have added some
 					const fetchedComments = response.data.data.comments || [];
 					setComments(fetchedComments);
 				}
@@ -106,8 +104,6 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			) {
 				const newComment = msg.data as Comment;
 				setComments((prev) => {
-					// Update if exists (e.g. like count change - though we only broadcast creation mostly, but if we broadcast update...)
-					// Actually our broadcast is creation only right now.
 					if (prev.find((c) => c.id === newComment.id)) return prev;
 					return [newComment, ...prev];
 				});
@@ -129,6 +125,50 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 		return sortBy === "newest" ? dateB - dateA : dateA - dateB;
 	});
 
+	// Organize comments into hierarchical structure
+	const parentComments = sortedComments.filter((c) => !c.parentId);
+	const repliesMap = new Map<string, Comment[]>();
+
+	sortedComments
+		.filter((c) => c.parentId)
+		.forEach((reply) => {
+			const existing = repliesMap.get(reply.parentId!) || [];
+			repliesMap.set(reply.parentId!, [...existing, reply]);
+		});
+
+	// Get parent comment user info for @mention
+	const getParentUser = (parentId: string) => {
+		const parent = comments.find((c) => c.id === parentId);
+		return parent?.user.displayName || parent?.user.username || "someone";
+	};
+
+	// Get all nested replies flattened (for display when expanded)
+	const getAllNestedReplies = (commentId: string): Comment[] => {
+		const directReplies = repliesMap.get(commentId) || [];
+		const allReplies: Comment[] = [];
+
+		for (const reply of directReplies) {
+			allReplies.push(reply);
+			// Also add nested replies to this reply
+			allReplies.push(...getAllNestedReplies(reply.id));
+		}
+
+		return allReplies;
+	};
+
+	// Toggle replies visibility
+	const toggleReplies = (commentId: string) => {
+		setExpandedReplies((prev) => {
+			const next = new Set(prev);
+			if (next.has(commentId)) {
+				next.delete(commentId);
+			} else {
+				next.add(commentId);
+			}
+			return next;
+		});
+	};
+
 	// Handle image selection
 	const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0];
@@ -146,9 +186,6 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 	const clearImage = () => {
 		setSelectedImage(null);
 		setImagePreview(null);
-		if (fileInputRef.current) {
-			fileInputRef.current.value = "";
-		}
 	};
 
 	// Handle like
@@ -187,7 +224,7 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 					c.id === commentId
 						? {
 								...c,
-								isLiked: isLiked, // Revert to original
+								isLiked: isLiked,
 								likesCount: isLiked
 									? (c.likesCount || 0) + 1
 									: (c.likesCount || 1) - 1,
@@ -204,18 +241,29 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			return;
 		}
 		setParentId(comment.id);
-		setReplyingTo(comment.user.displayName || comment.user.username || "Anonymous");
-		setShowCommentDialog(true);
+		setReplyingTo(
+			comment.user.displayName || comment.user.username || "Anonymous",
+		);
+		setTimeout(() => inlineInputRef.current?.focus(), 100);
 	};
 
-	// Send message from dialog
-	const handleDialogSend = async () => {
-		if (!dialogMessage.trim() || !isAuthenticated || sending) return;
+	const clearReply = () => {
+		setParentId(null);
+		setReplyingTo(null);
+	};
+
+	const scrollToTop = () => {
+		topRef.current?.scrollIntoView({ behavior: "smooth" });
+	};
+
+	// Send comment
+	const handleSendComment = async () => {
+		if (!inlineMessage.trim() || !isAuthenticated || sending) return;
 
 		setSending(true);
 		try {
 			const formData = new FormData();
-			formData.append("content", dialogMessage.trim());
+			formData.append("content", inlineMessage.trim());
 			if (selectedImage) {
 				formData.append("image", selectedImage);
 			}
@@ -225,18 +273,18 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 
 			const response = await apiClient.post(
 				`/api/v1/comments/token/${tokenId}`,
-				selectedImage ? formData : { content: dialogMessage.trim(), parentId },
+				selectedImage
+					? formData
+					: { content: inlineMessage.trim(), parentId },
 				selectedImage
 					? { headers: { "Content-Type": "multipart/form-data" } }
 					: undefined,
 			);
 
 			if (response.data?.success) {
-				setDialogMessage("");
+				setInlineMessage("");
 				clearImage();
-				setParentId(null);
-				setReplyingTo(null);
-				setShowCommentDialog(false);
+				clearReply();
 			}
 		} catch (error) {
 			console.error("Failed to send comment:", error);
@@ -245,50 +293,183 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 		}
 	};
 
-	// Format timestamp
+	const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+		if (e.key === "Enter" && !e.shiftKey) {
+			e.preventDefault();
+			handleSendComment();
+		}
+	};
+
 	const formatTime = (dateStr: string) => {
 		const date = new Date(dateStr);
 		const now = new Date();
 		const diff = now.getTime() - date.getTime();
 		const mins = Math.floor(diff / 60000);
 
-		if (mins < 1) return "Just now";
+		if (mins < 1) return "now";
 		if (mins < 60) return `${mins}m`;
 		if (mins < 1440) return `${Math.floor(mins / 60)}h`;
 		return `${Math.floor(mins / 1440)}d`;
 	};
 
-	// Open dialog when input is clicked
-	const handleInputClick = () => {
+	const handleInputFocus = () => {
 		if (!isAuthenticated) {
 			setShowAuthFlow(true);
-			return;
 		}
-		setParentId(null);
-		setReplyingTo(null);
-		setShowCommentDialog(true);
 	};
+
+	// Render a single comment
+	const renderComment = (
+		comment: Comment,
+		isReply = false,
+		parentUsername?: string,
+	) => (
+		<motion.div
+			key={comment.id}
+			initial={{ opacity: 0, y: 10 }}
+			animate={{ opacity: 1, y: 0 }}
+			exit={{ opacity: 0, scale: 0.95 }}
+			className={cn("flex gap-3", isReply && "ml-10")}
+		>
+			<Avatar className={cn("shrink-0", isReply ? "w-7 h-7" : "w-8 h-8")}>
+				<AvatarImage src={comment.user.avatarUrl || undefined} />
+				<AvatarFallback className="bg-muted text-xs">
+					{(comment.user.displayName || comment.user.username || "A")
+						.slice(0, 2)
+						.toUpperCase()}
+				</AvatarFallback>
+			</Avatar>
+
+			<div className="flex-1 min-w-0">
+				<div className="flex items-baseline gap-2 mb-0.5">
+					<span className="font-medium text-sm">
+						{comment.user.displayName ||
+							comment.user.username ||
+							"Anonymous"}
+					</span>
+					<span className="text-xs text-muted-foreground">
+						{formatTime(comment.createdAt)}
+					</span>
+				</div>
+
+				{/* Comment content with @mention for replies */}
+				<p className="text-sm text-foreground/90 break-words">
+					{isReply && parentUsername && (
+						<span className="text-primary font-medium">
+							@{parentUsername}{" "}
+						</span>
+					)}
+					{comment.content}
+				</p>
+
+				{/* Image if present */}
+				{comment.imageUrl && (
+					<div className="mt-2 rounded-lg overflow-hidden max-w-[200px]">
+						<img
+							src={comment.imageUrl}
+							alt="Comment attachment"
+							className="w-full h-auto"
+						/>
+					</div>
+				)}
+
+				{/* Reply link */}
+				<button
+					onClick={() => handleReply(comment)}
+					className="text-xs text-muted-foreground hover:text-foreground mt-1"
+				>
+					Reply
+				</button>
+			</div>
+
+			{/* Like button */}
+			<button
+				onClick={() => handleLike(comment.id, !!comment.isLiked)}
+				className="flex flex-col items-center gap-0.5 shrink-0"
+			>
+				<Heart
+					className={cn(
+						"h-4 w-4 transition-colors",
+						comment.isLiked
+							? "fill-red-500 text-red-500"
+							: "text-muted-foreground hover:text-foreground",
+					)}
+				/>
+				<span className="text-xs text-muted-foreground">
+					{comment.likesCount || 0}
+				</span>
+			</button>
+		</motion.div>
+	);
 
 	return (
 		<div className={cn("flex flex-col", className)}>
-			{/* Header with Input and Sort */}
+			<div ref={topRef} />
+
+			{/* Top Input Row: Avatar + Input + Newest Dropdown */}
 			<div className="flex items-center gap-3 p-4 border-b border-border">
 				<Avatar className="w-8 h-8 shrink-0">
+					<AvatarImage src={user?.avatarUrl || undefined} />
 					<AvatarFallback className="bg-muted text-xs">
-						👤
+						{(user?.displayName || user?.username || "?")
+							.slice(0, 2)
+							.toUpperCase()}
 					</AvatarFallback>
 				</Avatar>
+
 				<Input
+					ref={inlineInputRef}
 					placeholder="Add a comment..."
-					onClick={handleInputClick}
-					readOnly
-					className="flex-1 bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+					value={inlineMessage}
+					onChange={(e) => setInlineMessage(e.target.value)}
+					onKeyDown={handleKeyDown}
+					onFocus={handleInputFocus}
+					disabled={sending}
+					className="flex-1 bg-transparent border-0 focus-visible:ring-0 text-sm placeholder:text-muted-foreground"
+					maxLength={500}
 				/>
+
+				{/* Plus button for image */}
+				{inlineMessage.trim() && (
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon"
+						onClick={() => setShowImageDialog(true)}
+						disabled={sending}
+						className="shrink-0 h-8 w-8 text-muted-foreground hover:text-foreground"
+					>
+						<Plus className="h-4 w-4" />
+					</Button>
+				)}
+
+				{/* Send button - only show when there's text */}
+				{inlineMessage.trim() && (
+					<Button
+						type="button"
+						size="sm"
+						onClick={handleSendComment}
+						disabled={sending || !isAuthenticated}
+						className="shrink-0 h-8 px-3"
+					>
+						{sending ? (
+							<Loader2 className="h-4 w-4 animate-spin" />
+						) : (
+							"Post"
+						)}
+					</Button>
+				)}
+
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
-						<Button variant="outline" size="sm" className="gap-2">
-							<SlidersHorizontal className="h-3.5 w-3.5" />
-							{sortBy === "newest" ? "Newest" : "Oldest"}
+						<Button
+							variant="ghost"
+							size="sm"
+							className="shrink-0 gap-1.5 text-muted-foreground"
+						>
+							<span className="text-sm">
+								{sortBy === "newest" ? "Newest" : "Oldest"}
+							</span>
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="end">
@@ -302,13 +483,37 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 				</DropdownMenu>
 			</div>
 
-			{/* Messages */}
-			<div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[500px] min-h-[300px]">
+			{/* Reply indicator + Back to top */}
+			{replyingTo && (
+				<div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
+					<div className="flex items-center gap-2">
+						<span className="text-sm text-muted-foreground">
+							Reply
+						</span>
+						<button
+							onClick={clearReply}
+							className="text-muted-foreground hover:text-foreground"
+						>
+							<X className="h-3.5 w-3.5" />
+						</button>
+					</div>
+					<button
+						onClick={scrollToTop}
+						className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+					>
+						<ChevronUp className="h-4 w-4" />
+						Back to top
+					</button>
+				</div>
+			)}
+
+			{/* Comments List */}
+			<div className="flex-1 overflow-y-auto p-4 space-y-5 max-h-[500px] min-h-[300px]">
 				{loading ? (
 					<div className="flex items-center justify-center h-full">
 						<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
 					</div>
-				) : sortedComments.length === 0 ? (
+				) : parentComments.length === 0 ? (
 					<div className="flex flex-col items-center justify-center h-full text-muted-foreground">
 						<MessageCircle className="h-10 w-10 mb-2 opacity-50" />
 						<p className="text-sm">No comments yet</p>
@@ -316,200 +521,82 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 					</div>
 				) : (
 					<AnimatePresence mode="popLayout">
-						{sortedComments.map((comment) => (
-							<motion.div
-								key={comment.id}
-								initial={{ opacity: 0, y: 10 }}
-								animate={{ opacity: 1, y: 0 }}
-								exit={{ opacity: 0, scale: 0.95 }}
-								className="flex gap-3"
-							>
-								<Avatar className="w-8 h-8 flex-shrink-0">
-									<AvatarImage
-										src={
-											comment.user.avatarUrl || undefined
-										}
-									/>
-									<AvatarFallback className="bg-muted text-xs">
-										{(
-											comment.user.displayName ||
-											comment.user.username ||
-											"A"
-										)
-											.slice(0, 2)
-											.toUpperCase()}
-									</AvatarFallback>
-								</Avatar>
-								<div className="flex-1 min-w-0">
-									<div className="flex items-baseline gap-2 mb-1">
-										<span className="font-medium text-sm">
-											{comment.user.displayName ||
-												comment.user.username ||
-												"Anonymous"}
-										</span>
-										<span className="text-xs text-muted-foreground">
-											{formatTime(comment.createdAt)}
-										</span>
-									</div>
+						{parentComments.map((comment) => {
+							const allReplies = getAllNestedReplies(comment.id);
+							const replyCount = allReplies.length;
+							const isExpanded = expandedReplies.has(comment.id);
 
-									{/* Image if present */}
-									{comment.imageUrl && (
-										<div className="mb-2 rounded-lg overflow-hidden max-w-[200px]">
-											<img
-												src={comment.imageUrl}
-												alt="Comment attachment"
-												className="w-full h-auto"
-											/>
-										</div>
+							return (
+								<div key={comment.id} className="space-y-4">
+									{/* Parent Comment */}
+									{renderComment(comment)}
+
+									{/* View replies link or expanded replies */}
+									{replyCount > 0 && (
+										<>
+											{isExpanded ? (
+												<>
+													{/* Expanded replies - all nested levels */}
+													<div className="space-y-4">
+														{allReplies.map(
+															(reply) =>
+																renderComment(
+																	reply,
+																	true,
+																	getParentUser(
+																		reply.parentId!,
+																	),
+																),
+														)}
+													</div>
+													{/* Hide replies link */}
+													<button
+														onClick={() =>
+															toggleReplies(
+																comment.id,
+															)
+														}
+														className="flex items-center gap-2 ml-10 text-xs text-muted-foreground hover:text-foreground"
+													>
+														<span className="w-6 h-px bg-muted-foreground/30" />
+														hide replies
+													</button>
+												</>
+											) : (
+												/* View replies link */
+												<button
+													onClick={() =>
+														toggleReplies(
+															comment.id,
+														)
+													}
+													className="flex items-center gap-2 ml-10 text-xs text-muted-foreground hover:text-foreground"
+												>
+													<span className="w-6 h-px bg-muted-foreground/30" />
+													view {replyCount} more{" "}
+													{replyCount === 1
+														? "reply"
+														: "replies"}
+												</button>
+											)}
+										</>
 									)}
-
-									<p className="text-sm text-foreground/90 break-words">
-										{comment.content}
-									</p>
-
-									{/* Reply link */}
-									<button 
-										onClick={() => handleReply(comment)}
-										className="text-xs text-muted-foreground hover:text-foreground mt-1"
-									>
-										Reply
-									</button>
 								</div>
-
-								{/* Like button */}
-								<button
-									onClick={() => handleLike(comment.id, !!comment.isLiked)}
-									className="flex flex-col items-center gap-0.5 shrink-0"
-								>
-									<Heart
-										className={cn(
-											"h-4 w-4 transition-colors",
-											comment.isLiked
-												? "fill-red-500 text-red-500"
-												: "text-muted-foreground hover:text-foreground",
-										)}
-									/>
-									<span className="text-xs text-muted-foreground">
-										{comment.likesCount || 0}
-									</span>
-								</button>
-							</motion.div>
-						))}
+							);
+						})}
 					</AnimatePresence>
 				)}
-				<div ref={messagesEndRef} />
 			</div>
 
-			{/* Comment Dialog */}
-			<Dialog
-				open={showCommentDialog}
-				onOpenChange={(open) => {
-					setShowCommentDialog(open);
-					if (!open) {
-						setParentId(null);
-						setReplyingTo(null);
-					}
-				}}
-			>
-				<DialogContent className="sm:max-w-md">
-					<DialogHeader>
-						<DialogTitle>
-							{replyingTo ? `Reply to ${replyingTo}` : "Add a comment"}
-						</DialogTitle>
-					</DialogHeader>
-					<div className="space-y-4">
-						<Textarea
-							placeholder={replyingTo ? "Write a reply..." : "Write a comment..."}
-							value={dialogMessage}
-							onChange={(e) => setDialogMessage(e.target.value)}
-							className="min-h-[100px] bg-muted/50 resize-none"
-							maxLength={500}
-						/>
-
-						{/* Image upload section */}
-						<div>
-							<p className="text-sm text-muted-foreground mb-2">
-								Image (optional)
-							</p>
-							<input
-								ref={fileInputRef}
-								type="file"
-								accept="image/*"
-								onChange={handleImageSelect}
-								className="hidden"
-							/>
-
-							{imagePreview ? (
-								<div className="relative inline-block">
-									<img
-										src={imagePreview}
-										alt="Preview"
-										className="max-w-full max-h-[150px] rounded-lg"
-									/>
-									<button
-										onClick={clearImage}
-										className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center"
-									>
-										<X className="h-3 w-3" />
-									</button>
-								</div>
-							) : (
-								<div
-									onClick={() =>
-										fileInputRef.current?.click()
-									}
-									className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-muted-foreground transition-colors"
-								>
-									<ImageIcon className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-									<p className="text-sm text-muted-foreground">
-										Select image to upload
-									</p>
-									<p className="text-xs text-muted-foreground">
-										or drag and drop it here
-									</p>
-									<Button
-										variant="outline"
-										size="sm"
-										className="mt-3"
-										onClick={(e) => {
-											e.stopPropagation();
-											fileInputRef.current?.click();
-										}}
-									>
-										Select file
-									</Button>
-								</div>
-							)}
-						</div>
-
-						{/* Action buttons */}
-						<div className="flex justify-end gap-2">
-							<Button
-								variant="ghost"
-								onClick={() => {
-									setShowCommentDialog(false);
-									setDialogMessage("");
-									clearImage();
-									setParentId(null);
-									setReplyingTo(null);
-								}}
-							>
-								Cancel
-							</Button>
-							<Button
-								onClick={handleDialogSend}
-								disabled={!dialogMessage.trim() || sending}
-								className="bg-primary hover:bg-primary/90"
-							>
-								{sending ? (
-									<Loader2 className="h-4 w-4 animate-spin mr-2" />
-								) : null}
-								{replyingTo ? "Post reply" : "Post comment"}
-							</Button>
-						</div>
-					</div>
-				</DialogContent>
-			</Dialog>
+			{/* Image Upload Dialog */}
+			<ImageUploadDialog
+				open={showImageDialog}
+				onOpenChange={setShowImageDialog}
+				imagePreview={imagePreview}
+				onImageSelect={handleImageSelect}
+				onClearImage={clearImage}
+				onConfirm={() => {}}
+			/>
 		</div>
 	);
 }

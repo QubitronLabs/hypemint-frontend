@@ -5,7 +5,18 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { Star, Copy, Check, Shield, Info } from "lucide-react";
+import {
+	Star,
+	Copy,
+	Check,
+	Shield,
+	Info,
+	UserPlus,
+	UserMinus,
+	Loader2,
+	ChevronDown,
+	ChevronUp,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +38,14 @@ import { useTokenTrades, tradeKeys } from "@/hooks/useTrades";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useManualSync } from "@/hooks/useBlockchainSync";
 import { usePersistedTabs } from "@/hooks/usePersistedTabs";
-import { useNativeCurrencySymbol } from "@/hooks";
+import { useNativeCurrencySymbol, useAuth } from "@/hooks";
+import {
+	useFollowUser,
+	useUnfollowUser,
+	useUserProfile,
+} from "@/hooks/useUsers";
+import { useShare } from "@/lib/utils/share";
+import { toast } from "sonner";
 import {
 	cn,
 	formatMarketCap,
@@ -46,7 +64,14 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 	const { id } = use(params);
 	const [copied, setCopied] = useState(false);
 	const [isStarred, setIsStarred] = useState(false);
+	const [localIsFollowing, setLocalIsFollowing] = useState(false);
+	const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 	const nativeSymbol = useNativeCurrencySymbol();
+
+	// Auth and follow hooks
+	const { isAuthenticated, walletAddress } = useAuth();
+	const followMutation = useFollowUser();
+	const unfollowMutation = useUnfollowUser();
 
 	const { data: token, isLoading, error } = useToken(id);
 	const { data: tradesData } = useTokenTrades(id);
@@ -68,6 +93,92 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 
 	// Get holders from blockchain data
 	const holders = holdersData?.holders || [];
+
+	// Fetch creator profile to check if current user is following them
+	const creatorAddress = token?.creator?.walletAddress;
+	const { data: creatorProfile } = useUserProfile(creatorAddress || "");
+
+	// Check if current user is the creator
+	const isOwnToken =
+		walletAddress?.toLowerCase() === creatorAddress?.toLowerCase();
+
+	// Sync local follow state with API data
+	useEffect(() => {
+		if (creatorProfile?.isFollowing !== undefined) {
+			setLocalIsFollowing(creatorProfile.isFollowing);
+		}
+	}, [creatorProfile?.isFollowing]);
+
+	// Follow/unfollow handler
+	const handleFollow = async () => {
+		if (!isAuthenticated || !creatorAddress) return;
+
+		// Extra check: Don't allow following yourself
+		if (isOwnToken) {
+			toast.error("Cannot follow yourself");
+			return;
+		}
+
+		// Store previous state for potential revert
+		const wasFollowing = localIsFollowing;
+
+		// Immediately update local state for instant UI feedback
+		setLocalIsFollowing(!localIsFollowing);
+
+		try {
+			if (wasFollowing) {
+				const response =
+					await unfollowMutation.mutateAsync(creatorAddress);
+				const creatorName =
+					response?.user?.displayName ||
+					response?.user?.username ||
+					token?.creator?.displayName ||
+					token?.creator?.username ||
+					"this creator";
+				toast.success("Unfollowed", {
+					description: `You are no longer following ${creatorName}`,
+				});
+			} else {
+				const response =
+					await followMutation.mutateAsync(creatorAddress);
+				const creatorName =
+					response?.user?.displayName ||
+					response?.user?.username ||
+					token?.creator?.displayName ||
+					token?.creator?.username ||
+					"this creator";
+				toast.success("Following!", {
+					description: `You are now following ${creatorName}`,
+				});
+			}
+		} catch (error: any) {
+			// Revert on error
+			setLocalIsFollowing(wasFollowing);
+
+			// Extract error message from Axios API response
+			// Structure: error.response.data.error.message for our API
+			const apiErrorMessage = error?.response?.data?.error?.message;
+			const fallbackMessage = wasFollowing
+				? "Failed to unfollow"
+				: "Failed to follow";
+			const errorMessage =
+				apiErrorMessage || error?.message || fallbackMessage;
+
+			toast.error(errorMessage);
+			console.error("Follow/unfollow failed:", error);
+		}
+	};
+
+	const isFollowLoading =
+		followMutation.isPending || unfollowMutation.isPending;
+
+	// Share hook with customizable platforms
+	const { open: openShare, ShareMenu: ShareMenuComponent } = useShare({
+		title: token?.name || "Token",
+		description: `Check out ${token?.symbol || ""} on HypeMint!`,
+		hashtags: ["HypeMint", "Crypto", token?.symbol || ""].filter(Boolean),
+		platforms: ["twitter", "telegram", "whatsapp", "reddit"],
+	});
 
 	// Real-time updates via WebSocket
 	const handleWebSocketMessage = useCallback(
@@ -108,9 +219,15 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							// Update tradesCount in real-time
 							tradesCount:
 								message.data.tradesCount ?? oldData.tradesCount,
-              priceChange5m: message.data.priceChange5m ?? oldData.priceChange5m,
-              priceChange1h: message.data.priceChange1h ?? oldData.priceChange1h,
-              priceChange6h: message.data.priceChange6h ?? oldData.priceChange6h,
+							priceChange5m:
+								message.data.priceChange5m ??
+								oldData.priceChange5m,
+							priceChange1h:
+								message.data.priceChange1h ??
+								oldData.priceChange1h,
+							priceChange6h:
+								message.data.priceChange6h ??
+								oldData.priceChange6h,
 						};
 					},
 				);
@@ -142,32 +259,11 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 		return `${address.slice(0, 6)}...${address.slice(-4)}`;
 	};
 
-	// Get explorer URL for contract
-	const getExplorerUrl = (address: string) => {
-		return `https://amoy.polygonscan.com/address/${address}`;
-	};
-
 	const handleCopy = () => {
 		if (!token) return;
 		navigator.clipboard.writeText(token.id);
 		setCopied(true);
 		setTimeout(() => setCopied(false), 2000);
-	};
-
-	const handleShare = async () => {
-		if (!token) return;
-		const url = window.location.href;
-		const text = `Check out $${token.symbol} on HypeMint!`;
-
-		if (navigator.share) {
-			try {
-				await navigator.share({ title: token.name, text, url });
-			} catch (e) {
-				// User cancelled or error
-			}
-		} else {
-			navigator.clipboard.writeText(url);
-		}
 	};
 
 	// Calculate time since creation
@@ -296,10 +392,47 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 								</div>
 							</div>
 
-							{/* Right side: Share, Copy, Star buttons */}
+							{/* Right side: Follow, Share, Copy, Star buttons */}
 							<div className="flex items-center gap-2 shrink-0">
+								{/* Follow Button - only show if not own token and authenticated */}
+								{!isOwnToken &&
+									isAuthenticated &&
+									creatorAddress && (
+										<motion.button
+											onClick={handleFollow}
+											disabled={isFollowLoading}
+											whileHover={{ scale: 1.02 }}
+											whileTap={{ scale: 0.98 }}
+											className={cn(
+												"flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200",
+												localIsFollowing
+													? "border border-border text-foreground hover:border-destructive hover:text-destructive hover:bg-destructive/10"
+													: "bg-primary text-primary-foreground hover:bg-primary/90",
+												isFollowLoading &&
+													"opacity-70 cursor-not-allowed",
+											)}
+										>
+											{isFollowLoading ? (
+												<Loader2 className="h-3.5 w-3.5 animate-spin" />
+											) : localIsFollowing ? (
+												<>
+													<UserMinus className="h-3.5 w-3.5" />
+													<span className="hidden sm:inline">
+														Unfollow
+													</span>
+												</>
+											) : (
+												<>
+													<UserPlus className="h-3.5 w-3.5" />
+													<span className="hidden sm:inline">
+														Follow
+													</span>
+												</>
+											)}
+										</motion.button>
+									)}
 								<Button
-									onClick={handleShare}
+									onClick={() => openShare()}
 									size="sm"
 									className="bg-primary hover:bg-primary/90 text-primary-foreground"
 								>
@@ -368,17 +501,17 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 										% 24hr
 									</p>
 								</div>
-								<div className="text-right">
+								{/* <div className="text-right">
 									<p className="text-xs text-muted-foreground">
 										ATH
 									</p>
 									<p className="text-sm font-medium text-primary">
 										{formatMarketCap(
-											(token as any).athMarketCap ||
+											token.athMarketCap ||
 												token.marketCap,
 										)}
 									</p>
-								</div>
+								</div> */}
 							</div>
 						</div>
 
@@ -416,39 +549,113 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							<p className="text-xs text-muted-foreground mb-1">
 								5m
 							</p>
-							<p className={cn(
-								"font-semibold tabular-nums",
-								parseFloat(token.priceChange5m || "0") >= 0 ? "text-[#00ff88]" : "text-destructive"
-							)}>
-								{parseFloat(token.priceChange5m || "0") >= 0 ? "+" : ""}
-								{parseFloat(token.priceChange5m || "0").toFixed(2)}%
+							<p
+								className={cn(
+									"font-semibold tabular-nums",
+									parseFloat(token.priceChange5m || "0") >= 0
+										? "text-[#00ff88]"
+										: "text-destructive",
+								)}
+							>
+								{parseFloat(token.priceChange5m || "0") >= 0
+									? "+"
+									: ""}
+								{parseFloat(token.priceChange5m || "0").toFixed(
+									2,
+								)}
+								%
 							</p>
 						</div>
 						<div className="bg-card border border-border rounded-lg p-3 text-center">
 							<p className="text-xs text-muted-foreground mb-1">
 								1h
 							</p>
-							<p className={cn(
-								"font-semibold tabular-nums",
-								parseFloat(token.priceChange1h || "0") >= 0 ? "text-[#00ff88]" : "text-destructive"
-							)}>
-								{parseFloat(token.priceChange1h || "0") >= 0 ? "+" : ""}
-								{parseFloat(token.priceChange1h || "0").toFixed(2)}%
+							<p
+								className={cn(
+									"font-semibold tabular-nums",
+									parseFloat(token.priceChange1h || "0") >= 0
+										? "text-[#00ff88]"
+										: "text-destructive",
+								)}
+							>
+								{parseFloat(token.priceChange1h || "0") >= 0
+									? "+"
+									: ""}
+								{parseFloat(token.priceChange1h || "0").toFixed(
+									2,
+								)}
+								%
 							</p>
 						</div>
 						<div className="bg-card border border-border rounded-lg p-3 text-center col-span-2 sm:col-span-1">
 							<p className="text-xs text-muted-foreground mb-1">
 								6h
 							</p>
-							<p className={cn(
-								"font-semibold tabular-nums",
-								parseFloat(token.priceChange6h || "0") >= 0 ? "text-[#00ff88]" : "text-destructive"
-							)}>
-								{parseFloat(token.priceChange6h || "0") >= 0 ? "+" : ""}
-								{parseFloat(token.priceChange6h || "0").toFixed(2)}%
+							<p
+								className={cn(
+									"font-semibold tabular-nums",
+									parseFloat(token.priceChange6h || "0") >= 0
+										? "text-[#00ff88]"
+										: "text-destructive",
+								)}
+							>
+								{parseFloat(token.priceChange6h || "0") >= 0
+									? "+"
+									: ""}
+								{parseFloat(token.priceChange6h || "0").toFixed(
+									2,
+								)}
+								%
 							</p>
 						</div>
 					</motion.div>
+
+					{/* Section 3.5: Token Description */}
+					{token.description && (
+						<motion.div
+							initial={{ opacity: 0, y: 20 }}
+							animate={{ opacity: 1, y: 0 }}
+							transition={{ delay: 0.18 }}
+							className="bg-card border border-border rounded-xl p-4"
+						>
+							<h3 className="text-sm font-semibold mb-2">
+								About {token.symbol}
+							</h3>
+							<div className="relative">
+								<p
+									className={cn(
+										"text-sm text-muted-foreground whitespace-pre-wrap",
+										!isDescriptionExpanded &&
+											"line-clamp-2",
+									)}
+								>
+									{token.description}
+								</p>
+								{token.description.length > 150 && (
+									<button
+										onClick={() =>
+											setIsDescriptionExpanded(
+												!isDescriptionExpanded,
+											)
+										}
+										className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 mt-2 font-medium transition-colors"
+									>
+										{isDescriptionExpanded ? (
+											<>
+												<ChevronUp className="h-3.5 w-3.5" />
+												Show less
+											</>
+										) : (
+											<>
+												<ChevronDown className="h-3.5 w-3.5" />
+												Show more
+											</>
+										)}
+									</button>
+								)}
+							</div>
+						</motion.div>
+					)}
 
 					{/* Section 4 & 5: Comments / Trades Tabs - matching screenshot exactly */}
 					<motion.div
@@ -712,6 +919,9 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 					</motion.div>
 				</div>
 			</div>
+
+			{/* Share Modal */}
+			<ShareMenuComponent />
 		</div>
 	);
 }

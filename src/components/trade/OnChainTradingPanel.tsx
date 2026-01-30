@@ -11,7 +11,6 @@ import { formatEther, parseEther, type Address } from "viem";
 import {
 	ArrowUpCircle,
 	ArrowDownCircle,
-	Wallet,
 	AlertTriangle,
 	TrendingUp,
 	TrendingDown,
@@ -107,11 +106,7 @@ export function OnChainTradingPanel({
 	currentPrice,
 	className,
 }: OnChainTradingPanelProps) {
-	const {
-		walletAddress: address,
-		isAuthenticated,
-		setShowAuthFlow,
-	} = useAuth();
+	const { isAuthenticated, setShowAuthFlow } = useAuth();
 	const [tradeType, setTradeType] = useState<TradeType>("buy");
 	const [amount, setAmount] = useState("");
 	const [slippage, setSlippage] = useState(5); // 5% default
@@ -122,11 +117,8 @@ export function OnChainTradingPanel({
 	// Balances - with refetch capability
 	const { data: nativeBalance, refetch: refetchNativeBalance } =
 		useNativeBalance();
-	const {
-		data: tokenBalance,
-		refetch: refetchTokenBalance,
-		isLoading: isLoadingBalance,
-	} = useTokenBalance(tokenAddress);
+	const { data: tokenBalance, refetch: refetchTokenBalance } =
+		useTokenBalance(tokenAddress);
 
 	// Debug logging for balance
 	// useEffect(() => {
@@ -208,7 +200,6 @@ export function OnChainTradingPanel({
 	const isFailed = isBuyFailed || isSellFailed;
 	const txHash = buyTxHash || sellTxHash;
 	const error = buyError || sellError || approveError;
-
 
 	// Check if needs approval for sell
 	const needsApproval = useMemo(() => {
@@ -580,7 +571,6 @@ export function OnChainTradingPanel({
 			if (qa === "25%") percentage = 0.25;
 			else if (qa === "50%") percentage = 0.5;
 			else if (qa === "75%") percentage = 0.75;
-
 			// else if (qa === "MAX") 0.99
 			else if (qa === "MAX") percentage = 0.9999999;
 
