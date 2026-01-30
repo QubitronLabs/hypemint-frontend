@@ -11,34 +11,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PriceChart } from "@/components/charts";
-import dynamic from "next/dynamic";
+import {
+	BondingCurveProgress,
+	TokenChat,
+	VestingCard,
+} from "@/components/token";
+import {
+	TradeTape,
+	OnChainTradingPanel,
+	TradingPanel,
+} from "@/components/trade";
 
-
-const TradeTape = dynamic(
-	() => import("@/components/trade").then((mod) => mod.TradeTape),
-	{ ssr: false, loading: () => <Skeleton className="h-[200px] rounded-xl" /> },
-);
-const TradingPanel = dynamic(
-	() => import("@/components/trade").then((mod) => mod.TradingPanel),
-	{ ssr: false, loading: () => <Skeleton className="h-[400px] rounded-xl" /> },
-);
-const OnChainTradingPanel = dynamic(
-	() => import("@/components/trade").then((mod) => mod.OnChainTradingPanel),
-	{ ssr: false, loading: () => <Skeleton className="h-[400px] rounded-xl" /> },
-);
-const BondingCurveProgress = dynamic(
-	() =>
-		import("@/components/token").then((mod) => mod.BondingCurveProgress),
-	{ ssr: false, loading: () => <Skeleton className="h-[100px] rounded-xl" /> },
-);
-const TokenChat = dynamic(
-	() => import("@/components/token").then((mod) => mod.TokenChat),
-	{ ssr: false, loading: () => <Skeleton className="h-[300px] rounded-xl" /> },
-);
-const VestingCard = dynamic(
-	() => import("@/components/token").then((mod) => mod.VestingCard),
-	{ ssr: false, loading: () => <Skeleton className="h-[150px] rounded-xl" /> },
-);
 import { useToken, tokenKeys, useTokenHolders } from "@/hooks/useTokens";
 import { useTokenTrades, tradeKeys } from "@/hooks/useTrades";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -483,19 +466,6 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						>
 							{/* Tab Headers */}
 							<TabsList className=" h-auto bg-transparent border-0 p-0 gap-6 px-4 pt-4">
-								{/* <TabsTrigger
-								
-									value="comments"
-									className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground data-[state=active]:text-foreground border-b-2 border-transparent data-[state=active]:border-foreground rounded-none  pb-2 text-sm font-medium "
-								>
-									Comments
-								</TabsTrigger>
-								<TabsTrigger
-									value="trades"
-									className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground data-[state=active]:text-foreground border-b-2 border-transparent data-[state=active]:border-foreground rounded-none pb-2 text-sm font-medium "
-								>
-									Trades
-								</TabsTrigger> */}
 								<TabsTrigger
 									value="comments"
 									className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-green-500 data-[state=active]:shadow-[0_2px_8px_rgba(var(--primary),0.5)] border-b-2 border-transparent rounded-sm pb-2 text-sm font-medium"
