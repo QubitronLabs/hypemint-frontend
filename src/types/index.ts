@@ -102,6 +102,7 @@ export interface CreateTokenInput {
 	chainId: number;
 	contractAddress?: string; // On-chain contract address
 	bondingCurveAddress?: string; // On-chain bonding curve address
+	hypeBoostEnabled?: boolean; // Whether HypeBoost is enabled for enhanced visibility
 }
 
 export interface Trade {

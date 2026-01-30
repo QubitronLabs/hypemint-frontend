@@ -699,6 +699,7 @@ export function TokenCreationForm() {
 						chainId: 80002,
 						contractAddress: result.tokenAddress,
 						bondingCurveAddress: result.bondingCurveAddress,
+						hypeBoostEnabled, 
 					});
 
 					if (apiResult.id) {
