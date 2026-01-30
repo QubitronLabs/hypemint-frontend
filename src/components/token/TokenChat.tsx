@@ -214,21 +214,39 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 
 		setSending(true);
 		try {
-			const formData = new FormData();
-			formData.append("content", dialogMessage.trim());
+			let imageUrl: string | undefined = undefined;
+
+			// 1. Upload image if selected
 			if (selectedImage) {
-				formData.append("image", selectedImage);
+				const formData = new FormData();
+				formData.append("file", selectedImage); // backend expects 'file'
+
+				const uploadResponse = await apiClient.post(
+					"/api/v1/uploads/image",
+					formData,
+					{ headers: { "Content-Type": "multipart/form-data" } }
+				);
+
+				if (uploadResponse.data?.success) {
+					imageUrl = uploadResponse.data.data.url;
+				} else {
+					// Handle upload failure silently or notify user?
+					// For now we continue without image or throw?
+					console.error("Image upload failed");
+					// Optional: throw new Error("Image upload failed");
+				}
 			}
-			if (parentId) {
-				formData.append("parentId", parentId);
-			}
+
+			// 2. Create comment with imageUrl
+			const payload = {
+				content: dialogMessage.trim(),
+				parentId: parentId || null, // Ensure explicit null if not set, or undefined
+				imageUrl: imageUrl, 
+			};
 
 			const response = await apiClient.post(
 				`/api/v1/comments/token/${tokenId}`,
-				selectedImage ? formData : { content: dialogMessage.trim(), parentId },
-				selectedImage
-					? { headers: { "Content-Type": "multipart/form-data" } }
-					: undefined,
+				payload
 			);
 
 			if (response.data?.success) {
