@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Zap } from "lucide-react";
+import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { cn, fromWei, formatNumber } from "@/lib/utils";
 import { TokenImage } from "@/components/ui/token-image";
 import { formatRelativeTime } from "@/lib/formatters";
@@ -15,11 +16,48 @@ interface TokenCardProps {
 }
 
 /**
+ * Mini Price Chart - Proper Recharts BC
+ */
+function MiniPriceChart({ data }: { data?: Array<{ timestamp: number; price: number }> }) {
+	if (!data || data.length < 2) return null;
+	
+	// Format data for recharts
+	const chartData = data.map(d => ({ value: d.price }));
+	
+	// Determine trend color
+	const isPositive = data[data.length - 1].price >= data[0].price;
+	const strokeColor = isPositive ? "#00ff88" : "#ff4444";
+	
+	return (
+		<ResponsiveContainer width={80} height={30}>
+			<LineChart data={chartData}>
+				<Line 
+					type="monotone" 
+					dataKey="value" 
+					stroke={strokeColor}
+					strokeWidth={2}
+					dot={false}
+					isAnimationActive={false}
+				/>
+			</LineChart>
+		</ResponsiveContainer>
+	);
+}
+
+/**
  * TokenCard - Pump.fun style token card with image, creator info, and bonding curve progress
  */
 export function TokenCard({ token, className }: TokenCardProps) {
-	// Add null safety for priceChange24h
-	const priceChange = token.priceChange24h ?? 0;
+	// Calculate price change from initial to current (actual gain/loss %) BC
+	const priceChange = useMemo(() => {
+		const currentPrice = parseFloat(token.currentPrice);
+		const initialPrice = parseFloat(token.initialPrice);
+		
+		if (!initialPrice || !currentPrice || initialPrice === 0) return 0;
+		
+		return ((currentPrice - initialPrice) / initialPrice) * 100;
+	}, [token.currentPrice, token.initialPrice]);
+	
 	const priceChangePositive = priceChange >= 0;
 
 	const formattedMarketCap = useMemo(() => {
@@ -81,12 +119,19 @@ export function TokenCard({ token, className }: TokenCardProps) {
 					opacity: { duration: 0.2 },
 				}}
 				className={cn(
-					"bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3 cursor-pointer",
+					"bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3 cursor-pointer relative overflow-hidden",
 					"hover:bg-[#1e1e1e] hover:border-[#3a3a3a] transition-all duration-200",
 					"flex gap-3",
 					className,
 				)}
 			>
+				{/* Mini Chart - Top Right Corner BC */}
+				{token.priceHistory && token.priceHistory.length > 0 && (
+					<div className="absolute top-2 right-2 z-10">
+						<MiniPriceChart data={token.priceHistory} />
+					</div>
+				)}
+				
 				{/* Token Image - Square */}
 				<div className="shrink-0">
 					<TokenImage
@@ -100,7 +145,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
 
 				{/* Content */}
 				<div className="flex-1 min-w-0 flex flex-col">
-					{/* Row 1: Name + HYPE badge + Progress bar at end */}
+					{/* Row 1: Name + HYPE badge */}
 					<div className="flex items-center gap-2">
 						<h3 className="font-bold text-white text-[15px] leading-tight truncate">
 							{token.name}
@@ -111,20 +156,6 @@ export function TokenCard({ token, className }: TokenCardProps) {
 								HYPE
 							</span>
 						)}
-						{/* Progress Bar - at the end of first row */}
-						<div className="ml-auto flex items-center gap-1.5 shrink-0">
-							<div className="w-[150px] h-[10px] bg-[#333] rounded-full overflow-hidden">
-								<motion.div
-									initial={{ width: 0 }}
-									animate={{ width: `${bondingProgress}%` }}
-									transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
-									className="h-full rounded-full bg-gradient-to-r from-[#00ff88] to-[#00cc6a]"
-								/>
-							</div>
-							<span className="text-[10px] text-[#888] font-medium">
-								{bondingProgress.toFixed(1)}%
-							</span>
-						</div>
 					</div>
 
 					{/* Row 2: Symbol */}
@@ -132,7 +163,6 @@ export function TokenCard({ token, className }: TokenCardProps) {
 
 					{/* Row 3: Creator + Time */}
 					<div className="flex items-center gap-1.5 mt-1 text-xs">
-						{/* <span className="text-sm">🐸</span> */}
 						{creatorDisplay && (
 							<span className="text-[#6b8afd] font-medium">{creatorDisplay}</span>
 						)}
@@ -140,27 +170,62 @@ export function TokenCard({ token, className }: TokenCardProps) {
 					</div>
 
 					{/* Row 4: Market Cap + Price Change */}
-					<div className="flex items-center gap-2 mt-1.5">
+					<div className="flex items-center gap-2 mt-1.5 mb-2">
 						<span className="text-[#777] text-xs font-medium shrink-0">MC</span>
 						<span className="text-[#00ff88] text-sm font-bold shrink-0">
 							{formattedMarketCap}
-						</span>
-
-						{/* Price Change at end */}
-						<span
+						&nbsp;&nbsp;
+							<span
 							className={cn(
-								"text-xs font-semibold shrink-0 ml-auto",
+								"text-[10px] font-semibold shrink-0 ml-auto",
 								priceChangePositive ? "text-[#00ff88]" : "text-[#ff4444]"
 							)}
 						>
+							(
 							{priceChangePositive ? "↑" : "↓"}
 							{formattedPriceChange}
+							)
+						</span>
+						</span>
+						{/* Price Change */}
+					</div>
+
+					{/* Progress Bar - Glassmorphism Style BC! */}
+					<div className="relative">
+						{/* Background track with subtle gradient */}
+						<div className="w-full h-2 bg-gradient-to-r from-[#1a1a1a] via-[#222] to-[#1a1a1a] rounded-full border border-[#333] overflow-hidden backdrop-blur-sm">
+							{/* Animated progress bar with glow */}
+							<motion.div
+								initial={{ width: 0 }}
+								animate={{ width: `${bondingProgress}%` }}
+								transition={{ duration: 1.2, ease: [0.4, 0, 0.2, 1] }}
+								className="relative h-full rounded-full bg-gradient-to-r from-[#00ff88] via-[#00dd77] to-[#00cc6a]"
+								style={{
+									boxShadow: bondingProgress > 0 
+										? '0 0 12px rgba(0, 255, 136, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.3)'
+										: 'none'
+								}}
+							>
+								{/* Shine effect saale */}
+								{bondingProgress > 5 && (
+									<div 
+										className="absolute inset-0 rounded-full"
+										style={{
+											background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)',
+										}}
+									/>
+								)}
+							</motion.div>
+						</div>
+						{/* Progress percentage */}
+						<span className="absolute -top-5 right-0 text-[10px] text-[#999] font-bold">
+							{bondingProgress.toFixed(1)}%
 						</span>
 					</div>
 
 					{/* Row 5: Description */}
 					{truncatedDescription && (
-						<p className="text-[#666] text-xs mt-1 leading-relaxed line-clamp-1">
+						<p className="text-[#666] text-xs mt-2 leading-relaxed line-clamp-1">
 							{truncatedDescription}
 						</p>
 					)}

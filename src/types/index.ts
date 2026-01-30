@@ -75,6 +75,7 @@ export interface Token {
 	priceChange5m?: string;
 	priceChange1h?: string;
 	priceChange6h?: string;
+	priceHistory?: Array<{ timestamp: number; price: number }>; // Mini chart data BC
 	chainId: number;
 	status: TokenStatus;
 	creatorId: string;
@@ -86,6 +87,7 @@ export interface Token {
 	currentBondingAmount: string;
 	holdersCount: number;
 	tradesCount: number;
+	likesCount?: number; // Social signal madarchod
 	hypeBoostEnabled?: boolean;
 	createdAt: string;
 	updatedAt: string;

@@ -125,18 +125,14 @@ export function Header() {
 					{/* Create Button */}
 					<Link href="/create" className="hidden sm:block">
 						<motion.div
-							whileHover={{ scale: 1.05 }}
-							whileTap={{ scale: 0.95 }}
+							whileHover={{ scale: 1.02 }}
+							whileTap={{ scale: 0.98 }}
+							className="h-9 md:h-10 px-3 md:px-4 rounded-lg bg-primary hover:bg-primary/90 transition-colors flex items-center gap-2 cursor-pointer"
 						>
-							<Button
-								size="sm"
-								className="gap-2 h-9 md:h-10 px-3 md:px-4 bg-gradient-to-r from-primary to-purple-600 hover:opacity-90 rounded-xl shadow-lg shadow-primary/20"
-							>
-								<Plus className="h-4 w-4" />
-								<span className="hidden md:inline font-medium">
-									Create
-								</span>
-							</Button>
+							<Plus className="h-4 w-4 text-primary-foreground" />
+							<span className="hidden md:inline font-semibold text-sm text-primary-foreground">
+								Create
+							</span>
 						</motion.div>
 					</Link>
 

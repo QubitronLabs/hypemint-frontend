@@ -163,18 +163,14 @@ export function Sidebar() {
 				<div className="p-3 border-t border-border/50">
 					<Link href="/create" onClick={handleNavClick}>
 						<motion.div
-							whileHover={{ scale: 1.05 }}
-							whileTap={{ scale: 0.95 }}
+							whileHover={{ scale: 1.03 }}
+							whileTap={{ scale: 0.97 }}
+							className="w-full h-11 flex flex-col items-center justify-center gap-0.5 rounded-lg bg-primary hover:bg-primary/90 transition-colors cursor-pointer"
 						>
-							<Button
-								className="w-full h-12 bg-gradient-to-br from-primary to-purple-600 hover:opacity-90 flex flex-col items-center justify-center gap-0.5 px-0 rounded-xl shadow-lg shadow-primary/20"
-								size="sm"
-							>
-								<Plus className="h-5 w-5" />
-								<span className="text-[9px] font-medium">
-									Create
-								</span>
-							</Button>
+							<Plus className="h-4 w-4 text-primary-foreground" />
+							<span className="text-[9px] font-semibold text-primary-foreground">
+								Create
+							</span>
 						</motion.div>
 					</Link>
 				</div>

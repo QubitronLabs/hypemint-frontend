@@ -560,20 +560,16 @@ function HomePage() {
 					className="mb-6 sm:mb-8"
 				>
 					<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4">
-						<div>
-							<h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2">
-								<span className="bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
-									Discover Tokens
-								</span>
+						<div className="flex-1">
+							<h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">
+								Trending Coins
 							</h1>
 							<p className="text-sm sm:text-base text-muted-foreground">
 								Find the next moonshot or launch your own
 							</p>
 						</div>
 
-						<div className="flex items-center gap-2 sm:gap-3">
-							{/* <LiveIndicator isConnected={wsConnected} /> */}
-						</div>
+						 
 					</div>
 				</motion.div>
 
@@ -693,7 +689,7 @@ function HomePage() {
 									initial={{ opacity: 0 }}
 									animate={{ opacity: 1 }}
 									exit={{ opacity: 0 }}
-									className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4"
+									className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4"
 								>
 									{Array.from({ length: 12 }).map((_, i) => (
 										<div
@@ -757,7 +753,7 @@ function HomePage() {
 									key="grid"
 									initial={{ opacity: 0 }}
 									animate={{ opacity: 1 }}
-									className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4"
+									className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4"
 								>
 									{filteredTokens.map((token, index) => (
 										<motion.div
