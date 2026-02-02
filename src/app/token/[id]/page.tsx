@@ -342,7 +342,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 		<div className="w-full mx-auto p-3 sm:p-4 lg:p-6 relative overflow-x-clip">
 			<div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] relative gap-4 lg:gap-6">
 				{/* Main Content */}
-				<div className="min-w-0 space-y-4 sm:space-y-6 w-full lg:sticky lg:top-22 lg:self-start overflow-y-auto scroll-smooth lg:max-h-[calc(100vh-6rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+				<div className="min-w-0 space-y-4 sm:space-y-6 w-full lg:sticky lg:top-22 lg:self-start overflow-y-auto scroll-smooth lg:max-h-[calc(100vh-6.5rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 					{/* Section 1: Token Header Card - Simplified as per screenshot 1 */}
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
@@ -732,7 +732,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 				</div>
 
 				{/* Sidebar */}
-				<div className="min-w-0 w-full lg:sticky lg:top-22 lg:self-start space-y-4 sm:space-y-6 overflow-y-auto scroll-smooth lg:max-h-[calc(100vh-6rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+				<div className="min-w-0 w-full lg:sticky lg:top-22 lg:self-start space-y-4 sm:space-y-6 overflow-y-auto scroll-smooth lg:max-h-[calc(100vh-6.5rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 					{/* Vesting Panel (Only if HypeBoost is enabled) */}
 					{token.hypeBoostEnabled && token.bondingCurveAddress && (
 					<motion.div
