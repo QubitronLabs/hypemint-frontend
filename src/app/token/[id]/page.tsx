@@ -261,6 +261,18 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 		}
 	}, [isConnected, id, subscribe, unsubscribe]);
 
+	useEffect(() => {
+		function applyOverflow() {
+			document.body.style.overflowY = "clip";
+		}
+		function removeOverflowY() {
+			document.body.style.overflowY = "auto";
+		}
+
+		applyOverflow();
+		return removeOverflowY;
+	}, []);
+
 	// Format contract address for display
 	const formatAddress = (address: string) => {
 		if (!address) return "";
@@ -330,7 +342,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 		<div className="w-full mx-auto p-3 sm:p-4 lg:p-6 relative overflow-x-clip">
 			<div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] relative gap-4 lg:gap-6">
 				{/* Main Content */}
-				<div className="min-w-0 space-y-4 sm:space-y-6">
+				<div className="min-w-0 space-y-4 sm:space-y-6 w-full lg:sticky lg:top-22 lg:self-start overflow-y-auto scroll-smooth lg:max-h-[calc(100vh-6rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 					{/* Section 1: Token Header Card - Simplified as per screenshot 1 */}
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
@@ -720,22 +732,22 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 				</div>
 
 				{/* Sidebar */}
-				<div className="min-w-0 w-full lg:sticky lg:top-22 lg:self-start space-y-4 sm:space-y-6 overflow-y-scroll scroll-smooth lg:max-h-[calc(100vh-2rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+				<div className="min-w-0 w-full lg:sticky lg:top-22 lg:self-start space-y-4 sm:space-y-6 overflow-y-auto scroll-smooth lg:max-h-[calc(100vh-6rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 					{/* Vesting Panel (Only if HypeBoost is enabled) */}
 					{token.hypeBoostEnabled && token.bondingCurveAddress && (
-						<motion.div
-							initial={{ opacity: 0, x: 20 }}
-							animate={{ opacity: 1, x: 0 }}
-							className="mb-6"
-						>
-							<VestingCard
-								bondingCurveAddress={
-									token.bondingCurveAddress as Address
-								}
-								symbol={token.symbol}
-							/>
-						</motion.div>
-					)}
+					<motion.div
+						initial={{ opacity: 0, x: 20 }}
+						animate={{ opacity: 1, x: 0 }}
+						className="mb-6"
+					>
+						<VestingCard
+							bondingCurveAddress={
+								token.bondingCurveAddress as Address
+							}
+							symbol={token.symbol}
+						/>
+					</motion.div>
+					 )} 
 
 					{/* Trading Panel - On-Chain or Centralized */}
 					<motion.div

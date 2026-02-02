@@ -537,7 +537,7 @@ export function OnChainTradingPanel({
 					slippageBps: slippage * 100,
 				});
 				if (hash) {
-					toast.success("Sell order submitted!", {
+					toast.info("Sell order submitted!", {
 						id: "trade",
 						description: `Tx: ${hash.slice(0, 10)}...`,
 						action: {
