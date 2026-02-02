@@ -134,11 +134,11 @@ export function TokenCard({ token, className }: TokenCardProps) {
 				)}
 			>
 				{/* Mini Chart - Top Right Corner BC */}
-				{token.priceHistory && token.priceHistory.length > 0 && (
+				{/* {token.priceHistory && token.priceHistory.length > 0 && (
 					<div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 z-10">
 						<MiniPriceChart data={token.priceHistory} />
 					</div>
-				)}
+				)} */}
 				
 				{/* Token Image - Square (responsive size) */}
 				<div className="shrink-0">
@@ -189,12 +189,9 @@ export function TokenCard({ token, className }: TokenCardProps) {
 						>
 							({priceChangePositive ? "+" : ""}{priceChange.toFixed(2)}%)
 						</span>
-					</div>
-
-					{/* Row 4: Progress Bar + Percentage + Graduated Badge */}
-					<div className="flex items-center gap-1.5 sm:gap-2 mt-1 sm:mt-1.5">
 						{/* Mini Progress Bar */}
-						<div className="relative w-10 sm:w-12 h-1 sm:h-1.5 bg-[#222] rounded-full overflow-hidden shrink-0">
+						{/* hide this on mobile */}
+						<div className="relative hidden md:block w-10 sm:w-22 h-1 sm:h-1.5 bg-[#222] rounded-full overflow-hidden shrink-0">
 							<motion.div
 								initial={{ width: 0 }}
 								animate={{ width: `${Math.max(bondingProgress > 0 ? 4 : 0, bondingProgress)}%` }}
@@ -208,9 +205,32 @@ export function TokenCard({ token, className }: TokenCardProps) {
 								}}
 							/>
 						</div>
-						<span className="text-[9px] sm:text-[10px] text-[#999] font-medium shrink-0">
+						<span className="text-[9px] sm:text-[10px] hidden md:block text-[#999] font-medium shrink-0">
 							{bondingProgress.toFixed(1)}%
 						</span>
+					</div>
+
+					{/* Row 4: Progress Bar + Percentage + Graduated Badge */}
+					<div className="flex items-center gap-1.5 sm:gap-2 mt-1 sm:mt-1.5">
+						{/* Mini Progress Bar */}
+						<div className="relative w-42 h-1 sm:h-1.5 bg-[#222] rounded-full overflow-hidden shrink-0 md:hidden block">
+							<motion.div
+								initial={{ width: 0 }}
+								animate={{ width: `${Math.max(bondingProgress > 0 ? 4 : 0, bondingProgress)}%` }}
+								transition={{ duration: 0.8, ease: "easeOut" }}
+								className="h-full rounded-full bg-gradient-to-r from-[#00ff88] to-[#00cc6a]"
+								style={{
+									minWidth: bondingProgress > 0 ? '3px' : '0px',
+									boxShadow: bondingProgress > 0 
+										? '0 0 6px rgba(0, 255, 136, 0.4)'
+										: 'none'
+								}}
+							/>
+						</div>
+						<span className="text-[9px] sm:text-[10px] text-[#999] font-medium shrink-0 md:hidden ">
+							{bondingProgress.toFixed(1)}%
+						</span>
+						
 						{/* Graduated Badge */}
 						{isGraduated && (
 							<span className="inline-flex items-center gap-0.5 px-1 sm:px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 text-[8px] sm:text-[10px] font-medium shrink-0 ml-auto">
