@@ -10,7 +10,7 @@ import {
 	// Rocket,
 	Flame,
 	// TrendingUp,
-	Clock,
+	// Clock,
 	Trophy,
 	Plus,
 	LayoutGrid,
@@ -803,7 +803,7 @@ function HomePage() {
 									key="list"
 									initial={{ opacity: 0 }}
 									animate={{ opacity: 1 }}
-									className="overflow-x-auto"
+									className="overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
 								>
 									{/* List Header - Fixed min-width for horizontal scrolling */}
 									<div className="flex items-center gap-3 px-4 py-2.5 text-[10px] text-[#666] font-medium uppercase border-b border-[#333] bg-[#0a0a0a] sticky top-0 z-10 min-w-[1200px]">

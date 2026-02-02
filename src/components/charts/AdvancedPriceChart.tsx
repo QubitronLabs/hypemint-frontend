@@ -391,11 +391,45 @@ export function AdvancedPriceChart({
 				if (!cancelled) {
 					setCandles(processed);
 					setIsLoading(false);
-					// Preserve user's manual positioning, only reset candleWidth to default
-					setChartState((prev) => ({
-						offsetX: prev.offsetX,
-						candleWidth: DEFAULT_CANDLE_WIDTH,
-					}));
+					
+					// Center the chart on initial load, preserve position on timeframe changes
+					setChartState((prev) => {
+						// If this is the first load (offsetX is still 0), position chart to show most recent candles
+						if (prev.offsetX === 0 && processed.length > 0) {
+							const spacing = DEFAULT_CANDLE_WIDTH + 2;
+							const chartWidth = dims.w - PRICE_AXIS_WIDTH;
+							const visibleCandles = Math.floor(chartWidth / spacing);
+							
+							// Position chart so most recent candles are visible on the right
+							// Leave ~15% empty space on the right for future candles
+							const rightPadding = Math.floor(visibleCandles * 0.15);
+							const totalWidth = processed.length * spacing;
+							
+							// If all candles fit in view, center them
+							if (totalWidth <= chartWidth) {
+								const targetOffset = (chartWidth - totalWidth) / 2;
+								return {
+									offsetX: targetOffset,
+									candleWidth: DEFAULT_CANDLE_WIDTH,
+								};
+							}
+							
+							// If more candles than fit in view, show the most recent ones
+							// Position = rightmost position - right padding
+							const targetOffset = chartWidth - totalWidth + (rightPadding * spacing);
+							
+							return {
+								offsetX: targetOffset,
+								candleWidth: DEFAULT_CANDLE_WIDTH,
+							};
+						}
+						
+						// Preserve user's manual positioning, only reset candleWidth to default
+						return {
+							offsetX: prev.offsetX,
+							candleWidth: DEFAULT_CANDLE_WIDTH,
+						};
+					});
 				}
 			} catch (err) {
 				if (!cancelled) {
@@ -411,7 +445,7 @@ export function AdvancedPriceChart({
 		return () => {
 			cancelled = true;
 		};
-	}, [tokenId, timeRange]);
+	}, [tokenId, timeRange, dims.w]);
 
 	// ============================================================================
 	// Resize Observer
@@ -602,8 +636,17 @@ export function AdvancedPriceChart({
 		}
 
 		// Grid - vertical (time)
-		const timeStep = Math.max(1, Math.floor((endIdx - startIdx) / 8));
-		for (let i = startIdx; i < endIdx; i += timeStep) {
+		// Calculate minimum pixel distance between grid lines to prevent clutter
+		const gridSpacing = chartState.candleWidth + 2;
+		const minGridSpacing = 60; // Minimum 60px between grid lines
+		const minGridStep = Math.max(1, Math.ceil(minGridSpacing / gridSpacing));
+		const gridTimeStep = Math.max(minGridStep, Math.floor((endIdx - startIdx) / 8));
+		
+		// Extend grid beyond visible candles to fill the entire width
+		const maxGridIdx = Math.ceil(chartWidth / gridSpacing);
+		const extendedGridEndIdx = Math.max(endIdx, startIdx + maxGridIdx);
+		
+		for (let i = startIdx; i < extendedGridEndIdx; i += gridTimeStep) {
 			const x = Math.floor(getCandleX(i)) + 0.5;
 			if (x >= 0 && x <= chartWidth) {
 				ctx.beginPath();
@@ -1241,14 +1284,63 @@ export function AdvancedPriceChart({
 		ctx.font = "10px -apple-system, system-ui, sans-serif";
 		ctx.textAlign = "center";
 
-		for (let i = startIdx; i < endIdx; i += timeStep) {
+		// Calculate time interval in seconds based on timeRange
+		const timeIntervalSeconds: Record<TimeRange, number> = {
+			"1m": 60,
+			"5m": 300,
+			"15m": 900,
+			"1h": 3600,
+			"4h": 14400,
+			"1D": 86400,
+		};
+		const intervalSec = timeIntervalSeconds[timeRange];
+
+		// Calculate minimum pixel distance between labels to prevent overlap
+		const sampleLabel = candles[startIdx] ? formatTime(candles[startIdx].time, timeRange) : "00:00";
+		const labelWidth = ctx.measureText(sampleLabel).width;
+		const minLabelSpacing = labelWidth + 20; // Add 20px padding between labels
+		
+		// Calculate how many candles we need to skip to maintain minimum spacing
+		const labelSpacing = chartState.candleWidth + 2;
+		const minCandleStep = Math.max(1, Math.ceil(minLabelSpacing / labelSpacing));
+		
+		// Adjust timeStep to ensure labels don't overlap
+		const baseTimeStep = Math.max(1, Math.floor((endIdx - startIdx) / 8));
+		const timeStep = Math.max(minCandleStep, baseTimeStep);
+
+		// Extend the timeline beyond visible candles
+		// Calculate how many extra "virtual" candles to show on the right
+		const maxVisibleIdx = Math.ceil(chartWidth / labelSpacing);
+		const extendedEndIdx = Math.max(endIdx, startIdx + maxVisibleIdx);
+
+		let lastLabelX = -Infinity; // Track last drawn label position
+		for (let i = startIdx; i < extendedEndIdx; i += timeStep) {
 			const x = getCandleX(i);
-			if (x >= 0 && x <= chartWidth && candles[i]) {
+			
+			// Only draw label if it's within visible bounds and far enough from the last label
+			if (x >= 0 && x <= chartWidth && (x - lastLabelX) >= minLabelSpacing) {
+				let timeToDisplay: number;
+				
+				// If we have a real candle at this index, use its time
+				if (i < candles.length && candles[i]) {
+					timeToDisplay = candles[i].time;
+				} else {
+					// For virtual candles beyond available data, calculate projected time
+					const lastCandle = candles[candles.length - 1];
+					if (lastCandle) {
+						const candlesBeyond = i - (candles.length - 1);
+						timeToDisplay = lastCandle.time + (candlesBeyond * intervalSec);
+					} else {
+						continue; // Skip if no candles at all
+					}
+				}
+				
 				ctx.fillText(
-					formatTime(candles[i].time, timeRange),
+					formatTime(timeToDisplay, timeRange),
 					x,
 					chartHeight + 15,
 				);
+				lastLabelX = x;
 			}
 		}
 
