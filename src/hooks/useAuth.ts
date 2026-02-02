@@ -20,7 +20,7 @@ import {
  * NO API CALLS - uses cached data from auth store
  */
 export function useAuth() {
-    const { user: dynamicUser, primaryWallet, handleLogOut ,setShowAuthFlow} = useDynamicContext();
+    const { user: dynamicUser, primaryWallet, handleLogOut, setShowAuthFlow, sdkHasLoaded } = useDynamicContext();
     const isLoggedIn = useIsLoggedIn();
 
     const jwt = useJwt();
@@ -33,9 +33,10 @@ export function useAuth() {
     return {
         // Auth state
         isAuthenticated,
-        isLoading,
+        isLoading: isLoading || !sdkHasLoaded,
         isUserFetched,
         jwt,
+        sdkHasLoaded,
 
         // User data (from cache)
         user,

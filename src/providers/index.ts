@@ -1,5 +1,6 @@
 export { QueryProvider } from "./QueryProvider";
 export { DynamicProvider } from "./DynamicProvider";
+export { DynamicProviderWrapper } from "./DynamicProviderWrapper";
 export {
   UsernamePromptProvider,
   useRequireUsername,

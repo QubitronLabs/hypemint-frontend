@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PriceChart } from "@/components/charts";
+import { AdvancedPriceChart } from "@/components/charts";
 import {
 	BondingCurveProgress,
 	TokenChat,
@@ -521,11 +521,14 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							</div>
 						</div>
 
-						{/* Price Chart */}
-						<PriceChart
-							tokenId={id}
-							className="border-none rounded-none"
-						/>
+						{/* Advanced Price Chart with Tools and Indicators */}
+						<div className="h-[420px] sm:h-[480px]">
+							<AdvancedPriceChart
+								tokenId={id}
+								className="border-none rounded-none h-full"
+								showToolbar={true}
+							/>
+						</div>
 					</motion.div>
 
 					{/* Section 3: Metrics Row - 5 cards as per screenshot 2 bottom */}
