@@ -26,6 +26,7 @@ import {
 	BondingCurveProgress,
 	TokenChat,
 	VestingCard,
+	BubbleMapDialog,
 } from "@/components/token";
 import {
 	TradeTape,
@@ -66,6 +67,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 	const [isStarred, setIsStarred] = useState(false);
 	const [localIsFollowing, setLocalIsFollowing] = useState(false);
 	const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+	const [showBubbleMap, setShowBubbleMap] = useState(false);
 	const nativeSymbol = useNativeCurrencySymbol();
 
 	// Auth and follow hooks
@@ -871,6 +873,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 								variant="outline"
 								size="sm"
 								className="text-xs h-7"
+								onClick={() => setShowBubbleMap(true)}
 							>
 								Generate bubble map
 							</Button>
@@ -928,6 +931,15 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 
 			{/* Share Modal */}
 			<ShareMenuComponent />
+
+			{/* Bubble Map Dialog */}
+			<BubbleMapDialog
+				open={showBubbleMap}
+				onOpenChange={setShowBubbleMap}
+				tokenAddress={token.contractAddress}
+				tokenSymbol={token.symbol}
+				chainId={token.chainId}
+			/>
 		</div>
 	);
 }
