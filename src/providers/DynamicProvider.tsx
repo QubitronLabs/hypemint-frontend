@@ -9,7 +9,7 @@ import {
 } from "@dynamic-labs/sdk-react-core";
 import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
 import { SolanaWalletConnectors } from "@dynamic-labs/solana";
-import { type ReactNode, useEffect, useRef, useCallback } from "react";
+import { type ReactNode, useEffect, useRef, useCallback, useState } from "react";
 import { useAuthStore, shouldFetchUser } from "@/lib/auth";
 import { getCurrentUser } from "@/lib/api/auth";
 import { forceLogout } from "@/lib/api/client";
@@ -45,7 +45,7 @@ interface DynamicProviderProps {
  * Must be inside DynamicContextProvider to access hooks
  */
 function AuthSync({ children }: { children: ReactNode }) {
-  const { user, primaryWallet } = useDynamicContext();
+  const { user, primaryWallet, sdkHasLoaded } = useDynamicContext();
   const isLoggedIn = useIsLoggedIn();
   const {
     setJwt,
@@ -63,6 +63,9 @@ function AuthSync({ children }: { children: ReactNode }) {
 
   // Handle auth token changes from Dynamic.xyz
   const syncAuth = useCallback(async () => {
+    // Wait for SDK to fully load before syncing
+    if (!sdkHasLoaded) return;
+    
     // Prevent concurrent sync calls
     if (isSyncingRef.current) return;
 
@@ -141,6 +144,7 @@ function AuthSync({ children }: { children: ReactNode }) {
     primaryWallet,
     user,
     isUserFetched,
+    sdkHasLoaded,
     setJwt,
     setUser,
     setDynamicUser,
@@ -152,6 +156,12 @@ function AuthSync({ children }: { children: ReactNode }) {
   useEffect(() => {
     syncAuth();
   }, [syncAuth]);
+
+  // Wait for SDK to fully load before rendering children
+  // This prevents "getClient is null" errors in child components using Dynamic hooks
+  if (!sdkHasLoaded) {
+    return null;
+  }
 
   return (
     <>

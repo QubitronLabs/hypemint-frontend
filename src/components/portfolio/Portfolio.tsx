@@ -70,7 +70,7 @@ export function Portfolio({ className }: PortfolioProps) {
 	const queryClient = useQueryClient();
 
 	// Get Dynamic context for native token info and balance
-	const { primaryWallet } = useDynamicContext();
+	const { primaryWallet, sdkHasLoaded } = useDynamicContext();
 	const { networkName, chainLogo, chainId } = useGlobalNetwork();
 
 	// State for native balance from Dynamic
@@ -79,6 +79,9 @@ export function Portfolio({ className }: PortfolioProps) {
 
 	// Fetch native balance from Dynamic wallet
 	useEffect(() => {
+		// Wait for SDK to fully load before accessing wallet
+		if (!sdkHasLoaded) return;
+
 		const fetchBalance = async () => {
 			if (!primaryWallet) {
 				setNativeBalance(null);
@@ -103,7 +106,7 @@ export function Portfolio({ className }: PortfolioProps) {
 		};
 
 		fetchBalance();
-	}, [primaryWallet, chainId]); // Re-fetch when chain changes
+	}, [primaryWallet, chainId, sdkHasLoaded]); // Re-fetch when chain changes
 
 	// Get native token symbol from network name (uses our formatter helper)
 	const nativeTokenSymbol = useMemo(() => {

@@ -4,11 +4,21 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, Plus, Command, Menu } from "lucide-react";
-import { DynamicWidget } from "@dynamic-labs/sdk-react-core";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useSidebarStore } from "@/lib/sidebar";
+
+// Dynamic import DynamicWidget to prevent SSR issues
+const DynamicWidget = dynamic(
+	() => import("@dynamic-labs/sdk-react-core").then((mod) => mod.DynamicWidget),
+	{
+		ssr: false,
+		loading: () => <Skeleton className="h-9 md:h-10 w-24 rounded-xl" />,
+	}
+);
 
 export function Header() {
 	const [searchFocused, setSearchFocused] = useState(false);

@@ -30,12 +30,15 @@ interface EvmWalletConnector {
  * all Dynamic hooks work correctly.
  */
 export function NetworkStateSynchronizer() {
-	const { primaryWallet } = useDynamicContext();
+	const { primaryWallet, sdkHasLoaded } = useDynamicContext();
 	const { setNetworkData, clearNetworkData } = useNetworkStore();
 	const queryClient = useQueryClient();
 	const lastChainIdRef = useRef<number | null>(null);
 
 	useEffect(() => {
+		// Wait for SDK to be fully loaded before accessing wallet state
+		if (!sdkHasLoaded) return;
+
 		const updateNetworkState = async () => {
 			if (!primaryWallet?.connector) {
 				console.log(
@@ -159,7 +162,7 @@ export function NetworkStateSynchronizer() {
 				handleNetworkChange,
 			);
 		};
-	}, [primaryWallet, setNetworkData, clearNetworkData, queryClient]);
+	}, [primaryWallet, sdkHasLoaded, setNetworkData, clearNetworkData, queryClient]);
 
 	// This component renders nothing - it's just a state synchronizer
 	return null;

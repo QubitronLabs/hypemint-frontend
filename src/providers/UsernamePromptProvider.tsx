@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect, useRef, type ReactNode } from 'react';
-import { useIsLoggedIn } from '@dynamic-labs/sdk-react-core';
 import { UsernamePromptModal } from '@/components/modals';
 import { useUsernamePromptStore } from '@/lib/username-prompt';
-import { useCurrentUser } from '@/hooks';
+import { useCurrentUser, useAuth } from '@/hooks';
 
 interface UsernamePromptProviderProps {
     children: ReactNode;
@@ -21,7 +20,7 @@ interface UsernamePromptProviderProps {
  * IMPORTANT: Only shows once per session after user data is fetched.
  */
 export function UsernamePromptProvider({ children }: UsernamePromptProviderProps) {
-    const isLoggedIn = useIsLoggedIn();
+    const { isLoggedIn, sdkHasLoaded } = useAuth();
     const { data: user, isLoading, isFetched } = useCurrentUser();
     const { isOpen, hasSetUsername, open } = useUsernamePromptStore();
 
@@ -31,6 +30,7 @@ export function UsernamePromptProvider({ children }: UsernamePromptProviderProps
     // Check if we need to show the username prompt
     useEffect(() => {
         // Skip if:
+        // - SDK not loaded yet
         // - Already checking/checked
         // - Not logged in
         // - Still loading user data
@@ -38,6 +38,7 @@ export function UsernamePromptProvider({ children }: UsernamePromptProviderProps
         // - Modal is already open
         // - Username was set in this session
         if (
+            !sdkHasLoaded ||
             hasCheckedRef.current ||
             !isLoggedIn ||
             isLoading ||
@@ -61,14 +62,14 @@ export function UsernamePromptProvider({ children }: UsernamePromptProviderProps
 
             return () => clearTimeout(timer);
         }
-    }, [isLoggedIn, isLoading, isFetched, user, isOpen, hasSetUsername, open]);
+    }, [sdkHasLoaded, isLoggedIn, isLoading, isFetched, user, isOpen, hasSetUsername, open]);
 
     // Reset check when user logs out
     useEffect(() => {
-        if (!isLoggedIn) {
+        if (sdkHasLoaded && !isLoggedIn) {
             hasCheckedRef.current = false;
         }
-    }, [isLoggedIn]);
+    }, [sdkHasLoaded, isLoggedIn]);
 
     return (
         <>

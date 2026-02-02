@@ -7,7 +7,7 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import {
 	QueryProvider,
-	DynamicProvider,
+	DynamicProviderWrapper,
 	UsernamePromptProvider,
 	WagmiProvider,
 	WebSocketProvider,
@@ -78,7 +78,7 @@ export default function RootLayout({
 			>
 				<QueryProvider>
 					<WagmiProvider>
-						<DynamicProvider>
+						<DynamicProviderWrapper>
 							<WebSocketProvider>
 								<UsernamePromptProvider>
 									{/* Sidebar Navigation */}
@@ -96,7 +96,7 @@ export default function RootLayout({
 									<Toaster richColors position="top-right" />
 								</UsernamePromptProvider>
 							</WebSocketProvider>
-						</DynamicProvider>
+						</DynamicProviderWrapper>
 					</WagmiProvider>
 				</QueryProvider>
 			</body>
