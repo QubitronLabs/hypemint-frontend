@@ -203,7 +203,14 @@ export function OnChainTradingPanel({
 
 	// Check if needs approval for sell
 	const needsApproval = useMemo(() => {
-		if (tradeType !== "sell" || !amount) return false;
+		if (tradeType !== "sell") return false;
+
+		// If no amount entered, check if allowance is zero or insufficient for any meaningful trade
+		if (!amount) {
+			return allowance !== undefined && allowance === 0n;
+		}
+
+		// If amount is entered, check if allowance is sufficient for that specific amount
 		try {
 			const amountWei = parseEther(amount);
 			return allowance !== undefined && allowance < amountWei;
@@ -494,7 +501,7 @@ export function OnChainTradingPanel({
 					slippageBps: slippage * 100,
 				});
 				if (hash) {
-					toast.success("Buy order submitted!", {
+					toast.info("Buy order submitted!", {
 						id: "trade",
 						description: `Tx: ${hash.slice(0, 10)}...`,
 						action: {
@@ -645,7 +652,12 @@ export function OnChainTradingPanel({
 							placeholder="0.00"
 							value={amount}
 							onChange={(e) => setAmount(e.target.value)}
-							className="pr-14 sm:pr-16 text-base sm:text-lg font-medium bg-background/50"
+							className={cn(
+								"pr-14 sm:pr-16 text-base sm:text-lg font-medium bg-background/50",
+								tradeType === "buy"
+									? "focus-visible:border-green-500/70 focus-visible:ring-green-500/30"
+									: "focus-visible:border-red-500/70 focus-visible:ring-red-500/30",
+							)}
 						/>
 						<div className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-muted-foreground">
 							{tradeType === "buy" ? nativeSymbol : tokenSymbol}
@@ -659,7 +671,12 @@ export function OnChainTradingPanel({
 						<button
 							key={qa}
 							onClick={() => handleQuickAmount(qa)}
-							className="flex-1 py-1.5 text-xs font-medium bg-background/50 border border-border/50 rounded-md hover:border-primary/30 transition-colors"
+							className={cn(
+								"flex-1 py-1.5 text-xs font-medium bg-background/50 border border-border/50 rounded-md transition-colors",
+								tradeType === "buy"
+									? "hover:border-green-500/60 hover:bg-green-500/15"
+									: "hover:border-red-500/60 hover:bg-red-500/15",
+							)}
 						>
 							{qa}
 						</button>
@@ -777,7 +794,9 @@ export function OnChainTradingPanel({
 								className={cn(
 									"px-2 py-1 text-xs rounded transition-colors",
 									slippage === s
-										? "bg-primary text-primary-foreground"
+										? tradeType === "buy"
+											? "bg-green-500/25 text-green-300 border border-green-500/50"
+											: "bg-red-500/25 text-red-300 border border-red-500/50"
 										: "bg-background/50 hover:bg-background",
 								)}
 							>
@@ -790,48 +809,44 @@ export function OnChainTradingPanel({
 				{/* Execute Button */}
 
 				<>
-					{/* Approval Button (for sell) */}
-					{tradeType === "sell" && needsApproval && (
-						<Button
-							onClick={handleApprove}
-							disabled={isApproving || isApproveConfirming}
-							className="w-full h-12 mb-2 bg-gradient-to-r from-purple-500 to-pink-500"
-						>
-							{isApproving || isApproveConfirming ? (
-								<>
-									<Loader2 className="h-5 w-5 mr-2 animate-spin" />
-									Approving...
-								</>
-							) : (
-								<>
-									<Zap className="h-5 w-5 mr-2" />
-									Approve {tokenSymbol}
-								</>
-							)}
-						</Button>
-					)}
-
-					{/* Trade Button */}
+					{/* Trade Button - Merged with Approval functionality for sell */}
 					<Button
-						onClick={handleTrade}
+						onClick={
+							tradeType === "sell" && needsApproval
+								? handleApprove
+								: handleTrade
+						}
 						disabled={
 							isAuthenticated
 								? !amount ||
 									parseFloat(amount) <= 0 ||
 									isLoading ||
 									isConfirming ||
-									(tradeType === "sell" && needsApproval)
+									isApproving ||
+									isApproveConfirming
 								: false
 						}
 						className={cn(
 							"w-full h-12 text-base font-semibold cursor-pointer transition-all duration-200",
 							tradeType === "buy"
 								? "bg-gradient-to-r from-green-500 to-emerald-500 hover:opacity-90"
-								: "bg-gradient-to-r from-red-500 to-rose-500 hover:opacity-90 text-gray-100",
+								: tradeType === "sell" && needsApproval
+									? "bg-red-600/30 hover:bg-red-600/40 text-red-400"
+									: "bg-gradient-to-r from-red-500 to-rose-500 hover:opacity-90 text-gray-100",
 						)}
 					>
 						{!isAuthenticated ? (
 							<>Connect Wallet to Trade</>
+						) : tradeType === "sell" && needsApproval ? (
+							// Approval state for sell
+							isApproving || isApproveConfirming ? (
+								<>
+									<Loader2 className="h-5 w-5 mr-2 animate-spin" />
+									Approving...
+								</>
+							) : (
+								<>Approve {tokenSymbol}</>
+							)
 						) : isLoading ? (
 							<>
 								<Loader2 className="h-5 w-5 mr-2 animate-spin" />
