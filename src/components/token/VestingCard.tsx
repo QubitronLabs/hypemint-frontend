@@ -5,9 +5,9 @@ import { formatEther, type Address } from "viem";
 import { useVestingInfo, useClaimVested } from "@/hooks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Lock, Unlock, Clock, AlertCircle } from "lucide-react";
+import { Lock, Unlock, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface VestingCardProps {
@@ -16,8 +16,9 @@ interface VestingCardProps {
 }
 
 export function VestingCard({ bondingCurveAddress, symbol }: VestingCardProps) {
-    const { vestingInfo, claimableAmount } = useVestingInfo(bondingCurveAddress);
-    const { claim, isClaiming, isConfirming, isConfirmed, txHash, error } = useClaimVested();
+    const { vestingInfo, claimableAmount, refetch } = useVestingInfo(bondingCurveAddress);
+    const { claim, isClaiming, isConfirming, isConfirmed, txHash, error, reset } = useClaimVested();
+    const [justClaimed, setJustClaimed] = useState(false);
 
     // Vesting duration is fixed at 1 hour (3600 seconds) in current contract
     const VESTING_DURATION = 3600;
@@ -27,6 +28,25 @@ export function VestingCard({ bondingCurveAddress, symbol }: VestingCardProps) {
 
     // Get startTime safely (may be undefined if no vestingInfo)
     const startTime = vestingInfo?.startTime ?? 0n;
+
+    // Refetch data after successful claim
+    useEffect(() => {
+        if (isConfirmed && !justClaimed) {
+            setJustClaimed(true);
+            // Refetch vesting data after a short delay to allow blockchain to update
+            const timer = setTimeout(() => {
+                refetch();
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [isConfirmed, justClaimed, refetch]);
+
+    // Reset justClaimed state when user makes another claim attempt
+    useEffect(() => {
+        if (isClaiming) {
+            setJustClaimed(false);
+        }
+    }, [isClaiming]);
 
     useEffect(() => {
         // Only update if we have a valid startTime
@@ -44,12 +64,19 @@ export function VestingCard({ bondingCurveAddress, symbol }: VestingCardProps) {
     }, [startTime, VESTING_DURATION]);
 
     // Early return AFTER all hooks
+    // Don't show card if no vesting info or totalAmount is 0
     if (!vestingInfo || vestingInfo.totalAmount === 0n) {
         return null;
     }
 
     const { totalAmount, claimedAmount } = vestingInfo;
     const remaining = totalAmount - claimedAmount;
+
+    // Hide card if everything is claimed (remaining === 0 and no claimable)
+    const isFullyClaimed = remaining === 0n && (!claimableAmount || claimableAmount === 0n);
+    if (isFullyClaimed) {
+        return null;
+    }
 
     const progressPercent = Math.min(100, (elapsed / VESTING_DURATION) * 100);
     const timeRemaining = Math.max(0, VESTING_DURATION - elapsed);
@@ -58,10 +85,13 @@ export function VestingCard({ bondingCurveAddress, symbol }: VestingCardProps) {
     const secondsLeft = timeRemaining % 60;
 
     const handleClaim = async () => {
+        reset(); // Reset previous state
+        setJustClaimed(false);
         await claim(bondingCurveAddress);
     };
 
     const hasClaimable = claimableAmount && claimableAmount > 0n;
+    const isVestingComplete = elapsed >= VESTING_DURATION;
 
     return (
         <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-background">
@@ -91,7 +121,7 @@ export function VestingCard({ bondingCurveAddress, symbol }: VestingCardProps) {
                 {/* Progress Bar */}
                 <div className="space-y-1">
                     <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Unlocking...</span>
+                        <span>{isVestingComplete ? "Fully Unlocked" : "Unlocking..."}</span>
                         <span>{minutesLeft}m {secondsLeft}s left</span>
                     </div>
                     <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
@@ -105,28 +135,44 @@ export function VestingCard({ bondingCurveAddress, symbol }: VestingCardProps) {
                 </div>
 
                 {/* Claim Button */}
-                <Button 
-                    onClick={handleClaim}
-                    disabled={!hasClaimable || isClaiming || isConfirming}
-                    className="w-full"
-                    variant={hasClaimable ? "default" : "secondary"}
-                >
-                    {isClaiming || isConfirming ? (
-                         <>Processing...</>
+                <AnimatePresence mode="wait">
+                    {justClaimed && isConfirmed ? (
+                        <motion.div
+                            key="claimed"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            className="w-full py-2 px-4 bg-green-500/20 border border-green-500/30 rounded-md flex items-center justify-center gap-2 text-green-500"
+                        >
+                            <CheckCircle2 className="h-4 w-4" />
+                            <span className="font-medium">Claimed Successfully!</span>
+                        </motion.div>
                     ) : (
-                        <>
-                            <Unlock className="mr-2 h-4 w-4" />
-                            Claim Tokens
-                        </>
+                        <motion.div key="button" initial={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                            <Button 
+                                onClick={handleClaim}
+                                disabled={!hasClaimable || isClaiming || isConfirming}
+                                className="w-full"
+                                variant={hasClaimable ? "default" : "secondary"}
+                            >
+                                {isClaiming || isConfirming ? (
+                                     <>Processing...</>
+                                ) : hasClaimable ? (
+                                    <>
+                                        <Unlock className="mr-2 h-4 w-4" />
+                                        Claim Tokens
+                                    </>
+                                ) : (
+                                    <>
+                                        <Clock className="mr-2 h-4 w-4" />
+                                        No Tokens to Claim
+                                    </>
+                                )}
+                            </Button>
+                        </motion.div>
                     )}
-                </Button>
+                </AnimatePresence>
 
-                {/* Status Messages */}
-                {isConfirmed && (
-                    <div className="text-xs text-green-500 flex items-center gap-1">
-                        <span className="font-bold">✓ Claimed successfully!</span>
-                    </div>
-                )}
                 {error && (
                     <div className="text-xs text-red-500 flex items-center gap-1">
                          <AlertCircle className="h-3 w-3" />

@@ -3,8 +3,8 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Zap } from "lucide-react";
-import { LineChart, Line, ResponsiveContainer } from 'recharts';
+import { Zap, GraduationCap } from "lucide-react";
+import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { cn, fromWei, formatNumber } from "@/lib/utils";
 import { TokenImage } from "@/components/ui/token-image";
 import { formatRelativeTime } from "@/lib/formatters";
@@ -16,7 +16,7 @@ interface TokenCardProps {
 }
 
 /**
- * Mini Price Chart - Proper Recharts BC
+ * Mini Price Chart - Smooth area chart with gradient fill (pump.fun style)
  */
 function MiniPriceChart({ data }: { data?: Array<{ timestamp: number; price: number }> }) {
 	if (!data || data.length < 2) return null;
@@ -26,20 +26,29 @@ function MiniPriceChart({ data }: { data?: Array<{ timestamp: number; price: num
 	
 	// Determine trend color
 	const isPositive = data[data.length - 1].price >= data[0].price;
+	const gradientId = `gradient-${isPositive ? 'green' : 'red'}-${Math.random().toString(36).substr(2, 9)}`;
 	const strokeColor = isPositive ? "#00ff88" : "#ff4444";
+	const fillColor = isPositive ? "#00ff88" : "#ff4444";
 	
 	return (
-		<ResponsiveContainer width={80} height={30}>
-			<LineChart data={chartData}>
-				<Line 
+		<ResponsiveContainer width={70} height={28}>
+			<AreaChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+				<defs>
+					<linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+						<stop offset="0%" stopColor={fillColor} stopOpacity={0.4} />
+						<stop offset="100%" stopColor={fillColor} stopOpacity={0} />
+					</linearGradient>
+				</defs>
+				<Area 
 					type="monotone" 
 					dataKey="value" 
 					stroke={strokeColor}
-					strokeWidth={2}
+					strokeWidth={1.5}
+					fill={`url(#${gradientId})`}
 					dot={false}
 					isAnimationActive={false}
 				/>
-			</LineChart>
+			</AreaChart>
 		</ResponsiveContainer>
 	);
 }
@@ -48,15 +57,12 @@ function MiniPriceChart({ data }: { data?: Array<{ timestamp: number; price: num
  * TokenCard - Pump.fun style token card with image, creator info, and bonding curve progress
  */
 export function TokenCard({ token, className }: TokenCardProps) {
-	// Calculate price change from initial to current (actual gain/loss %) BC
+	// Use priceChange24h from API (it's already calculated on backend)
 	const priceChange = useMemo(() => {
-		const currentPrice = parseFloat(token.currentPrice);
-		const initialPrice = parseFloat(token.initialPrice);
-		
-		if (!initialPrice || !currentPrice || initialPrice === 0) return 0;
-		
-		return ((currentPrice - initialPrice) / initialPrice) * 100;
-	}, [token.currentPrice, token.initialPrice]);
+		const change = token.priceChange24h;
+		if (change === undefined || change === null || isNaN(change)) return 0;
+		return change;
+	}, [token.priceChange24h]);
 	
 	const priceChangePositive = priceChange >= 0;
 
@@ -67,11 +73,13 @@ export function TokenCard({ token, className }: TokenCardProps) {
 	}, [token.marketCap]);
 
 	const formattedPriceChange = useMemo(() => {
-		if (priceChange === 0) return "0.00%";
 		const change = Math.abs(priceChange);
 		if (isNaN(change)) return "0.00%";
 		return `${change.toFixed(2)}%`;
 	}, [priceChange]);
+
+	// Check if token is graduated
+	const isGraduated = token.status === 'graduated';
 
 	// Bonding curve progress (0-100) - from backend API
 	const bondingProgress = useMemo(() => {
@@ -119,116 +127,106 @@ export function TokenCard({ token, className }: TokenCardProps) {
 					opacity: { duration: 0.2 },
 				}}
 				className={cn(
-					"bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3 cursor-pointer relative overflow-hidden",
+					"bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-2 sm:p-3 cursor-pointer relative overflow-hidden",
 					"hover:bg-[#1e1e1e] hover:border-[#3a3a3a] transition-all duration-200",
-					"flex gap-3",
+					"flex gap-2 sm:gap-3",
 					className,
 				)}
 			>
 				{/* Mini Chart - Top Right Corner BC */}
 				{token.priceHistory && token.priceHistory.length > 0 && (
-					<div className="absolute top-2 right-2 z-10">
+					<div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 z-10">
 						<MiniPriceChart data={token.priceHistory} />
 					</div>
 				)}
 				
-				{/* Token Image - Square */}
+				{/* Token Image - Square (responsive size) */}
 				<div className="shrink-0">
 					<TokenImage
 						src={token.imageUrl}
 						alt={token.name}
 						symbol={token.symbol}
 						size={88}
-						className="rounded-lg w-[88px] h-[88px] object-cover"
+						className="rounded-lg w-16 h-16 sm:w-[88px] sm:h-[88px] object-cover"
 					/>
 				</div>
 
 				{/* Content */}
 				<div className="flex-1 min-w-0 flex flex-col">
-					{/* Row 1: Name + HYPE badge */}
-					<div className="flex items-center gap-2">
-						<h3 className="font-bold text-white text-[15px] leading-tight truncate">
+					{/* Row 1: Name + Symbol + HYPE badge */}
+					<div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+						<h3 className="font-bold text-white text-sm sm:text-[15px] leading-tight truncate max-w-[120px] sm:max-w-none">
 							{token.name}
 						</h3>
+						<p className="text-[#888] text-[9px] sm:text-[10px] font-medium">({token.symbol})</p>
 						{token.hypeBoostEnabled && (
-							<span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[10px] font-medium shrink-0">
-								<Zap className="h-2.5 w-2.5 fill-amber-400" />
+							<span className="inline-flex items-center gap-0.5 px-1 sm:px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[8px] sm:text-[10px] font-medium shrink-0">
+								<Zap className="h-2 w-2 sm:h-2.5 sm:w-2.5 fill-amber-400" />
 								HYPE
 							</span>
 						)}
 					</div>
 
-					{/* Row 2: Symbol */}
-					<p className="text-[#888] text-sm font-medium">{token.symbol}</p>
-
-					{/* Row 3: Creator + Time */}
-					<div className="flex items-center gap-1.5 mt-1 text-xs">
+					{/* Row 2: Creator + Time */}
+					<div className="flex items-center gap-1 sm:gap-1.5 mt-0.5 sm:mt-1 text-[10px] sm:text-xs">
 						{creatorDisplay && (
-							<span className="text-[#6b8afd] font-medium">{creatorDisplay}</span>
+							<span className="text-[#6b8afd] font-medium truncate max-w-[80px] sm:max-w-none">{creatorDisplay}</span>
 						)}
-						{timeAgo && <span className="text-[#666]">{timeAgo}</span>}
+						{timeAgo && <span className="text-[#666] shrink-0">{timeAgo}</span>}
 					</div>
 
-					{/* Row 4: Market Cap + Price Change */}
-					<div className="flex items-center gap-2 mt-1.5 mb-2">
-						<span className="text-[#777] text-xs font-medium shrink-0">MC</span>
-						<span className="text-[#00ff88] text-sm font-bold shrink-0">
+					{/* Row 3: Market Cap + Price Change */}
+					<div className="flex items-center gap-1 sm:gap-2 mt-1 sm:mt-1.5 flex-wrap">
+						<span className="text-[#777] text-[10px] sm:text-xs font-medium shrink-0">MC</span>
+						<span className="text-[#00ff88] text-xs sm:text-sm font-bold shrink-0">
 							{formattedMarketCap}
-						&nbsp;&nbsp;
-							<span
+						</span>
+						<span
 							className={cn(
-								"text-[10px] font-semibold shrink-0 ml-auto",
+								"text-[9px] sm:text-[10px] font-semibold shrink-0",
 								priceChangePositive ? "text-[#00ff88]" : "text-[#ff4444]"
 							)}
 						>
-							(
-							{priceChangePositive ? "↑" : "↓"}
-							{formattedPriceChange}
-							)
+							({priceChangePositive ? "+" : ""}{priceChange.toFixed(2)}%)
 						</span>
-						</span>
-						{/* Price Change */}
 					</div>
 
-					{/* Progress Bar - Glassmorphism Style BC! */}
-					<div className="relative">
-						{/* Background track with subtle gradient */}
-						<div className="w-full h-2 bg-gradient-to-r from-[#1a1a1a] via-[#222] to-[#1a1a1a] rounded-full border border-[#333] overflow-hidden backdrop-blur-sm">
-							{/* Animated progress bar with glow */}
+					{/* Row 4: Progress Bar + Percentage + Graduated Badge */}
+					<div className="flex items-center gap-1.5 sm:gap-2 mt-1 sm:mt-1.5">
+						{/* Mini Progress Bar */}
+						<div className="relative w-10 sm:w-12 h-1 sm:h-1.5 bg-[#222] rounded-full overflow-hidden shrink-0">
 							<motion.div
 								initial={{ width: 0 }}
-								animate={{ width: `${bondingProgress}%` }}
-								transition={{ duration: 1.2, ease: [0.4, 0, 0.2, 1] }}
-								className="relative h-full rounded-full bg-gradient-to-r from-[#00ff88] via-[#00dd77] to-[#00cc6a]"
+								animate={{ width: `${Math.max(bondingProgress > 0 ? 4 : 0, bondingProgress)}%` }}
+								transition={{ duration: 0.8, ease: "easeOut" }}
+								className="h-full rounded-full bg-gradient-to-r from-[#00ff88] to-[#00cc6a]"
 								style={{
+									minWidth: bondingProgress > 0 ? '3px' : '0px',
 									boxShadow: bondingProgress > 0 
-										? '0 0 12px rgba(0, 255, 136, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.3)'
+										? '0 0 6px rgba(0, 255, 136, 0.4)'
 										: 'none'
 								}}
-							>
-								{/* Shine effect saale */}
-								{bondingProgress > 5 && (
-									<div 
-										className="absolute inset-0 rounded-full"
-										style={{
-											background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)',
-										}}
-									/>
-								)}
-							</motion.div>
+							/>
 						</div>
-						{/* Progress percentage */}
-						<span className="absolute -top-5 right-0 text-[10px] text-[#999] font-bold">
+						<span className="text-[9px] sm:text-[10px] text-[#999] font-medium shrink-0">
 							{bondingProgress.toFixed(1)}%
 						</span>
+						{/* Graduated Badge */}
+						{isGraduated && (
+							<span className="inline-flex items-center gap-0.5 px-1 sm:px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 text-[8px] sm:text-[10px] font-medium shrink-0 ml-auto">
+								<GraduationCap className="h-2 w-2 sm:h-2.5 sm:w-2.5" />
+								<span className="hidden sm:inline">GRADUATED</span>
+								<span className="sm:hidden">GRAD</span>
+							</span>
+						)}
 					</div>
-
-					{/* Row 5: Description */}
 					{truncatedDescription && (
-						<p className="text-[#666] text-xs mt-2 leading-relaxed line-clamp-1">
+						<p className="text-[#666] text-[10px] sm:text-xs leading-relaxed line-clamp-1 hidden sm:block">
 							{truncatedDescription}
 						</p>
 					)}
+
+					 
 				</div>
 			</motion.div>
 		</Link>

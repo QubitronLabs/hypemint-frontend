@@ -1,25 +1,27 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
 	Zap,
 	BarChart3,
 	Sparkles,
 	Search,
-	Rocket,
+	// Rocket,
 	Flame,
 	// TrendingUp,
 	Clock,
 	Trophy,
 	Plus,
+	LayoutGrid,
+	List,
 	// Wifi,
 	// WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TokenCard } from "@/components/token";
+import { TokenCard, TokenListItem } from "@/components/token";
 import {
 	useTrendingTokens,
 	useNewTokens,
@@ -161,48 +163,48 @@ interface ActivityItem {
 // }
 
 // Stats card component
-function StatsCard({
-	icon: Icon,
-	label,
-	value,
-	trend,
-}: {
-	icon: React.ElementType;
-	label: string;
-	value: string;
-	trend?: number;
-}) {
-	return (
-		<div className="bg-card/40 backdrop-blur-sm border border-border/50 rounded-xl p-3 sm:p-4">
-			<div className="flex items-center gap-2 sm:gap-3">
-				<div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-					<Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-				</div>
-				<div className="min-w-0">
-					<p className="text-lg sm:text-2xl font-bold truncate">
-						{value}
-					</p>
-					<p className="text-[10px] sm:text-xs text-muted-foreground truncate">
-						{label}
-					</p>
-				</div>
-				{trend !== undefined && (
-					<div
-						className={cn(
-							"ml-auto text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 sm:py-1 rounded shrink-0",
-							trend >= 0
-								? "bg-green-500/10 text-green-500"
-								: "bg-red-500/10 text-red-500",
-						)}
-					>
-						{trend >= 0 ? "+" : ""}
-						{trend}%
-					</div>
-				)}
-			</div>
-		</div>
-	);
-}
+// function StatsCard({
+// 	icon: Icon,
+// 	label,
+// 	value,
+// 	trend,
+// }: {
+// 	icon: React.ElementType;
+// 	label: string;
+// 	value: string;
+// 	trend?: number;
+// }) {
+// 	return (
+// 		<div className="bg-card/40 backdrop-blur-sm border border-border/50 rounded-xl p-3 sm:p-4">
+// 			<div className="flex items-center gap-2 sm:gap-3">
+// 				<div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+// 					<Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+// 				</div>
+// 				<div className="min-w-0">
+// 					<p className="text-lg sm:text-2xl font-bold truncate">
+// 						{value}
+// 					</p>
+// 					<p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+// 						{label}
+// 					</p>
+// 				</div>
+// 				{trend !== undefined && (
+// 					<div
+// 						className={cn(
+// 							"ml-auto text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 sm:py-1 rounded shrink-0",
+// 							trend >= 0
+// 								? "bg-green-500/10 text-green-500"
+// 								: "bg-red-500/10 text-red-500",
+// 						)}
+// 					>
+// 						{trend >= 0 ? "+" : ""}
+// 						{trend}%
+// 					</div>
+// 				)}
+// 			</div>
+// 		</div>
+// 	);
+// }
 
 function HomePage() {
 	// Use persisted tabs hook for URL-based tab state persistence
@@ -216,10 +218,37 @@ function HomePage() {
 		validTabs: VALID_TABS,
 	});
 
+	// Debounced filter state to prevent rapid API calls when switching tabs quickly
+	const [debouncedFilter, setDebouncedFilter] = useState<FilterTab>(activeFilter);
+	const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+	// Debounce the filter changes (300ms delay)
+	useEffect(() => {
+		// Clear any existing timeout
+		if (debounceRef.current) {
+			clearTimeout(debounceRef.current);
+		}
+
+		// Set up new debounced update
+		debounceRef.current = setTimeout(() => {
+			setDebouncedFilter(activeFilter);
+		}, 300);
+
+		// Cleanup on unmount or when activeFilter changes
+		return () => {
+			if (debounceRef.current) {
+				clearTimeout(debounceRef.current);
+			}
+		};
+	}, [activeFilter]);
+
 	const [searchQuery, setSearchQuery] = useState("");
 	const [mounted, setMounted] = useState(false);
 	// const [wsConnected, setWsConnected] = useState(false);
 	const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
+	
+	// View mode state: 'grid' or 'list' (default is grid)
+	const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
 	// Prevent hydration mismatch
 	useEffect(() => {
@@ -234,77 +263,44 @@ function HomePage() {
 	// Query Client for cache updates
 	const queryClient = useQueryClient();
 
-	// Fetch data - ONLY call API for the active tab
+	// Fetch data - ONLY call API for the debounced tab (prevents rapid API calls)
 	// All tokens (for "all" tab)
 	const { data: allTokens = [], isLoading: allLoading } = useTokens(
 		{ page: 1, pageSize: 50 },
-		{ enabled: isHydrated && activeFilter === "all" },
+		{ enabled: isHydrated && debouncedFilter === "all" },
 	);
 
 	// Trending tokens (for "trending" tab)
 	const {
 		data: trendingTokens = [],
 		isLoading: trendingLoading,
-		refetch: refetchTrending,
 	} = useTrendingTokens(undefined, {
-		enabled: isHydrated && activeFilter === "trending",
+		enabled: isHydrated && debouncedFilter === "trending",
 	});
 
 	// New tokens (for "new" tab)
 	const {
 		data: newTokens = [],
 		isLoading: newLoading,
-		refetch: refetchNew,
 	} = useNewTokens(undefined, {
-		enabled: isHydrated && activeFilter === "new",
+		enabled: isHydrated && debouncedFilter === "new",
 	});
 
 	// Live tokens (for "live" tab)
 	const {
 		data: liveTokens = [],
 		isLoading: liveLoading,
-		refetch: refetchLive,
 	} = useLiveTokens(undefined, {
-		enabled: isHydrated && activeFilter === "live",
+		enabled: isHydrated && debouncedFilter === "live",
 	});
 
 	// Graduated tokens (for "graduated" tab)
 	const {
 		data: graduatedTokens = [],
 		isLoading: graduatedLoading,
-		refetch: refetchGraduated,
 	} = useGraduatedTokens(undefined, {
-		enabled: isHydrated && activeFilter === "graduated",
+		enabled: isHydrated && debouncedFilter === "graduated",
 	});
-
-	// Refetch data when tab changes
-	useEffect(() => {
-		if (!isHydrated) return;
-
-		switch (activeFilter) {
-			case "all":
-				break;
-			case "trending":
-				refetchTrending();
-				break;
-			case "new":
-				refetchNew();
-				break;
-			case "live":
-				refetchLive();
-				break;
-			case "graduated":
-				refetchGraduated();
-				break;
-		}
-	}, [
-		activeFilter,
-		isHydrated,
-		refetchTrending,
-		refetchNew,
-		refetchLive,
-		refetchGraduated,
-	]);
 
 	// WebSocket: Listen for new tokens
 	useNewTokenFeed(
@@ -574,7 +570,7 @@ function HomePage() {
 				</motion.div>
 
 				{/* Stats Row */}
-				<motion.div
+				{/* <motion.div
 					initial={{ opacity: 0, y: 20 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ delay: 0.1 }}
@@ -613,7 +609,7 @@ function HomePage() {
 								: "—"
 						}
 					/>
-				</motion.div>
+				</motion.div> */}
 
 				{/* Main Content Grid */}
 				<div className="grid  gap-4 sm:gap-6">
@@ -667,21 +663,51 @@ function HomePage() {
 								</div>
 							</div>
 
-							{/* Search */}
-							<div className="relative w-full sm:w-64">
-								<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-								<Input
-									placeholder="Search tokens..."
-									value={searchQuery}
-									onChange={(e) =>
-										setSearchQuery(e.target.value)
-									}
-									className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm bg-card/60 border-border/50 focus:border-primary/50"
-								/>
+							{/* Search + View Toggle */}
+							<div className="flex items-center gap-2 w-full sm:w-auto">
+								<div className="relative flex-1 sm:w-64 sm:flex-none">
+									<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+									<Input
+										placeholder="Search tokens..."
+										value={searchQuery}
+										onChange={(e) =>
+											setSearchQuery(e.target.value)
+										}
+										className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm bg-card/60 border-border/50 focus:border-primary/50"
+									/>
+								</div>
+								
+								{/* View Toggle */}
+								<div className="flex bg-card/60 backdrop-blur-md p-0.5 rounded-lg border border-border/60 shrink-0">
+									<button
+										onClick={() => setViewMode('grid')}
+										className={cn(
+											"p-1.5 sm:p-2 rounded-md transition-all",
+											viewMode === 'grid'
+												? "bg-primary text-primary-foreground"
+												: "text-muted-foreground hover:text-foreground"
+										)}
+										title="Grid view"
+									>
+										<LayoutGrid className="w-4 h-4" />
+									</button>
+									<button
+										onClick={() => setViewMode('list')}
+										className={cn(
+											"p-1.5 sm:p-2 rounded-md transition-all",
+											viewMode === 'list'
+												? "bg-primary text-primary-foreground"
+												: "text-muted-foreground hover:text-foreground"
+										)}
+										title="List view"
+									>
+										<List className="w-4 h-4" />
+									</button>
+								</div>
 							</div>
 						</motion.div>
 
-						{/* Token Grid */}
+						{/* Token Grid/List */}
 						<AnimatePresence mode="wait">
 							{isLoading ? (
 								<motion.div
@@ -748,7 +774,7 @@ function HomePage() {
 										</Button>
 									</Link>
 								</motion.div>
-							) : (
+							) : viewMode === 'grid' ? (
 								<motion.div
 									key="grid"
 									initial={{ opacity: 0 }}
@@ -770,6 +796,50 @@ function HomePage() {
 												className="h-full bg-card/40 hover:bg-card/70 border-border/50 hover:border-primary/30 transition-all duration-200"
 											/>
 										</motion.div>
+									))}
+								</motion.div>
+							) : (
+								<motion.div
+									key="list"
+									initial={{ opacity: 0 }}
+									animate={{ opacity: 1 }}
+									className="w-full overflow-x-auto"
+								>
+									{/* List Header - Fixed min-width for horizontal scrolling */}
+									<div className="flex items-center gap-3 px-4 py-2.5 text-[10px] text-[#666] font-medium uppercase border-b border-[#333] bg-[#0a0a0a] sticky top-0 z-10 min-w-[1200px]">
+										{/* Coin header (2.5 parts) */}
+										<div className="flex-[2.5] min-w-0">
+											<span className="ml-14">Coin</span>
+										</div>
+										{/* Graph (1.5 parts) */}
+										<div className="flex-[1.5] text-center">Graph</div>
+										{/* MCAP (1 part) */}
+										<div className="flex-1 text-right">MCap</div>
+										{/* Age (0.5 part) */}
+										<div className="flex-[0.5] text-center">Age</div>
+										{/* TXNS (0.75 part) */}
+										<div className="flex-[0.75] text-right">Txns</div>
+										{/* 24H VOL (1 part) */}
+										<div className="flex-1 text-right">24h Vol</div>
+										{/* TRADERS (0.75 part) */}
+										<div className="flex-[0.75] text-right">Traders</div>
+										{/* 5M (0.75 part) */}
+										<div className="flex-[0.75] text-right">5m</div>
+										{/* 1H (0.75 part) */}
+										<div className="flex-[0.75] text-right">1h</div>
+										{/* 6H (0.75 part) */}
+										<div className="flex-[0.75] text-right">6h</div>
+										{/* 24H (0.75 part) */}
+										<div className="flex-[0.75] text-right">24h</div>
+										{/* Star (0.4 part) */}
+										<div className="flex flex-[0.4] justify-center"></div>
+									</div>
+									{filteredTokens.map((token, index) => (
+										<TokenListItem
+											key={token.id}
+											token={token}
+											index={index}
+										/>
 									))}
 								</motion.div>
 							)}

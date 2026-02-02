@@ -695,7 +695,7 @@ export function useTokenAllowance(
 export function useVestingInfo(bondingCurveAddress: Address | undefined) {
 	const { walletAddress } = useAuth();
 
-	const { data: vestingInfo } = useReadContract({
+	const { data: vestingInfo, refetch: refetchVestingInfo } = useReadContract({
 		address: bondingCurveAddress,
 		abi: HYPE_BONDING_CURVE_ABI,
 		functionName: "getVestingInfo",
@@ -706,7 +706,7 @@ export function useVestingInfo(bondingCurveAddress: Address | undefined) {
 		},
 	});
 
-    const { data: claimableAmount } = useReadContract({
+    const { data: claimableAmount, refetch: refetchClaimable } = useReadContract({
 		address: bondingCurveAddress,
 		abi: HYPE_BONDING_CURVE_ABI,
 		functionName: "getClaimableVested",
@@ -717,6 +717,10 @@ export function useVestingInfo(bondingCurveAddress: Address | undefined) {
 		},
 	});
 
+	const refetch = useCallback(async () => {
+		await Promise.all([refetchVestingInfo(), refetchClaimable()]);
+	}, [refetchVestingInfo, refetchClaimable]);
+
     return {
         vestingInfo: vestingInfo as {
             totalAmount: bigint;
@@ -724,6 +728,7 @@ export function useVestingInfo(bondingCurveAddress: Address | undefined) {
             startTime: bigint;
         } | undefined,
         claimableAmount: claimableAmount as bigint | undefined,
+		refetch,
     };
 }
 

@@ -19,11 +19,11 @@ export default function Loading() {
                 {/* Logo animation */}
                 <div className="relative">
                     <motion.div
-                        animate={{ rotate: 360 }}
+                        animate={{ scale: [1, 1.1, 1] }}
                         transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                        className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center"
+                        className="w-16 h-16 rounded-2xl flex items-center justify-center"
                     >
-                        <span className="text-2xl font-bold text-white">H</span>
+                        <span className="text-2xl font-bold text-white"><img src="/logo2.png" alt="Logo" /></span>
                     </motion.div>
                     <motion.div
                         animate={{ scale: [1, 1.2, 1] }}
