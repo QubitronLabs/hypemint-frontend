@@ -3,6 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
+  // Disable React compiler in production to prevent code splitting issues with Dynamic SDK
+  experimental: {
+    optimizePackageImports: ["@dynamic-labs/sdk-react-core"],
+  },
   images: {
     remotePatterns: [
       {

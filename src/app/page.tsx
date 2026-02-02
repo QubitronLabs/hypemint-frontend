@@ -614,7 +614,7 @@ function HomePage() {
 				{/* Main Content Grid */}
 				<div className="grid  gap-4 sm:gap-6">
 					{/* Left Column - Token Grid */}
-					<div>
+					<div className="min-w-0">
 						{/* Filter & Search Bar */}
 						<motion.div
 							initial={{ opacity: 0 }}
@@ -803,7 +803,7 @@ function HomePage() {
 									key="list"
 									initial={{ opacity: 0 }}
 									animate={{ opacity: 1 }}
-									className="w-full overflow-x-auto"
+									className="overflow-x-auto"
 								>
 									{/* List Header - Fixed min-width for horizontal scrolling */}
 									<div className="flex items-center gap-3 px-4 py-2.5 text-[10px] text-[#666] font-medium uppercase border-b border-[#333] bg-[#0a0a0a] sticky top-0 z-10 min-w-[1200px]">
