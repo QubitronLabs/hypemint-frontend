@@ -349,7 +349,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						animate={{ opacity: 1, y: 0 }}
 						className="bg-card border border-border rounded-xl p-4"
 					>
-						<div className="flex items-center justify-between gap-4">
+						<div className="flex flex-col md:flex-row items-start justify-between gap-4">
 							{/* Left side: Image, Name, Symbol, Creator, Time */}
 							<div className="flex items-center gap-3 min-w-0">
 								<div className="w-12 h-12 rounded-lg bg-muted overflow-hidden shrink-0">
