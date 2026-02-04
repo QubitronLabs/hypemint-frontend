@@ -15,6 +15,7 @@ import {
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import "./globals.css";
+import { IsBrowser } from "@dynamic-labs/sdk-react-core";
 
 /**
  * Font Configuration
@@ -87,12 +88,12 @@ export default function RootLayout({
 
 									{/* Header */}
 									<Header />
-
-									{/* Main Content */}
-									<main className="md:ml-[70px] w-full md:w-[calc(100vw-70px)] md:max-w-[calc(100vw-90px)] mx-auto pt-14 md:pt-16 min-h-screen overflow-x-clip px-3 md:px-0">
-										{children}
-									</main>
-
+									<IsBrowser>
+										{/* Main Content */}
+										<main className="md:ml-[70px] w-full md:w-[calc(100vw-70px)] md:max-w-[calc(100vw-90px)] mx-auto pt-14 md:pt-16 min-h-screen overflow-x-clip px-3 md:px-0">
+											{children}
+										</main>
+									</IsBrowser>
 									{/* Toast Notifications */}
 									<Toaster richColors position="top-right" />
 								</UsernamePromptProvider>

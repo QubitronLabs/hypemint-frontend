@@ -21,7 +21,11 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AdvancedPriceChart } from "@/components/charts";
+// import { AdvancedPriceChart } from "@/components/charts";
+const AdvancedPriceChart = dynamic(
+	() => import("@/components/charts").then((mod) => mod.AdvancedPriceChart),
+	{ ssr: false },
+);
 import {
 	BondingCurveProgress,
 	TokenChat,
@@ -56,6 +60,7 @@ import {
 } from "@/lib/utils";
 import type { Address } from "viem";
 import type { Token } from "@/types";
+import dynamic from "next/dynamic";
 
 interface TokenDetailPageProps {
 	params: Promise<{ id: string }>;
@@ -735,19 +740,18 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 				<div className="min-w-0 w-full lg:sticky lg:top-22 lg:self-start space-y-4 sm:space-y-6 overflow-y-auto scroll-smooth lg:max-h-[calc(100vh-6.5rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 					{/* Vesting Panel (Only if HypeBoost is enabled) */}
 					{token.hypeBoostEnabled && token.bondingCurveAddress && (
-					<motion.div
-						initial={{ opacity: 0, x: 20 }}
-						animate={{ opacity: 1, x: 0 }}
-						className="mb-6"
-					>
-						<VestingCard
-							bondingCurveAddress={
-								token.bondingCurveAddress as Address
-							}
-							symbol={token.symbol}
-						/>
-					</motion.div>
-					 )} 
+						<motion.div
+							initial={{ opacity: 0, x: 20 }}
+							animate={{ opacity: 1, x: 0 }}
+						>
+							<VestingCard
+								bondingCurveAddress={
+									token.bondingCurveAddress as Address
+								}
+								symbol={token.symbol}
+							/>
+						</motion.div>
+					)}
 
 					{/* Trading Panel - On-Chain or Centralized */}
 					<motion.div
