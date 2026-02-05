@@ -147,7 +147,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
 						alt={token.name}
 						symbol={token.symbol}
 						size={88}
-						className="rounded-lg w-16 h-16 sm:w-[88px] sm:h-[88px] object-cover"
+						className="rounded-lg w-16 h-16 sm:w-22 sm:h-22 object-cover"
 					/>
 				</div>
 
@@ -155,7 +155,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
 				<div className="flex-1 min-w-0 flex flex-col">
 					{/* Row 1: Name + Symbol + HYPE badge */}
 					<div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-						<h3 className="font-bold text-white text-sm sm:text-[15px] leading-tight truncate max-w-[120px] sm:max-w-none">
+						<h3 className="font-bold text-white text-sm sm:text-[15px] leading-tight truncate max-w-30 sm:max-w-none">
 							{token.name}
 						</h3>
 						<p className="text-[#888] text-[9px] sm:text-[10px] font-medium">({token.symbol})</p>
@@ -170,7 +170,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
 					{/* Row 2: Creator + Time */}
 					<div className="flex items-center gap-1 sm:gap-1.5 mt-0.5 sm:mt-1 text-[10px] sm:text-xs">
 						{creatorDisplay && (
-							<span className="text-[#6b8afd] font-medium truncate max-w-[80px] sm:max-w-none">{creatorDisplay}</span>
+							<span className="text-[#6b8afd] font-medium truncate max-w-20 sm:max-w-none">{creatorDisplay}</span>
 						)}
 						{timeAgo && <span className="text-[#666] shrink-0">{timeAgo}</span>}
 					</div>
@@ -196,7 +196,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
 								initial={{ width: 0 }}
 								animate={{ width: `${Math.max(bondingProgress > 0 ? 4 : 0, bondingProgress)}%` }}
 								transition={{ duration: 0.8, ease: "easeOut" }}
-								className="h-full rounded-full bg-gradient-to-r from-[#00ff88] to-[#00cc6a]"
+								className="h-full rounded-full bg-linear-to-r from-[#00ff88] to-[#00cc6a]"
 								style={{
 									minWidth: bondingProgress > 0 ? '3px' : '0px',
 									boxShadow: bondingProgress > 0 
@@ -218,7 +218,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
 								initial={{ width: 0 }}
 								animate={{ width: `${Math.max(bondingProgress > 0 ? 4 : 0, bondingProgress)}%` }}
 								transition={{ duration: 0.8, ease: "easeOut" }}
-								className="h-full rounded-full bg-gradient-to-r from-[#00ff88] to-[#00cc6a]"
+								className="h-full rounded-full bg-linear-to-r from-[#00ff88] to-[#00cc6a]"
 								style={{
 									minWidth: bondingProgress > 0 ? '3px' : '0px',
 									boxShadow: bondingProgress > 0 

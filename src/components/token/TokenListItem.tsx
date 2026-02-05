@@ -130,7 +130,7 @@ export function TokenListItem({ token, index, className }: TokenListItemProps) {
 				className={cn(
 					"bg-[#111] border-b border-[#222] px-4 py-3 cursor-pointer",
 					"hover:bg-[#1a1a1a] transition-all duration-150",
-					"flex items-center gap-3 min-w-[1200px]",
+					"flex items-center gap-3 min-w-300",
 					className,
 				)}
 			>
