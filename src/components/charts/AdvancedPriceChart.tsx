@@ -275,6 +275,9 @@ export function AdvancedPriceChart({
 	className,
 	showToolbar = true,
 }: AdvancedPriceChartProps) {
+	// // DEBUG: This log ONLY fires on React re-renders, NOT on canvas redraws
+	// console.log("[COMPONENT-RENDER] AdvancedPriceChart rendered");
+
 	// Refs
 	const containerRef = useRef<HTMLDivElement>(null);
 	const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -619,6 +622,9 @@ export function AdvancedPriceChart({
 	// ============================================================================
 
 	const render = useCallback(() => {
+		// // DEBUG: This log fires on every animation frame (~60fps) - EXPECTED BEHAVIOR
+		// console.log("[CANVAS-REDRAW] Animation frame");
+
 		const canvas = canvasRef.current;
 		if (!canvas) return;
 
@@ -1103,49 +1109,153 @@ export function AdvancedPriceChart({
 					const price2 = d.points[1].price;
 					const priceDiff = price2 - price1;
 					const pctChange = (priceDiff / price1) * 100;
+					const isUp = priceDiff >= 0;
 
-					// Draw rectangle
-					ctx.strokeRect(
-						Math.min(p1.x, p2.x),
-						Math.min(p1.y, p2.y),
-						Math.abs(p2.x - p1.x),
-						Math.abs(p2.y - p1.y),
-					);
-					ctx.fillStyle =
-						priceDiff >= 0
-							? "rgba(34,197,94,0.1)"
-							: "rgba(239,68,68,0.1)";
-					ctx.fillRect(
-						Math.min(p1.x, p2.x),
-						Math.min(p1.y, p2.y),
-						Math.abs(p2.x - p1.x),
-						Math.abs(p2.y - p1.y),
-					);
+					const x1 = Math.min(p1.x, p2.x);
+					const y1 = Math.min(p1.y, p2.y);
+					const w = Math.abs(p2.x - p1.x);
+					const h = Math.abs(p2.y - p1.y);
 
-					// Draw info box
-					const infoX = Math.max(p1.x, p2.x) + 5;
+					// Fill rectangle (no border)
+					ctx.fillStyle = isUp
+						? "rgba(59,130,246,0.15)"
+						: "rgba(239,68,68,0.15)";
+					ctx.fillRect(x1, y1, w, h);
+
+					// Draw full intersecting lines creating 4 quadrants
+					const centerX = x1 + w / 2;
+					const centerY = y1 + h / 2;
+					const arrowSize = 10;
+					const isDrawingRight = p1.x < p2.x;
+
+					ctx.strokeStyle = isUp
+						? "rgba(59,130,246,0.8)"
+						: "rgba(239,68,68,0.8)";
+					ctx.lineWidth = 1.5;
+
+					// Horizontal line - full width
+					ctx.beginPath();
+					ctx.moveTo(x1, centerY);
+					ctx.lineTo(x1 + w, centerY);
+					ctx.stroke();
+
+					// Vertical line - full height
+					ctx.beginPath();
+					ctx.moveTo(centerX, y1);
+					ctx.lineTo(centerX, y1 + h);
+					ctx.stroke();
+
+					// Draw arrows at edges
+					ctx.fillStyle = isUp ? "rgb(59,130,246)" : "rgb(239,68,68)";
+
+					// Horizontal arrows
+					if (isUp && !isDrawingRight) {
+						// Arrow pointing left at left edge
+						ctx.beginPath();
+						ctx.moveTo(x1, centerY);
+						ctx.lineTo(x1 + arrowSize, centerY - arrowSize / 2);
+						ctx.lineTo(x1 + arrowSize, centerY + arrowSize / 2);
+						ctx.closePath();
+						ctx.fill();
+					} else if (!isUp && isDrawingRight) {
+						// Arrow pointing right at right edge
+						ctx.beginPath();
+						ctx.moveTo(x1 + w, centerY);
+						ctx.lineTo(x1 + w - arrowSize, centerY - arrowSize / 2);
+						ctx.lineTo(x1 + w - arrowSize, centerY + arrowSize / 2);
+						ctx.closePath();
+						ctx.fill();
+					}
+
+					// Vertical arrows
+					if (isUp) {
+						// Arrow pointing up at top edge
+						ctx.beginPath();
+						ctx.moveTo(centerX, y1);
+						ctx.lineTo(centerX - arrowSize / 2, y1 + arrowSize);
+						ctx.lineTo(centerX + arrowSize / 2, y1 + arrowSize);
+						ctx.closePath();
+						ctx.fill();
+					} else {
+						// Arrow pointing down at bottom edge
+						ctx.beginPath();
+						ctx.moveTo(centerX, y1 + h);
+						ctx.lineTo(centerX - arrowSize / 2, y1 + h - arrowSize);
+						ctx.lineTo(centerX + arrowSize / 2, y1 + h - arrowSize);
+						ctx.closePath();
+						ctx.fill();
+					}
+
+					// Calculate additional stats
+					const idx1 = d.points[0].candleIdx;
+					const idx2 = d.points[1].candleIdx;
+					const bars = Math.abs(idx2 - idx1);
+
+					// Draw info box with updated styling
+					const infoX = Math.max(p1.x, p2.x) + 10;
 					const infoY = Math.min(p1.y, p2.y);
+					const infoW = 220;
+					const infoH = 55;
 
-					ctx.fillStyle = "rgba(0,0,0,0.9)";
-					ctx.fillRect(infoX, infoY, 100, 50);
-					ctx.strokeRect(infoX, infoY, 100, 50);
+					ctx.fillStyle = isUp
+						? "rgba(20,25,35,0.95)"
+						: "rgba(30,25,25,0.95)";
+					ctx.fillRect(infoX, infoY, infoW, infoH);
+					ctx.strokeStyle = isUp
+						? "rgba(59,130,246,0.3)"
+						: "rgba(239,68,68,0.3)";
+					ctx.lineWidth = 1;
+					ctx.strokeRect(infoX, infoY, infoW, infoH);
 
-					ctx.fillStyle =
-						priceDiff >= 0 ? COLORS.bullish : COLORS.bearish;
-					ctx.font = "bold 11px -apple-system, system-ui, sans-serif";
 					ctx.textAlign = "left";
-					ctx.fillText(
-						`${pctChange >= 0 ? "+" : ""}${pctChange.toFixed(2)}%`,
-						infoX + 8,
-						infoY + 18,
-					);
-					ctx.fillStyle = COLORS.textLight;
-					ctx.font = "10px -apple-system, system-ui, sans-serif";
-					ctx.fillText(
-						`${formatPrice(priceDiff)}`,
-						infoX + 8,
-						infoY + 35,
-					);
+
+					// Line 1: Percentage + Y-axis value (price difference)
+					ctx.fillStyle = isUp ? "rgb(59,130,246)" : "rgb(239,68,68)";
+					ctx.font = "bold 13px -apple-system, system-ui, sans-serif";
+					const line1 = `${pctChange >= 0 ? "+" : ""}${pctChange.toFixed(2)}% • Δ ${formatPrice(Math.abs(priceDiff))}`;
+					ctx.fillText(line1, infoX + 8, infoY + 20);
+
+					// Line 2: Bars + X-axis values (time duration)
+					ctx.fillStyle = "rgb(200,200,200)";
+					ctx.font = "11px -apple-system, system-ui, sans-serif";
+					let line2 = `${bars} bars`;
+
+					// Calculate time duration using interval-based calculation
+					if (bars > 0) {
+						// Map timeRange to seconds per candle
+						const timeIntervalSeconds: Record<TimeRange, number> = {
+							"1m": 60,
+							"5m": 300,
+							"15m": 900,
+							"1h": 3600,
+							"4h": 14400,
+							"1D": 86400,
+						};
+						const intervalSec =
+							timeIntervalSeconds[timeRange] || 300; // Default 5m
+						const diffMs = bars * intervalSec * 1000;
+
+						const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+						const diffMins = Math.floor(
+							(diffMs % (1000 * 60 * 60)) / (1000 * 60),
+						);
+
+						let timeDuration = "";
+						if (diffHours > 0) {
+							timeDuration = `${diffHours}h ${diffMins}m`;
+						} else if (diffMins > 0) {
+							timeDuration = `${diffMins}m`;
+						} else {
+							const diffSecs = Math.floor(diffMs / 1000);
+							timeDuration = `${diffSecs}s`;
+						}
+
+						if (timeDuration) {
+							line2 += ` • ${timeDuration}`;
+						}
+					}
+
+					ctx.fillText(line2, infoX + 8, infoY + 38);
 				} else if (d.type === "text" && d.points[0] && d.text) {
 					const p0 = toScreen(d.points[0]);
 					ctx.fillStyle = d.color;
@@ -1169,7 +1279,49 @@ export function AdvancedPriceChart({
 			});
 
 			const pts = drawingInProgress.points.map(toScreen);
-			const mp = { x: mousePos.x, y: mousePos.y };
+
+			// Snap to grid intersections for measure tool
+			let mp;
+			if (drawingInProgress.type === "measure") {
+				// Calculate grid parameters (same as in render)
+				const gridSpacing = chartState.candleWidth + 2;
+				const minGridSpacing = 60;
+				const minGridStep = Math.max(
+					1,
+					Math.ceil(minGridSpacing / gridSpacing),
+				);
+				const gridTimeStep = Math.max(
+					minGridStep,
+					Math.floor((endIdx - startIdx) / 8),
+				);
+
+				// Snap X to nearest vertical grid line
+				const currentIdx = getIndexAtX(mousePos.x);
+				const snappedIdx =
+					Math.round(currentIdx / gridTimeStep) * gridTimeStep;
+				const snappedX = getCandleX(snappedIdx);
+
+				// Snap Y to nearest horizontal grid line (6 price steps)
+				const priceSteps = 6;
+				const gridHeightStep = priceHeight / priceSteps;
+				const snappedY =
+					Math.round(mousePos.y / gridHeightStep) * gridHeightStep;
+
+				mp = { x: snappedX, y: snappedY };
+			} else {
+				// For other tools, snap to candles
+				const snappedIdx = getIndexAtX(mousePos.x);
+				const snappedPrice = getPriceAtY(
+					mousePos.y,
+					priceMin,
+					priceMax,
+					priceHeight,
+				);
+				mp = {
+					x: getCandleX(snappedIdx),
+					y: getPriceY(snappedPrice, priceMin, priceMax, priceHeight),
+				};
+			}
 
 			if (drawingInProgress.type === "hline" && pts[0]) {
 				ctx.beginPath();
@@ -1216,6 +1368,173 @@ export function AdvancedPriceChart({
 						Math.PI * 2,
 					);
 					ctx.stroke();
+				} else if (drawingInProgress.type === "measure") {
+					// Enhanced measure tool rendering
+					const isDrawingDown = pts[0].y < p2.y;
+					const isDrawingRight = pts[0].x < p2.x;
+
+					// Fill with transparent color based on direction
+					ctx.fillStyle = isDrawingDown
+						? "rgba(239,68,68,0.15)"
+						: "rgba(59,130,246,0.15)";
+					ctx.fillRect(x1, y1, w, h);
+
+					// Draw full intersecting lines creating 4 quadrants
+					const centerX = x1 + w / 2;
+					const centerY = y1 + h / 2;
+					const arrowSize = 10;
+
+					ctx.strokeStyle = isDrawingDown
+						? "rgba(239,68,68,0.8)"
+						: "rgba(59,130,246,0.8)";
+					ctx.lineWidth = 1.5;
+
+					// Horizontal line - full width
+					ctx.beginPath();
+					ctx.moveTo(x1, centerY);
+					ctx.lineTo(x1 + w, centerY);
+					ctx.stroke();
+
+					// Vertical line - full height
+					ctx.beginPath();
+					ctx.moveTo(centerX, y1);
+					ctx.lineTo(centerX, y1 + h);
+					ctx.stroke();
+
+					ctx.fillStyle = isDrawingDown
+						? "rgb(239,68,68)"
+						: "rgb(59,130,246)";
+
+					// Horizontal arrows at edges
+					if (isDrawingDown && isDrawingRight) {
+						// Arrow pointing right at right edge
+						ctx.beginPath();
+						ctx.moveTo(x1 + w, centerY);
+						ctx.lineTo(x1 + w - arrowSize, centerY - arrowSize / 2);
+						ctx.lineTo(x1 + w - arrowSize, centerY + arrowSize / 2);
+						ctx.closePath();
+						ctx.fill();
+					} else if (!isDrawingDown && !isDrawingRight) {
+						// Arrow pointing left at left edge
+						ctx.beginPath();
+						ctx.moveTo(x1, centerY);
+						ctx.lineTo(x1 + arrowSize, centerY - arrowSize / 2);
+						ctx.lineTo(x1 + arrowSize, centerY + arrowSize / 2);
+						ctx.closePath();
+						ctx.fill();
+					}
+
+					// Vertical arrows at edges
+					if (isDrawingDown) {
+						// Arrow pointing down at bottom edge
+						ctx.beginPath();
+						ctx.moveTo(centerX, y1 + h);
+						ctx.lineTo(centerX - arrowSize / 2, y1 + h - arrowSize);
+						ctx.lineTo(centerX + arrowSize / 2, y1 + h - arrowSize);
+						ctx.closePath();
+						ctx.fill();
+					} else {
+						// Arrow pointing up at top edge
+						ctx.beginPath();
+						ctx.moveTo(centerX, y1);
+						ctx.lineTo(centerX - arrowSize / 2, y1 + arrowSize);
+						ctx.lineTo(centerX + arrowSize / 2, y1 + arrowSize);
+						ctx.closePath();
+						ctx.fill();
+					}
+
+					// Calculate and display live stats
+					const price1 = getPriceAtY(
+						pts[0].y,
+						priceMin,
+						priceMax,
+						priceHeight,
+					);
+					const price2 = getPriceAtY(
+						p2.y,
+						priceMin,
+						priceMax,
+						priceHeight,
+					);
+					const priceDiff = price2 - price1;
+					const pctChange = (priceDiff / price1) * 100;
+
+					const idx1 = getIndexAtX(pts[0].x);
+					const idx2 = getIndexAtX(p2.x);
+					const bars = Math.abs(idx2 - idx1);
+
+					// Calculate time difference using interval-based calculation
+					let timeDiff = "";
+					if (bars > 0) {
+						// Map timeRange to seconds per candle
+						const timeIntervalSeconds: Record<TimeRange, number> = {
+							"1m": 60,
+							"5m": 300,
+							"15m": 900,
+							"1h": 3600,
+							"4h": 14400,
+							"1D": 86400,
+						};
+						const intervalSec =
+							timeIntervalSeconds[timeRange] || 300; // Default 5m
+						const diffMs = bars * intervalSec * 1000;
+
+						const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+						const diffMins = Math.floor(
+							(diffMs % (1000 * 60 * 60)) / (1000 * 60),
+						);
+
+						if (diffHours > 0) {
+							timeDiff = `${diffHours}h ${diffMins}m`;
+						} else if (diffMins > 0) {
+							timeDiff = `${diffMins}m`;
+						} else {
+							const diffSecs = Math.floor(diffMs / 1000);
+							timeDiff = `${diffSecs}s`;
+						}
+					}
+
+					// Draw stats box
+					const statsBoxX = Math.max(pts[0].x, p2.x) + 10;
+					const statsBoxY = Math.min(pts[0].y, p2.y);
+					const statsBoxW = 220;
+					const statsBoxH = 55;
+
+					// Stats box background with subtle color tint
+					ctx.fillStyle = isDrawingDown
+						? "rgba(30,25,25,0.95)"
+						: "rgba(20,25,35,0.95)";
+					ctx.fillRect(statsBoxX, statsBoxY, statsBoxW, statsBoxH);
+					ctx.strokeStyle = isDrawingDown
+						? "rgba(239,68,68,0.3)"
+						: "rgba(59,130,246,0.3)";
+					ctx.lineWidth = 1;
+					ctx.strokeRect(statsBoxX, statsBoxY, statsBoxW, statsBoxH);
+
+					// Stats text
+					ctx.textAlign = "left";
+
+					// Line 1: Percentage + Y-axis value (price difference)
+					ctx.fillStyle = isDrawingDown
+						? "rgb(239,68,68)"
+						: "rgb(59,130,246)";
+					ctx.font = "bold 13px -apple-system, system-ui, sans-serif";
+					const statsLine1 = `${pctChange >= 0 ? "+" : ""}${pctChange.toFixed(2)}% •  ${formatPrice(Math.abs(priceDiff))}`;
+					ctx.fillText(statsLine1, statsBoxX + 8, statsBoxY + 20);
+
+					// Line 2: Bars + X-axis values (time duration)
+					ctx.fillStyle = "rgb(200,200,200)";
+					ctx.font = "11px -apple-system, system-ui, sans-serif";
+					let statsLine2 = `${bars} bars`;
+
+					// Use the timeDiff calculated above - always append if it exists
+					if (timeDiff && timeDiff !== "") {
+						statsLine2 += ` • ${timeDiff}`;
+					}
+
+					ctx.fillText(statsLine2, statsBoxX + 8, statsBoxY + 38);
+
+					ctx.lineWidth = 1;
 				} else {
 					ctx.strokeRect(x1, y1, w, h);
 				}
@@ -1382,7 +1701,7 @@ export function AdvancedPriceChart({
 		}
 
 		// ========== PRICE AXIS ==========
-		ctx.fillStyle = "rgba(15,15,15,0.95)";
+		ctx.fillStyle = "rgba(15,15,15,0)";
 		ctx.fillRect(chartWidth, 0, PRICE_AXIS_WIDTH, dims.h);
 
 		ctx.fillStyle = COLORS.text;
@@ -1619,6 +1938,11 @@ export function AdvancedPriceChart({
 
 			if (x > metrics.chartWidth || y > metrics.chartHeight) return;
 
+			// Right mouse button should only open context menu - block it from all other actions
+			if (e.button === 2) {
+				return;
+			}
+
 			// Start drag for all interactions - we'll determine if it's a pan or draw based on movement
 			setIsDragging(true);
 			setDragStart({
@@ -1662,6 +1986,11 @@ export function AdvancedPriceChart({
 
 	const handleMouseUp = useCallback(
 		(e: React.MouseEvent) => {
+			// Ignore right-click for drawing
+			if (e.button === 2) {
+				return;
+			}
+
 			const wasPanning = isPanning;
 			setIsDragging(false);
 			setIsPanning(false);
@@ -1757,12 +2086,15 @@ export function AdvancedPriceChart({
 							{ candleIdx, price },
 						],
 					};
-				// For measure tool, only keep one measure at a time
-				if (completed.type === 'measure') {
-					setDrawings((prev) => [...prev.filter(d => d.type !== 'measure'), completed]);
-				} else {
-					setDrawings((prev) => [...prev, completed]);
-				}
+					// For measure tool, only keep one measure at a time
+					if (completed.type === "measure") {
+						setDrawings((prev) => [
+							...prev.filter((d) => d.type !== "measure"),
+							completed,
+						]);
+					} else {
+						setDrawings((prev) => [...prev, completed]);
+					}
 					setDrawingInProgress(null);
 				}
 				return;
@@ -2142,12 +2474,15 @@ export function AdvancedPriceChart({
 								{ candleIdx, price },
 							],
 						};
-					// For measure tool, only keep one measure at a time
-					if (completed.type === 'measure') {
-						setDrawings((prev) => [...prev.filter(d => d.type !== 'measure'), completed]);
-					} else {
-						setDrawings((prev) => [...prev, completed]);
-					}
+						// For measure tool, only keep one measure at a time
+						if (completed.type === "measure") {
+							setDrawings((prev) => [
+								...prev.filter((d) => d.type !== "measure"),
+								completed,
+							]);
+						} else {
+							setDrawings((prev) => [...prev, completed]);
+						}
 						setDrawingInProgress(null);
 						setActiveTool("crosshair");
 					}
@@ -2949,7 +3284,7 @@ export function AdvancedPriceChart({
 						</button>
 					</div>
 
-					<div className="text-[10px] text-zinc-600 ml-2">
+					<div className="text-[10px] text-zinc-200 ml-2">
 						{candles.length} candles • {drawings.length} drawings
 					</div>
 				</div>
