@@ -16,6 +16,7 @@ import {
 	Loader2,
 	ChevronDown,
 	ChevronUp,
+	Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -266,18 +267,6 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 		}
 	}, [isConnected, id, subscribe, unsubscribe]);
 
-	useEffect(() => {
-		function applyOverflow() {
-			document.body.style.overflowY = "clip";
-		}
-		function removeOverflowY() {
-			document.body.style.overflowY = "auto";
-		}
-
-		applyOverflow();
-		return removeOverflowY;
-	}, []);
-
 	// Format contract address for display
 	const formatAddress = (address: string) => {
 		if (!address) return "";
@@ -378,13 +367,19 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 								</div>
 
 								<div className="min-w-0">
-									<div className="flex items-center gap-2">
+									<div className="flex items-center gap-2 flex-wrap">
 										<h1 className="text-lg font-bold truncate">
 											{token.name}
 										</h1>
 										<span className="text-sm text-muted-foreground">
 											{token.symbol}
 										</span>
+										{token.hypeBoostEnabled && (
+											<span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[10px] font-medium shrink-0">
+												<Zap className="h-2.5 w-2.5 fill-amber-400" />
+												HYPE
+											</span>
+										)}
 									</div>
 									<div className="flex items-center gap-2 text-xs text-muted-foreground">
 										<Link
@@ -541,7 +536,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						</div>
 
 						{/* Advanced Price Chart with Tools and Indicators */}
-						<div className="h-[420px] sm:h-[480px]">
+						<div className="h-[60dvh] lg:h-[55dvh]">
 							<AdvancedPriceChart
 								tokenId={id}
 								className="border-none rounded-none h-full"

@@ -26,6 +26,8 @@ import {
 	LineChart,
 	Undo2,
 	Activity,
+	Lock,
+	LockOpen,
 } from "lucide-react";
 import {
 	DropdownMenu,
@@ -44,7 +46,6 @@ interface AdvancedPriceChartProps {
 	tokenId: string;
 	className?: string;
 	showToolbar?: boolean;
-	height?: number;
 }
 
 type TimeRange = "1m" | "5m" | "15m" | "1h" | "4h" | "1D";
@@ -62,7 +63,8 @@ type DrawingTool =
 	| "pitchfork"
 	| "channel"
 	| "measure"
-	| "text";
+	| "text"
+	| "lock";
 
 type Indicator = "sma" | "ema" | "bb" | "rsi" | "macd";
 
@@ -76,11 +78,9 @@ interface Candle {
 }
 
 interface DrawingPoint {
-	x: number;
-	y: number;
-	price?: number;
-	time?: number;
-	candleIdx?: number;
+	// Store in data coordinates for sync with chart transformations
+	candleIdx: number;
+	price: number;
 }
 
 interface Drawing {
@@ -90,6 +90,7 @@ interface Drawing {
 	color: string;
 	text?: string;
 	selected?: boolean;
+	locked?: boolean;
 }
 
 interface IndicatorConfig {
@@ -102,6 +103,7 @@ interface IndicatorConfig {
 interface ChartState {
 	offsetX: number;
 	candleWidth: number;
+	priceZoomFactor: number; // 1.0 = default, >1.0 = zoomed in (narrower price range), <1.0 = zoomed out (wider price range)
 }
 
 // ============================================================================
@@ -272,7 +274,6 @@ export function AdvancedPriceChart({
 	tokenId,
 	className,
 	showToolbar = true,
-	height = 450,
 }: AdvancedPriceChartProps) {
 	// Refs
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -291,6 +292,8 @@ export function AdvancedPriceChart({
 	const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(
 		null,
 	);
+	const [allDrawingsLocked, setAllDrawingsLocked] = useState(false);
+	const [isPanning, setIsPanning] = useState(false);
 
 	// Indicators
 	const [indicators, setIndicators] = useState<IndicatorConfig[]>([
@@ -303,18 +306,46 @@ export function AdvancedPriceChart({
 	const [chartState, setChartState] = useState<ChartState>({
 		offsetX: 0,
 		candleWidth: DEFAULT_CANDLE_WIDTH,
+		priceZoomFactor: 1.0,
 	});
 
 	// Interaction state
 	const [mousePos, setMousePos] = useState({ x: -1, y: -1 });
 	const [isDragging, setIsDragging] = useState(false);
-	const [dragStart, setDragStart] = useState({ x: 0, offsetX: 0 });
+	const [dragStart, setDragStart] = useState({ x: 0, y: 0, offsetX: 0 });
 	const [drawingInProgress, setDrawingInProgress] = useState<Drawing | null>(
 		null,
 	);
+	const [dragThreshold] = useState(5); // pixels to move before it's considered a drag
+
+	// Context menu state
+	const [contextMenu, setContextMenu] = useState<{
+		visible: boolean;
+		x: number;
+		y: number;
+		price: number;
+		candleIdx?: number;
+		exactX?: number; // Exact mouse X position relative to the chart
+	}>({ visible: false, x: 0, y: 0, price: 0 });
+	const [hideMarksOnBar, setHideMarksOnBar] = useState(false);
+	const [lockedCursorPosition, setLockedCursorPosition] = useState<{
+		candleIdx: number;
+		offsetFromCandleCenter: number; // Store exact offset from candle center
+	} | null>(null);
 
 	// Dimensions
-	const [dims, setDims] = useState({ w: 800, h: height });
+	const [dims, setDims] = useState({ w: 800, h: 450 });
+
+	// Touch state
+	const [touchStart, setTouchStart] = useState<{
+		x: number;
+		y: number;
+		time: number;
+	} | null>(null);
+	const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(
+		null,
+	);
+	const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
 	// ============================================================================
 	// Fetch Candles
@@ -391,44 +422,47 @@ export function AdvancedPriceChart({
 				if (!cancelled) {
 					setCandles(processed);
 					setIsLoading(false);
-					
+
 					// Center the chart on initial load, preserve position on timeframe changes
 					setChartState((prev) => {
 						// If this is the first load (offsetX is still 0), position chart to show most recent candles
 						if (prev.offsetX === 0 && processed.length > 0) {
 							const spacing = DEFAULT_CANDLE_WIDTH + 2;
 							const chartWidth = dims.w - PRICE_AXIS_WIDTH;
-							const visibleCandles = Math.floor(chartWidth / spacing);
-							
+							const visibleCandles = Math.floor(
+								chartWidth / spacing,
+							);
+
 							// Position chart so most recent candles are visible on the right
 							// Leave ~15% empty space on the right for future candles
-							const rightPadding = Math.floor(visibleCandles * 0.15);
+							const rightPadding = Math.floor(
+								visibleCandles * 0.15,
+							);
 							const totalWidth = processed.length * spacing;
-							
+
 							// If all candles fit in view, center them
 							if (totalWidth <= chartWidth) {
-								const targetOffset = (chartWidth - totalWidth) / 2;
+								const targetOffset =
+									(chartWidth - totalWidth) / 2;
 								return {
 									offsetX: targetOffset,
 									candleWidth: DEFAULT_CANDLE_WIDTH,
+									priceZoomFactor: 1.0,
 								};
 							}
-							
 							// If more candles than fit in view, show the most recent ones
 							// Position = rightmost position - right padding
-							const targetOffset = chartWidth - totalWidth + (rightPadding * spacing);
-							
+							const targetOffset =
+								chartWidth -
+								totalWidth +
+								rightPadding * spacing;
 							return {
 								offsetX: targetOffset,
 								candleWidth: DEFAULT_CANDLE_WIDTH,
+								priceZoomFactor: prev.priceZoomFactor,
 							};
 						}
-						
-						// Preserve user's manual positioning, only reset candleWidth to default
-						return {
-							offsetX: prev.offsetX,
-							candleWidth: DEFAULT_CANDLE_WIDTH,
-						};
+						return prev;
 					});
 				}
 			} catch (err) {
@@ -509,6 +543,15 @@ export function AdvancedPriceChart({
 		const padding = (pMax - pMin) * 0.08;
 		pMin -= padding;
 		pMax += padding;
+
+		// Apply price zoom factor
+		// Higher factor = zoomed in (narrower range), lower = zoomed out (wider range)
+		if (chartState.priceZoomFactor !== 1.0) {
+			const center = (pMin + pMax) / 2;
+			const range = (pMax - pMin) / chartState.priceZoomFactor;
+			pMin = center - range / 2;
+			pMax = center + range / 2;
+		}
 
 		return {
 			chartWidth,
@@ -639,13 +682,19 @@ export function AdvancedPriceChart({
 		// Calculate minimum pixel distance between grid lines to prevent clutter
 		const gridSpacing = chartState.candleWidth + 2;
 		const minGridSpacing = 60; // Minimum 60px between grid lines
-		const minGridStep = Math.max(1, Math.ceil(minGridSpacing / gridSpacing));
-		const gridTimeStep = Math.max(minGridStep, Math.floor((endIdx - startIdx) / 8));
-		
+		const minGridStep = Math.max(
+			1,
+			Math.ceil(minGridSpacing / gridSpacing),
+		);
+		const gridTimeStep = Math.max(
+			minGridStep,
+			Math.floor((endIdx - startIdx) / 8),
+		);
+
 		// Extend grid beyond visible candles to fill the entire width
 		const maxGridIdx = Math.ceil(chartWidth / gridSpacing);
 		const extendedGridEndIdx = Math.max(endIdx, startIdx + maxGridIdx);
-		
+
 		for (let i = startIdx; i < extendedGridEndIdx; i += gridTimeStep) {
 			const x = Math.floor(getCandleX(i)) + 0.5;
 			if (x >= 0 && x <= chartWidth) {
@@ -814,271 +863,298 @@ export function AdvancedPriceChart({
 		}
 
 		// ========== DRAWINGS ==========
-		for (const d of drawings) {
-			const isSelected = d.id === selectedDrawingId;
-			ctx.strokeStyle = d.color;
-			ctx.lineWidth = isSelected ? 3 : 2;
+		if (!hideMarksOnBar) {
+			for (const d of drawings) {
+				const isSelected = d.id === selectedDrawingId;
+				ctx.strokeStyle = d.color;
+				ctx.lineWidth = isSelected ? 3 : 2;
 
-			if (d.type === "hline" && d.points[0]?.price !== undefined) {
-				const y = getPriceY(
-					d.points[0].price,
-					priceMin,
-					priceMax,
-					priceHeight,
-				);
-				ctx.beginPath();
-				ctx.moveTo(0, y);
-				ctx.lineTo(chartWidth, y);
-				ctx.stroke();
-				ctx.fillStyle = d.color;
-				ctx.font = "10px -apple-system, system-ui, sans-serif";
-				ctx.textAlign = "left";
-				ctx.fillText(formatPrice(d.points[0].price), 5, y - 5);
-			} else if (d.type === "vline" && d.points[0]) {
-				const x = getCandleX(
-					d.points[0].candleIdx || getIndexAtX(d.points[0].x),
-				);
-				ctx.beginPath();
-				ctx.moveTo(x, 0);
-				ctx.lineTo(x, chartHeight);
-				ctx.stroke();
-			} else if (d.type === "trendline" && d.points.length === 2) {
-				ctx.beginPath();
-				ctx.moveTo(d.points[0].x, d.points[0].y);
-				ctx.lineTo(d.points[1].x, d.points[1].y);
-				ctx.stroke();
-				// Draw handles if selected
-				if (isSelected) {
-					ctx.fillStyle = d.color;
-					ctx.beginPath();
-					ctx.arc(d.points[0].x, d.points[0].y, 5, 0, Math.PI * 2);
-					ctx.fill();
-					ctx.beginPath();
-					ctx.arc(d.points[1].x, d.points[1].y, 5, 0, Math.PI * 2);
-					ctx.fill();
-				}
-			} else if (d.type === "ray" && d.points.length === 2) {
-				// Ray extends infinitely in one direction
-				const dx = d.points[1].x - d.points[0].x;
-				const dy = d.points[1].y - d.points[0].y;
-				const len = Math.sqrt(dx * dx + dy * dy);
-				const ex = d.points[0].x + (dx / len) * chartWidth * 2;
-				const ey = d.points[0].y + (dy / len) * chartWidth * 2;
-				ctx.beginPath();
-				ctx.moveTo(d.points[0].x, d.points[0].y);
-				ctx.lineTo(ex, ey);
-				ctx.stroke();
-			} else if (d.type === "extended" && d.points.length === 2) {
-				// Extended line (infinite both directions)
-				const dx = d.points[1].x - d.points[0].x;
-				const dy = d.points[1].y - d.points[0].y;
-				const len = Math.sqrt(dx * dx + dy * dy) || 1;
-				const ex1 = d.points[0].x - (dx / len) * chartWidth * 2;
-				const ey1 = d.points[0].y - (dy / len) * chartWidth * 2;
-				const ex2 = d.points[0].x + (dx / len) * chartWidth * 2;
-				const ey2 = d.points[0].y + (dy / len) * chartWidth * 2;
-				ctx.beginPath();
-				ctx.moveTo(ex1, ey1);
-				ctx.lineTo(ex2, ey2);
-				ctx.stroke();
-			} else if (d.type === "rect" && d.points.length === 2) {
-				const x1 = Math.min(d.points[0].x, d.points[1].x);
-				const y1 = Math.min(d.points[0].y, d.points[1].y);
-				const w = Math.abs(d.points[1].x - d.points[0].x);
-				const h = Math.abs(d.points[1].y - d.points[0].y);
-				ctx.strokeRect(x1, y1, w, h);
-				ctx.fillStyle = d.color + "1a";
-				ctx.fillRect(x1, y1, w, h);
-			} else if (d.type === "ellipse" && d.points.length === 2) {
-				const cx = (d.points[0].x + d.points[1].x) / 2;
-				const cy = (d.points[0].y + d.points[1].y) / 2;
-				const rx = Math.abs(d.points[1].x - d.points[0].x) / 2;
-				const ry = Math.abs(d.points[1].y - d.points[0].y) / 2;
-				ctx.beginPath();
-				ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-				ctx.stroke();
-				ctx.fillStyle = d.color + "1a";
-				ctx.fill();
-			} else if (d.type === "fibonacci" && d.points.length === 2) {
-				const y1 = d.points[0].y;
-				const y2 = d.points[1].y;
-				const price1 =
-					d.points[0].price ||
-					getPriceAtY(y1, priceMin, priceMax, priceHeight);
-				const price2 =
-					d.points[1].price ||
-					getPriceAtY(y2, priceMin, priceMax, priceHeight);
-				const priceDiff = price1 - price2;
+				// Helper to convert drawing point to screen coordinates
+				const toScreen = (point: DrawingPoint) => ({
+					x: getCandleX(point.candleIdx),
+					y: getPriceY(point.price, priceMin, priceMax, priceHeight),
+				});
 
-				ctx.font = "10px -apple-system, system-ui, sans-serif";
-				ctx.textAlign = "left";
-
-				for (const level of FIB_LEVELS) {
-					const price = price2 + priceDiff * level;
-					const y = getPriceY(price, priceMin, priceMax, priceHeight);
-
-					ctx.globalAlpha = level === 0 || level === 1 ? 1 : 0.6;
+				if (d.type === "hline" && d.points[0]) {
+					const y = getPriceY(
+						d.points[0].price,
+						priceMin,
+						priceMax,
+						priceHeight,
+					);
 					ctx.beginPath();
 					ctx.moveTo(0, y);
 					ctx.lineTo(chartWidth, y);
 					ctx.stroke();
-
 					ctx.fillStyle = d.color;
-					ctx.fillText(
-						`${(level * 100).toFixed(1)}% - ${formatPrice(price)}`,
-						5,
-						y - 3,
-					);
-				}
-				ctx.globalAlpha = 1;
-
-				// Highlight zone
-				ctx.fillStyle = d.color + "0d";
-				ctx.fillRect(
-					0,
-					Math.min(y1, y2),
-					chartWidth,
-					Math.abs(y2 - y1),
-				);
-			} else if (d.type === "pitchfork" && d.points.length === 3) {
-				const p0 = d.points[0];
-				const p1 = d.points[1];
-				const p2 = d.points[2];
-
-				// Median line (from p0 to midpoint of p1-p2)
-				const midX = (p1.x + p2.x) / 2;
-				const midY = (p1.y + p2.y) / 2;
-
-				ctx.beginPath();
-				ctx.moveTo(p0.x, p0.y);
-				const dx = midX - p0.x;
-				const dy = midY - p0.y;
-				const extX = p0.x + dx * 5;
-				const extY = p0.y + dy * 5;
-				ctx.lineTo(extX, extY);
-				ctx.stroke();
-
-				// Upper and lower prongs
-				const offsetX = p2.x - midX;
-				const offsetY = p2.y - midY;
-
-				ctx.setLineDash([4, 4]);
-				ctx.beginPath();
-				ctx.moveTo(p1.x, p1.y);
-				ctx.lineTo(p1.x + dx * 5, p1.y + dy * 5);
-				ctx.stroke();
-
-				ctx.beginPath();
-				ctx.moveTo(p2.x, p2.y);
-				ctx.lineTo(p2.x + dx * 5, p2.y + dy * 5);
-				ctx.stroke();
-				ctx.setLineDash([]);
-
-				// Draw points
-				[p0, p1, p2].forEach((p) => {
-					ctx.fillStyle = d.color;
+					ctx.font = "10px -apple-system, system-ui, sans-serif";
+					ctx.textAlign = "left";
+					ctx.fillText(formatPrice(d.points[0].price), 5, y - 5);
+				} else if (d.type === "vline" && d.points[0]) {
+					const x = getCandleX(d.points[0].candleIdx);
 					ctx.beginPath();
-					ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+					ctx.moveTo(x, 0);
+					ctx.lineTo(x, chartHeight);
+					ctx.stroke();
+				} else if (d.type === "trendline" && d.points.length === 2) {
+					const p0 = toScreen(d.points[0]);
+					const p1 = toScreen(d.points[1]);
+					ctx.beginPath();
+					ctx.moveTo(p0.x, p0.y);
+					ctx.lineTo(p1.x, p1.y);
+					ctx.stroke();
+					// Draw handles if selected
+					if (isSelected) {
+						ctx.fillStyle = d.color;
+						ctx.beginPath();
+						ctx.arc(p0.x, p0.y, 5, 0, Math.PI * 2);
+						ctx.fill();
+						ctx.beginPath();
+						ctx.arc(p1.x, p1.y, 5, 0, Math.PI * 2);
+						ctx.fill();
+					}
+				} else if (d.type === "ray" && d.points.length === 2) {
+					// Ray extends infinitely in one direction
+					const p0 = toScreen(d.points[0]);
+					const p1 = toScreen(d.points[1]);
+					const dx = p1.x - p0.x;
+					const dy = p1.y - p0.y;
+					const len = Math.sqrt(dx * dx + dy * dy);
+					const ex = p0.x + (dx / len) * chartWidth * 2;
+					const ey = p0.y + (dy / len) * chartWidth * 2;
+					ctx.beginPath();
+					ctx.moveTo(p0.x, p0.y);
+					ctx.lineTo(ex, ey);
+					ctx.stroke();
+				} else if (d.type === "extended" && d.points.length === 2) {
+					// Extended line (infinite both directions)
+					const p0 = toScreen(d.points[0]);
+					const p1 = toScreen(d.points[1]);
+					const dx = p1.x - p0.x;
+					const dy = p1.y - p0.y;
+					const len = Math.sqrt(dx * dx + dy * dy) || 1;
+					const ex1 = p0.x - (dx / len) * chartWidth * 2;
+					const ey1 = p0.y - (dy / len) * chartWidth * 2;
+					const ex2 = p0.x + (dx / len) * chartWidth * 2;
+					const ey2 = p0.y + (dy / len) * chartWidth * 2;
+					ctx.beginPath();
+					ctx.moveTo(ex1, ey1);
+					ctx.lineTo(ex2, ey2);
+					ctx.stroke();
+				} else if (d.type === "rect" && d.points.length === 2) {
+					const p0 = toScreen(d.points[0]);
+					const p1 = toScreen(d.points[1]);
+					const x1 = Math.min(p0.x, p1.x);
+					const y1 = Math.min(p0.y, p1.y);
+					const w = Math.abs(p1.x - p0.x);
+					const h = Math.abs(p1.y - p0.y);
+					ctx.strokeRect(x1, y1, w, h);
+					ctx.fillStyle = d.color + "1a";
+					ctx.fillRect(x1, y1, w, h);
+				} else if (d.type === "ellipse" && d.points.length === 2) {
+					const p0 = toScreen(d.points[0]);
+					const p1 = toScreen(d.points[1]);
+					const cx = (p0.x + p1.x) / 2;
+					const cy = (p0.y + p1.y) / 2;
+					const rx = Math.abs(p1.x - p0.x) / 2;
+					const ry = Math.abs(p1.y - p0.y) / 2;
+					ctx.beginPath();
+					ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+					ctx.stroke();
+					ctx.fillStyle = d.color + "1a";
 					ctx.fill();
-				});
-			} else if (d.type === "channel" && d.points.length === 3) {
-				const p0 = d.points[0];
-				const p1 = d.points[1];
-				const p2 = d.points[2];
+				} else if (d.type === "fibonacci" && d.points.length === 2) {
+					const price1 = d.points[0].price;
+					const price2 = d.points[1].price;
+					const priceDiff = price1 - price2;
 
-				// Main line
-				const dx = p1.x - p0.x;
-				const dy = p1.y - p0.y;
-				const len = Math.sqrt(dx * dx + dy * dy) || 1;
+					ctx.font = "10px -apple-system, system-ui, sans-serif";
+					ctx.textAlign = "left";
 
-				ctx.beginPath();
-				ctx.moveTo(p0.x - (dx / len) * 500, p0.y - (dy / len) * 500);
-				ctx.lineTo(p1.x + (dx / len) * 500, p1.y + (dy / len) * 500);
-				ctx.stroke();
+					for (const level of FIB_LEVELS) {
+						const price = price2 + priceDiff * level;
+						const y = getPriceY(
+							price,
+							priceMin,
+							priceMax,
+							priceHeight,
+						);
 
-				// Parallel line through p2
-				const offsetY = p2.y - p0.y;
-				ctx.beginPath();
-				ctx.moveTo(
-					p0.x - (dx / len) * 500,
-					p0.y + offsetY - (dy / len) * 500,
-				);
-				ctx.lineTo(
-					p1.x + (dx / len) * 500,
-					p1.y + offsetY + (dy / len) * 500,
-				);
-				ctx.stroke();
+						ctx.globalAlpha = level === 0 || level === 1 ? 1 : 0.6;
+						ctx.beginPath();
+						ctx.moveTo(0, y);
+						ctx.lineTo(chartWidth, y);
+						ctx.stroke();
 
-				// Fill channel
-				ctx.fillStyle = d.color + "1a";
-				ctx.beginPath();
-				ctx.moveTo(p0.x, p0.y);
-				ctx.lineTo(p1.x, p1.y);
-				ctx.lineTo(p1.x, p1.y + offsetY);
-				ctx.lineTo(p0.x, p0.y + offsetY);
-				ctx.closePath();
-				ctx.fill();
-			} else if (d.type === "measure" && d.points.length === 2) {
-				const p1 = d.points[0];
-				const p2 = d.points[1];
-				const price1 =
-					p1.price ||
-					getPriceAtY(p1.y, priceMin, priceMax, priceHeight);
-				const price2 =
-					p2.price ||
-					getPriceAtY(p2.y, priceMin, priceMax, priceHeight);
-				const priceDiff = price2 - price1;
-				const pctChange = (priceDiff / price1) * 100;
+						ctx.fillStyle = d.color;
+						ctx.fillText(
+							`${(level * 100).toFixed(1)}% - ${formatPrice(price)}`,
+							5,
+							y - 3,
+						);
+					}
+					ctx.globalAlpha = 1;
 
-				// Draw rectangle
-				ctx.strokeRect(
-					Math.min(p1.x, p2.x),
-					Math.min(p1.y, p2.y),
-					Math.abs(p2.x - p1.x),
-					Math.abs(p2.y - p1.y),
-				);
-				ctx.fillStyle =
-					priceDiff >= 0
-						? "rgba(34,197,94,0.1)"
-						: "rgba(239,68,68,0.1)";
-				ctx.fillRect(
-					Math.min(p1.x, p2.x),
-					Math.min(p1.y, p2.y),
-					Math.abs(p2.x - p1.x),
-					Math.abs(p2.y - p1.y),
-				);
+					// Highlight zone
+					const y1 = getPriceY(
+						price1,
+						priceMin,
+						priceMax,
+						priceHeight,
+					);
+					const y2 = getPriceY(
+						price2,
+						priceMin,
+						priceMax,
+						priceHeight,
+					);
+					ctx.fillStyle = d.color + "0d";
+					ctx.fillRect(
+						0,
+						Math.min(y1, y2),
+						chartWidth,
+						Math.abs(y2 - y1),
+					);
+				} else if (d.type === "pitchfork" && d.points.length === 3) {
+					const p0 = toScreen(d.points[0]);
+					const p1 = toScreen(d.points[1]);
+					const p2 = toScreen(d.points[2]);
 
-				// Draw info box
-				const infoX = Math.max(p1.x, p2.x) + 5;
-				const infoY = Math.min(p1.y, p2.y);
+					// Median line (from p0 to midpoint of p1-p2)
+					const midX = (p1.x + p2.x) / 2;
+					const midY = (p1.y + p2.y) / 2;
 
-				ctx.fillStyle = "rgba(0,0,0,0.9)";
-				ctx.fillRect(infoX, infoY, 100, 50);
-				ctx.strokeRect(infoX, infoY, 100, 50);
+					ctx.beginPath();
+					ctx.moveTo(p0.x, p0.y);
+					const dx = midX - p0.x;
+					const dy = midY - p0.y;
+					const extX = p0.x + dx * 5;
+					const extY = p0.y + dy * 5;
+					ctx.lineTo(extX, extY);
+					ctx.stroke();
 
-				ctx.fillStyle =
-					priceDiff >= 0 ? COLORS.bullish : COLORS.bearish;
-				ctx.font = "bold 11px -apple-system, system-ui, sans-serif";
-				ctx.textAlign = "left";
-				ctx.fillText(
-					`${pctChange >= 0 ? "+" : ""}${pctChange.toFixed(2)}%`,
-					infoX + 8,
-					infoY + 18,
-				);
-				ctx.fillStyle = COLORS.textLight;
-				ctx.font = "10px -apple-system, system-ui, sans-serif";
-				ctx.fillText(
-					`${formatPrice(priceDiff)}`,
-					infoX + 8,
-					infoY + 35,
-				);
-			} else if (d.type === "text" && d.points[0] && d.text) {
-				ctx.fillStyle = d.color;
-				ctx.font = "12px -apple-system, system-ui, sans-serif";
-				ctx.textAlign = "left";
-				ctx.fillText(d.text, d.points[0].x, d.points[0].y);
+					// Upper and lower prongs
+					ctx.setLineDash([4, 4]);
+					ctx.beginPath();
+					ctx.moveTo(p1.x, p1.y);
+					ctx.lineTo(p1.x + dx * 5, p1.y + dy * 5);
+					ctx.stroke();
+
+					ctx.beginPath();
+					ctx.moveTo(p2.x, p2.y);
+					ctx.lineTo(p2.x + dx * 5, p2.y + dy * 5);
+					ctx.stroke();
+					ctx.setLineDash([]);
+
+					// Draw points
+					[p0, p1, p2].forEach((p) => {
+						ctx.fillStyle = d.color;
+						ctx.beginPath();
+						ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+						ctx.fill();
+					});
+				} else if (d.type === "channel" && d.points.length === 3) {
+					const p0 = toScreen(d.points[0]);
+					const p1 = toScreen(d.points[1]);
+					const p2 = toScreen(d.points[2]);
+
+					// Main line
+					const dx = p1.x - p0.x;
+					const dy = p1.y - p0.y;
+					const len = Math.sqrt(dx * dx + dy * dy) || 1;
+
+					ctx.beginPath();
+					ctx.moveTo(
+						p0.x - (dx / len) * 500,
+						p0.y - (dy / len) * 500,
+					);
+					ctx.lineTo(
+						p1.x + (dx / len) * 500,
+						p1.y + (dy / len) * 500,
+					);
+					ctx.stroke();
+
+					// Parallel line through p2
+					const offsetY = p2.y - p0.y;
+					ctx.beginPath();
+					ctx.moveTo(
+						p0.x - (dx / len) * 500,
+						p0.y + offsetY - (dy / len) * 500,
+					);
+					ctx.lineTo(
+						p1.x + (dx / len) * 500,
+						p1.y + offsetY + (dy / len) * 500,
+					);
+					ctx.stroke();
+
+					// Fill channel
+					ctx.fillStyle = d.color + "1a";
+					ctx.beginPath();
+					ctx.moveTo(p0.x, p0.y);
+					ctx.lineTo(p1.x, p1.y);
+					ctx.lineTo(p1.x, p1.y + offsetY);
+					ctx.lineTo(p0.x, p0.y + offsetY);
+					ctx.closePath();
+					ctx.fill();
+				} else if (d.type === "measure" && d.points.length === 2) {
+					const p1 = toScreen(d.points[0]);
+					const p2 = toScreen(d.points[1]);
+					const price1 = d.points[0].price;
+					const price2 = d.points[1].price;
+					const priceDiff = price2 - price1;
+					const pctChange = (priceDiff / price1) * 100;
+
+					// Draw rectangle
+					ctx.strokeRect(
+						Math.min(p1.x, p2.x),
+						Math.min(p1.y, p2.y),
+						Math.abs(p2.x - p1.x),
+						Math.abs(p2.y - p1.y),
+					);
+					ctx.fillStyle =
+						priceDiff >= 0
+							? "rgba(34,197,94,0.1)"
+							: "rgba(239,68,68,0.1)";
+					ctx.fillRect(
+						Math.min(p1.x, p2.x),
+						Math.min(p1.y, p2.y),
+						Math.abs(p2.x - p1.x),
+						Math.abs(p2.y - p1.y),
+					);
+
+					// Draw info box
+					const infoX = Math.max(p1.x, p2.x) + 5;
+					const infoY = Math.min(p1.y, p2.y);
+
+					ctx.fillStyle = "rgba(0,0,0,0.9)";
+					ctx.fillRect(infoX, infoY, 100, 50);
+					ctx.strokeRect(infoX, infoY, 100, 50);
+
+					ctx.fillStyle =
+						priceDiff >= 0 ? COLORS.bullish : COLORS.bearish;
+					ctx.font = "bold 11px -apple-system, system-ui, sans-serif";
+					ctx.textAlign = "left";
+					ctx.fillText(
+						`${pctChange >= 0 ? "+" : ""}${pctChange.toFixed(2)}%`,
+						infoX + 8,
+						infoY + 18,
+					);
+					ctx.fillStyle = COLORS.textLight;
+					ctx.font = "10px -apple-system, system-ui, sans-serif";
+					ctx.fillText(
+						`${formatPrice(priceDiff)}`,
+						infoX + 8,
+						infoY + 35,
+					);
+				} else if (d.type === "text" && d.points[0] && d.text) {
+					const p0 = toScreen(d.points[0]);
+					ctx.fillStyle = d.color;
+					ctx.font = "12px -apple-system, system-ui, sans-serif";
+					ctx.textAlign = "left";
+					ctx.fillText(d.text, p0.x, p0.y);
+				}
 			}
-		}
+		} // End hide marks on bar check
 
 		// Drawing in progress
 		if (drawingInProgress) {
@@ -1086,7 +1162,13 @@ export function AdvancedPriceChart({
 			ctx.lineWidth = 2;
 			ctx.setLineDash([5, 5]);
 
-			const pts = drawingInProgress.points;
+			// Helper to convert drawing point to screen coordinates
+			const toScreen = (point: DrawingPoint) => ({
+				x: getCandleX(point.candleIdx),
+				y: getPriceY(point.price, priceMin, priceMax, priceHeight),
+			});
+
+			const pts = drawingInProgress.points.map(toScreen);
 			const mp = { x: mousePos.x, y: mousePos.y };
 
 			if (drawingInProgress.type === "hline" && pts[0]) {
@@ -1196,11 +1278,15 @@ export function AdvancedPriceChart({
 				ctx.lineWidth = 1;
 				ctx.setLineDash([4, 4]);
 
-				ctx.beginPath();
-				ctx.moveTo(mousePos.x, 0);
-				ctx.lineTo(mousePos.x, chartHeight);
-				ctx.stroke();
+				// Only draw vertical line if cursor is not locked
+				if (!lockedCursorPosition) {
+					ctx.beginPath();
+					ctx.moveTo(mousePos.x, 0);
+					ctx.lineTo(mousePos.x, chartHeight);
+					ctx.stroke();
+				}
 
+				// Always draw horizontal line
 				ctx.beginPath();
 				ctx.moveTo(0, mousePos.y);
 				ctx.lineTo(chartWidth, mousePos.y);
@@ -1227,23 +1313,70 @@ export function AdvancedPriceChart({
 					mousePos.y + 4,
 				);
 
-				// Time label on X-axis
-				const idx = getIndexAtX(mousePos.x);
-				if (idx >= 0 && idx < candles.length) {
-					const c = candles[idx];
+				// Time label on X-axis (only if cursor is not locked)
+				if (!lockedCursorPosition) {
+					const idx = getIndexAtX(mousePos.x);
+					if (idx >= 0 && idx < candles.length) {
+						const c = candles[idx];
+						const timeStr = formatTime(c.time, timeRange);
+						const labelW = ctx.measureText(timeStr).width + 12;
+
+						ctx.fillStyle = COLORS.priceLine;
+						ctx.fillRect(
+							mousePos.x - labelW / 2,
+							chartHeight,
+							labelW,
+							TIME_AXIS_HEIGHT,
+						);
+						ctx.fillStyle = "#000";
+						ctx.textAlign = "center";
+						ctx.fillText(timeStr, mousePos.x, chartHeight + 15);
+					}
+				}
+			}
+		}
+
+		// ========== LOCKED VERTICAL CURSOR ==========
+		// Only show locked cursor when mouse is over the chart canvas
+		if (lockedCursorPosition && mousePos) {
+			const lockedIdx = lockedCursorPosition.candleIdx;
+			if (lockedIdx >= 0 && lockedIdx < candles.length) {
+				const spacing = chartState.candleWidth + 2;
+				const candleCenterX =
+					chartState.offsetX +
+					lockedIdx * spacing +
+					chartState.candleWidth / 2;
+				const lockedX =
+					candleCenterX + lockedCursorPosition.offsetFromCandleCenter;
+
+				if (lockedX >= 0 && lockedX <= chartWidth) {
+					ctx.strokeStyle = "rgba(255, 255, 255, 0.3)"; // White color for locked cursor
+					ctx.lineWidth = 1;
+					ctx.setLineDash([5, 5]); // Dotted line
+
+					ctx.beginPath();
+					ctx.moveTo(lockedX, 0);
+					ctx.lineTo(lockedX, chartHeight);
+					ctx.stroke();
+
+					ctx.setLineDash([]); // Reset to solid
+
+					// Time label for locked cursor
+					const c = candles[lockedIdx];
 					const timeStr = formatTime(c.time, timeRange);
 					const labelW = ctx.measureText(timeStr).width + 12;
 
-					ctx.fillStyle = COLORS.priceLine;
+					ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
 					ctx.fillRect(
-						mousePos.x - labelW / 2,
+						lockedX - labelW / 2,
 						chartHeight,
 						labelW,
 						TIME_AXIS_HEIGHT,
 					);
-					ctx.fillStyle = "#000";
+					ctx.fillStyle = "#fff";
 					ctx.textAlign = "center";
-					ctx.fillText(timeStr, mousePos.x, chartHeight + 15);
+					ctx.font = "10px -apple-system, system-ui, sans-serif";
+					ctx.fillText(timeStr, lockedX, chartHeight + 15);
 				}
 			}
 		}
@@ -1281,7 +1414,10 @@ export function AdvancedPriceChart({
 		ctx.fillRect(0, chartHeight, dims.w, TIME_AXIS_HEIGHT);
 
 		ctx.fillStyle = COLORS.text;
-		ctx.font = "10px -apple-system, system-ui, sans-serif";
+		// Responsive font size - larger on mobile
+		const isMobile = dims.w < 768;
+		const fontSize = isMobile ? 11 : 10;
+		ctx.font = `${fontSize}px -apple-system, system-ui, sans-serif`;
 		ctx.textAlign = "center";
 
 		// Calculate time interval in seconds based on timeRange
@@ -1296,14 +1432,20 @@ export function AdvancedPriceChart({
 		const intervalSec = timeIntervalSeconds[timeRange];
 
 		// Calculate minimum pixel distance between labels to prevent overlap
-		const sampleLabel = candles[startIdx] ? formatTime(candles[startIdx].time, timeRange) : "00:00";
+		const sampleLabel = candles[startIdx]
+			? formatTime(candles[startIdx].time, timeRange)
+			: "00:00";
 		const labelWidth = ctx.measureText(sampleLabel).width;
-		const minLabelSpacing = labelWidth + 20; // Add 20px padding between labels
-		
+		// Increase spacing on mobile to prevent overcrowding
+		const minLabelSpacing = isMobile ? labelWidth + 30 : labelWidth + 20;
+
 		// Calculate how many candles we need to skip to maintain minimum spacing
 		const labelSpacing = chartState.candleWidth + 2;
-		const minCandleStep = Math.max(1, Math.ceil(minLabelSpacing / labelSpacing));
-		
+		const minCandleStep = Math.max(
+			1,
+			Math.ceil(minLabelSpacing / labelSpacing),
+		);
+
 		// Adjust timeStep to ensure labels don't overlap
 		const baseTimeStep = Math.max(1, Math.floor((endIdx - startIdx) / 8));
 		const timeStep = Math.max(minCandleStep, baseTimeStep);
@@ -1316,11 +1458,15 @@ export function AdvancedPriceChart({
 		let lastLabelX = -Infinity; // Track last drawn label position
 		for (let i = startIdx; i < extendedEndIdx; i += timeStep) {
 			const x = getCandleX(i);
-			
+
 			// Only draw label if it's within visible bounds and far enough from the last label
-			if (x >= 0 && x <= chartWidth && (x - lastLabelX) >= minLabelSpacing) {
+			if (
+				x >= 0 &&
+				x <= chartWidth &&
+				x - lastLabelX >= minLabelSpacing
+			) {
 				let timeToDisplay: number;
-				
+
 				// If we have a real candle at this index, use its time
 				if (i < candles.length && candles[i]) {
 					timeToDisplay = candles[i].time;
@@ -1329,12 +1475,13 @@ export function AdvancedPriceChart({
 					const lastCandle = candles[candles.length - 1];
 					if (lastCandle) {
 						const candlesBeyond = i - (candles.length - 1);
-						timeToDisplay = lastCandle.time + (candlesBeyond * intervalSec);
+						timeToDisplay =
+							lastCandle.time + candlesBeyond * intervalSec;
 					} else {
 						continue; // Skip if no candles at all
 					}
 				}
-				
+
 				ctx.fillText(
 					formatTime(timeToDisplay, timeRange),
 					x,
@@ -1408,6 +1555,8 @@ export function AdvancedPriceChart({
 		getPriceY,
 		getIndexAtX,
 		getPriceAtY,
+		hideMarksOnBar,
+		lockedCursorPosition,
 	]);
 
 	// Animation loop
@@ -1433,19 +1582,96 @@ export function AdvancedPriceChart({
 			const y = e.clientY - rect.top;
 			setMousePos({ x, y });
 
-			if (isDragging && activeTool === "cursor") {
+			// Handle panning when dragging
+			if (isDragging) {
 				const dx = e.clientX - dragStart.x;
-				setChartState((prev) => ({
-					...prev,
-					offsetX: dragStart.offsetX + dx,
-				}));
+				const dy = e.clientY - dragStart.y;
+				const distance = Math.sqrt(dx * dx + dy * dy);
+
+				// If we've moved past the threshold, start panning
+				if (distance > dragThreshold || isPanning) {
+					if (!isPanning) {
+						setIsPanning(true);
+					}
+					setChartState((prev) => ({
+						...prev,
+						offsetX: dragStart.offsetX + dx,
+					}));
+				}
 			}
 		},
-		[isDragging, dragStart, activeTool],
+		[isDragging, isPanning, dragStart, dragThreshold],
 	);
 
 	const handleMouseDown = useCallback(
 		(e: React.MouseEvent) => {
+			// Close context menu if it's visible
+			if (contextMenu.visible) {
+				setContextMenu({ visible: false, x: 0, y: 0, price: 0 });
+			}
+
+			const rect = canvasRef.current?.getBoundingClientRect();
+			if (!rect) return;
+
+			const x = e.clientX - rect.left;
+			const y = e.clientY - rect.top;
+			const metrics = getChartMetrics();
+
+			if (x > metrics.chartWidth || y > metrics.chartHeight) return;
+
+			// Start drag for all interactions - we'll determine if it's a pan or draw based on movement
+			setIsDragging(true);
+			setDragStart({
+				x: e.clientX,
+				y: e.clientY,
+				offsetX: chartState.offsetX,
+			});
+
+			// Don't allow drawing when drawings are locked
+			if (
+				allDrawingsLocked &&
+				activeTool !== "crosshair" &&
+				activeTool !== "cursor"
+			) {
+				return;
+			}
+
+			// Cursor tool always pans immediately
+			if (activeTool === "cursor") {
+				setIsPanning(true);
+				return;
+			}
+
+			// Middle mouse button always pans
+			if (e.button === 1) {
+				e.preventDefault();
+				setIsPanning(true);
+				return;
+			}
+
+			// Drawing logic has been moved to handleMouseUp for click-to-draw behavior
+		},
+		[
+			activeTool,
+			chartState,
+			allDrawingsLocked,
+			getChartMetrics,
+			contextMenu.visible,
+		],
+	);
+
+	const handleMouseUp = useCallback(
+		(e: React.MouseEvent) => {
+			const wasPanning = isPanning;
+			setIsDragging(false);
+			setIsPanning(false);
+
+			// If we were panning, don't process as a drawing action
+			if (wasPanning) {
+				return;
+			}
+
+			// If we didn't pan, process drawing actions
 			const rect = canvasRef.current?.getBoundingClientRect();
 			if (!rect) return;
 
@@ -1462,9 +1688,18 @@ export function AdvancedPriceChart({
 
 			if (x > metrics.chartWidth || y > metrics.chartHeight) return;
 
-			// Single-click tools
+			// Check if this was a click (not a drag)
+			const dx = e.clientX - dragStart.x;
+			const dy = e.clientY - dragStart.y;
+			const distance = Math.sqrt(dx * dx + dy * dy);
+
+			if (distance > dragThreshold) {
+				// This was a drag, not a click
+				return;
+			}
+
+			// This was a click - handle drawing
 			const singleClickTools: DrawingTool[] = ["hline", "vline"];
-			// Two-click tools
 			const twoClickTools: DrawingTool[] = [
 				"trendline",
 				"ray",
@@ -1474,14 +1709,7 @@ export function AdvancedPriceChart({
 				"fibonacci",
 				"measure",
 			];
-			// Three-click tools
 			const threeClickTools: DrawingTool[] = ["pitchfork", "channel"];
-
-			if (activeTool === "cursor") {
-				setIsDragging(true);
-				setDragStart({ x: e.clientX, offsetX: chartState.offsetX });
-				return;
-			}
 
 			if (activeTool === "text") {
 				const text = prompt("Enter text:");
@@ -1491,7 +1719,7 @@ export function AdvancedPriceChart({
 						{
 							id: Date.now().toString(),
 							type: "text",
-							points: [{ x, y }],
+							points: [{ candleIdx, price }],
 							color: drawingColor,
 							text,
 						},
@@ -1506,7 +1734,7 @@ export function AdvancedPriceChart({
 					{
 						id: Date.now().toString(),
 						type: activeTool as "hline" | "vline",
-						points: [{ x, y, price, candleIdx }],
+						points: [{ candleIdx, price }],
 						color: drawingColor,
 					},
 				]);
@@ -1518,7 +1746,7 @@ export function AdvancedPriceChart({
 					setDrawingInProgress({
 						id: Date.now().toString(),
 						type: activeTool,
-						points: [{ x, y, price, candleIdx }],
+						points: [{ candleIdx, price }],
 						color: drawingColor,
 					});
 				} else {
@@ -1526,7 +1754,7 @@ export function AdvancedPriceChart({
 						...drawingInProgress,
 						points: [
 							...drawingInProgress.points,
-							{ x, y, price, candleIdx },
+							{ candleIdx, price },
 						],
 					};
 					setDrawings((prev) => [...prev, completed]);
@@ -1540,7 +1768,7 @@ export function AdvancedPriceChart({
 					setDrawingInProgress({
 						id: Date.now().toString(),
 						type: activeTool,
-						points: [{ x, y, price, candleIdx }],
+						points: [{ candleIdx, price }],
 						color: drawingColor,
 					});
 				} else if (drawingInProgress.points.length < 2) {
@@ -1548,7 +1776,7 @@ export function AdvancedPriceChart({
 						...drawingInProgress,
 						points: [
 							...drawingInProgress.points,
-							{ x, y, price, candleIdx },
+							{ candleIdx, price },
 						],
 					});
 				} else {
@@ -1556,7 +1784,7 @@ export function AdvancedPriceChart({
 						...drawingInProgress,
 						points: [
 							...drawingInProgress.points,
-							{ x, y, price, candleIdx },
+							{ candleIdx, price },
 						],
 					};
 					setDrawings((prev) => [...prev, completed]);
@@ -1566,8 +1794,10 @@ export function AdvancedPriceChart({
 			}
 		},
 		[
+			isPanning,
+			dragStart,
+			dragThreshold,
 			activeTool,
-			chartState,
 			drawingInProgress,
 			drawingColor,
 			getChartMetrics,
@@ -1576,95 +1806,634 @@ export function AdvancedPriceChart({
 		],
 	);
 
-	const handleMouseUp = useCallback(() => {
-		setIsDragging(false);
-	}, []);
-
 	const handleMouseLeave = useCallback(() => {
 		setIsDragging(false);
+		setIsPanning(false);
 		setMousePos({ x: -1, y: -1 });
 	}, []);
 
-	const handleWheel = useCallback((e: React.WheelEvent) => {
-		e.preventDefault();
+	// ============================================================================
+	// Touch Handlers for Mobile
+	// ============================================================================
 
-		const rect = canvasRef.current?.getBoundingClientRect();
-		if (!rect) return;
+	const handleTouchStart = useCallback(
+		(e: React.TouchEvent) => {
+			const rect = canvasRef.current?.getBoundingClientRect();
+			if (!rect) return;
 
-		// Hold Shift for pan, otherwise zoom
-		if (e.shiftKey) {
-			// Pan horizontally when Shift is held
-			const panSpeed = 1.5;
-			const delta = -e.deltaY * panSpeed;
+			const chartWidth = dims.w - PRICE_AXIS_WIDTH;
 
-			setChartState((prev) => ({
-				...prev,
-				offsetX: prev.offsetX + delta,
-			}));
-		} else {
-			// Zoom behavior (default)
-			const mx = e.clientX - rect.left;
-			const factor = e.deltaY < 0 ? 1.15 : 0.87;
-
-			setChartState((prev) => {
-				const oldW = prev.candleWidth;
-				const newW = clamp(
-					oldW * factor,
-					MIN_CANDLE_WIDTH,
-					MAX_CANDLE_WIDTH,
-				);
-
-				// Zoom centered on mouse
-				const oldSpacing = oldW + 2;
-				const newSpacing = newW + 2;
-				const candleIdx = (mx - prev.offsetX) / oldSpacing;
-				const newOffsetX = mx - candleIdx * newSpacing;
-
-				return {
-					...prev,
-					candleWidth: newW,
-					offsetX: newOffsetX,
-				};
-			});
-		}
-	}, []);
-
-	// Escape key to cancel drawing, Delete to remove selected
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			if (e.key === "Escape") {
-				setDrawingInProgress(null);
-				setSelectedDrawingId(null);
+			// Close context menu on touch
+			if (contextMenu.visible) {
+				setContextMenu({ visible: false, x: 0, y: 0, price: 0 });
 			}
-			if (e.key === "Delete" || e.key === "Backspace") {
-				if (selectedDrawingId) {
-					setDrawings((prev) =>
-						prev.filter((d) => d.id !== selectedDrawingId),
+
+			if (e.touches.length === 1) {
+				// Single touch
+				const touch = e.touches[0];
+				const x = touch.clientX - rect.left;
+				const y = touch.clientY - rect.top;
+
+				// Check if touch is on Y-axis (price axis)
+				const isOnYAxis = x >= chartWidth;
+
+				if (isOnYAxis) {
+					// Y-axis scrolling mode
+					setTouchStart({
+						x: touch.clientX,
+						y: touch.clientY,
+						time: Date.now(),
+					});
+					setIsDragging(true);
+					return;
+				}
+
+				setMousePos({ x, y });
+				setTouchStart({
+					x: touch.clientX,
+					y: touch.clientY,
+					time: Date.now(),
+				});
+
+				// Start drag
+				setIsDragging(true);
+				setDragStart({
+					x: touch.clientX,
+					y: touch.clientY,
+					offsetX: chartState.offsetX,
+				});
+
+				// Start long press timer for context menu
+				longPressTimerRef.current = setTimeout(() => {
+					const metrics = getChartMetrics();
+					const price = getPriceAtY(
+						y,
+						metrics.priceMin,
+						metrics.priceMax,
+						metrics.priceHeight,
 					);
-					setSelectedDrawingId(null);
+					const candleIdx = getIndexAtX(x);
+					const boundedIdx = Math.max(
+						0,
+						Math.min(candleIdx, candles.length - 1),
+					);
+
+					setContextMenu({
+						visible: true,
+						x: touch.clientX,
+						y: touch.clientY,
+						price,
+						candleIdx: boundedIdx,
+						exactX: x,
+					});
+
+					// Haptic feedback if available
+					if ("vibrate" in navigator) {
+						navigator.vibrate(50);
+					}
+				}, 500); // 500ms long press
+
+				// Always pan on mobile with cursor tool
+				if (activeTool === "cursor") {
+					setIsPanning(true);
+				}
+			} else if (e.touches.length === 2) {
+				// Two finger pinch/pan
+				const touch1 = e.touches[0];
+				const touch2 = e.touches[1];
+				const distance = Math.hypot(
+					touch2.clientX - touch1.clientX,
+					touch2.clientY - touch1.clientY,
+				);
+				setLastTouchDistance(distance);
+				setIsPanning(true);
+
+				// Clear long press timer
+				if (longPressTimerRef.current) {
+					clearTimeout(longPressTimerRef.current);
+					longPressTimerRef.current = null;
 				}
 			}
-			if (e.key === "z" && (e.metaKey || e.ctrlKey)) {
-				setDrawings((prev) => prev.slice(0, -1));
+		},
+		[
+			activeTool,
+			chartState,
+			contextMenu.visible,
+			getChartMetrics,
+			getPriceAtY,
+			getIndexAtX,
+			candles,
+			dims.w,
+		],
+	);
+
+	const handleTouchMove = useCallback(
+		(e: React.TouchEvent) => {
+			e.preventDefault(); // Prevent page scroll
+
+			const rect = canvasRef.current?.getBoundingClientRect();
+			if (!rect) return;
+
+			const chartWidth = dims.w - PRICE_AXIS_WIDTH;
+			const chartHeight = dims.h - TIME_AXIS_HEIGHT;
+
+			// Clear long press timer on move
+			if (longPressTimerRef.current) {
+				clearTimeout(longPressTimerRef.current);
+				longPressTimerRef.current = null;
+			}
+
+			if (e.touches.length === 1) {
+				// Single touch drag
+				const touch = e.touches[0];
+				const x = touch.clientX - rect.left;
+				const y = touch.clientY - rect.top;
+
+				// Check if this is Y-axis scrolling
+				if (touchStart && x >= chartWidth) {
+					// Y-axis price scrolling
+					const deltaY = touch.clientY - touchStart.y;
+					const scrollFactor = 0.002; // Adjust sensitivity
+
+					setChartState((prev) => {
+						const newZoom = clamp(
+							prev.priceZoomFactor * (1 - deltaY * scrollFactor),
+							0.3, // Min zoom out (wider range)
+							5.0, // Max zoom in (narrower range)
+						);
+						return {
+							...prev,
+							priceZoomFactor: newZoom,
+						};
+					});
+
+					// Update touch start for continuous scrolling
+					setTouchStart({
+						x: touch.clientX,
+						y: touch.clientY,
+						time: touchStart.time,
+					});
+					return;
+				}
+
+				setMousePos({ x, y });
+
+				if (isDragging && touchStart) {
+					const dx = touch.clientX - touchStart.x;
+					const dy = touch.clientY - touchStart.y;
+					const distance = Math.sqrt(dx * dx + dy * dy);
+
+					// Check if moved beyond threshold
+					if (distance > dragThreshold && !isPanning) {
+						// Start panning for cursor tool or crosshair with significant movement
+						if (
+							activeTool === "cursor" ||
+							activeTool === "crosshair"
+						) {
+							setIsPanning(true);
+						}
+					}
+
+					// Handle panning
+					if (isPanning) {
+						const deltaX = touch.clientX - dragStart.x;
+						setChartState((prev) => ({
+							...prev,
+							offsetX: dragStart.offsetX + deltaX,
+						}));
+					}
+				}
+			} else if (e.touches.length === 2) {
+				// Two finger pinch zoom
+				const touch1 = e.touches[0];
+				const touch2 = e.touches[1];
+				const distance = Math.hypot(
+					touch2.clientX - touch1.clientX,
+					touch2.clientY - touch1.clientY,
+				);
+
+				if (lastTouchDistance) {
+					const centerX =
+						(touch1.clientX + touch2.clientX) / 2 - rect.left;
+					const scale = distance / lastTouchDistance;
+
+					setChartState((prev) => {
+						const oldW = prev.candleWidth;
+						const newW = clamp(
+							oldW * scale,
+							MIN_CANDLE_WIDTH,
+							MAX_CANDLE_WIDTH,
+						);
+
+						// Zoom centered on pinch center
+						const oldSpacing = oldW + 2;
+						const newSpacing = newW + 2;
+						const candleIdx = (centerX - prev.offsetX) / oldSpacing;
+						const newOffsetX = centerX - candleIdx * newSpacing;
+
+						return {
+							...prev,
+							candleWidth: newW,
+							offsetX: newOffsetX,
+						};
+					});
+				}
+
+				setLastTouchDistance(distance);
+			}
+		},
+		[
+			isDragging,
+			isPanning,
+			touchStart,
+			dragStart,
+			dragThreshold,
+			lastTouchDistance,
+			activeTool,
+			dims.w,
+			dims.h,
+		],
+	);
+
+	const handleTouchEnd = useCallback(
+		(e: React.TouchEvent) => {
+			// Clear long press timer
+			if (longPressTimerRef.current) {
+				clearTimeout(longPressTimerRef.current);
+				longPressTimerRef.current = null;
+			}
+
+			const wasPanning = isPanning;
+			setIsDragging(false);
+			setIsPanning(false);
+			setLastTouchDistance(null);
+
+			// If we were panning, don't process as a drawing action
+			if (wasPanning || !touchStart) {
+				setTouchStart(null);
+				return;
+			}
+
+			// Check if this was a tap (not a drag)
+			const timeDiff = Date.now() - touchStart.time;
+			if (timeDiff < 300 && e.changedTouches.length > 0) {
+				// This was a quick tap - handle as click for drawing
+				const touch = e.changedTouches[0];
+				const rect = canvasRef.current?.getBoundingClientRect();
+				if (!rect) return;
+
+				const x = touch.clientX - rect.left;
+				const y = touch.clientY - rect.top;
+				const metrics = getChartMetrics();
+				const candleIdx = getIndexAtX(x);
+				const price = getPriceAtY(
+					y,
+					metrics.priceMin,
+					metrics.priceMax,
+					metrics.priceHeight,
+				);
+
+				if (x > metrics.chartWidth || y > metrics.chartHeight) {
+					setTouchStart(null);
+					return;
+				}
+
+				// Handle drawing tools on tap
+				const singleClickTools: DrawingTool[] = ["hline", "vline"];
+				const twoClickTools: DrawingTool[] = [
+					"trendline",
+					"ray",
+					"extended",
+					"rect",
+					"ellipse",
+					"fibonacci",
+					"measure",
+				];
+
+				if (singleClickTools.includes(activeTool)) {
+					const newDrawing: Drawing = {
+						id: Date.now().toString(),
+						type: activeTool,
+						points: [{ candleIdx, price }],
+						color: drawingColor,
+					};
+					setDrawings((prev) => [...prev, newDrawing]);
+					setActiveTool("crosshair");
+				}
+
+				if (twoClickTools.includes(activeTool)) {
+					if (!drawingInProgress) {
+						setDrawingInProgress({
+							id: Date.now().toString(),
+							type: activeTool,
+							points: [{ candleIdx, price }],
+							color: drawingColor,
+						});
+					} else {
+						const completed = {
+							...drawingInProgress,
+							points: [
+								...drawingInProgress.points,
+								{ candleIdx, price },
+							],
+						};
+						setDrawings((prev) => [...prev, completed]);
+						setDrawingInProgress(null);
+						setActiveTool("crosshair");
+					}
+				}
+			}
+
+			setTouchStart(null);
+		},
+		[
+			isPanning,
+			touchStart,
+			activeTool,
+			drawingInProgress,
+			drawingColor,
+			getChartMetrics,
+			getPriceAtY,
+			getIndexAtX,
+		],
+	);
+
+	const handleContextMenu = useCallback(
+		(e: React.MouseEvent) => {
+			e.preventDefault();
+			const rect = canvasRef.current?.getBoundingClientRect();
+			if (!rect) return;
+
+			const x = e.clientX - rect.left;
+			const y = e.clientY - rect.top;
+			const metrics = getChartMetrics();
+			const price = getPriceAtY(
+				y,
+				metrics.priceMin,
+				metrics.priceMax,
+				metrics.priceHeight,
+			);
+			const candleIdx = getIndexAtX(x);
+
+			// Ensure candle index is within bounds
+			const boundedIdx = Math.max(
+				0,
+				Math.min(candleIdx, candles.length - 1),
+			);
+
+			setContextMenu({
+				visible: true,
+				x: e.clientX,
+				y: e.clientY,
+				price,
+				candleIdx: boundedIdx,
+				exactX: x,
+			});
+		},
+		[getChartMetrics, getPriceAtY, getIndexAtX, candles],
+	);
+
+	const resetChartView = useCallback(() => {
+		// Reset to the default position (same as initial load)
+		if (candles.length > 0) {
+			const spacing = DEFAULT_CANDLE_WIDTH + 2;
+			const chartWidth = dims.w - PRICE_AXIS_WIDTH;
+			const visibleCandles = Math.floor(chartWidth / spacing);
+
+			// Position chart so most recent candles are visible on the right
+			// Leave ~15% empty space on the right for future candles
+			const rightPadding = Math.floor(visibleCandles * 0.15);
+			const totalWidth = candles.length * spacing;
+
+			let targetOffset: number;
+
+			// If all candles fit in view, center them
+			if (totalWidth <= chartWidth) {
+				targetOffset = (chartWidth - totalWidth) / 2;
+			} else {
+				// If more candles than fit in view, show the most recent ones
+				// Position = rightmost position - right padding
+				targetOffset = chartWidth - totalWidth + rightPadding * spacing;
+			}
+
+			setChartState({
+				offsetX: targetOffset,
+				candleWidth: DEFAULT_CANDLE_WIDTH,
+				priceZoomFactor: 1.0,
+			});
+		} else {
+			setChartState({
+				offsetX: 0,
+				candleWidth: DEFAULT_CANDLE_WIDTH,
+				priceZoomFactor: 1.0,
+			});
+		}
+		setContextMenu({ visible: false, x: 0, y: 0, price: 0 });
+	}, [candles.length, dims.w]);
+
+	const copyPriceToClipboard = useCallback((price: number) => {
+		const formattedPrice = formatPrice(price);
+		navigator.clipboard.writeText(formattedPrice);
+		setContextMenu({ visible: false, x: 0, y: 0, price: 0 });
+	}, []);
+
+	const clearAllDrawings = useCallback(() => {
+		setDrawings([]);
+		setContextMenu({ visible: false, x: 0, y: 0, price: 0 });
+	}, []);
+
+	const handleWheel = useCallback(
+		(e: React.WheelEvent) => {
+			e.preventDefault();
+
+			const rect = canvasRef.current?.getBoundingClientRect();
+			if (!rect) return;
+
+			const mx = e.clientX - rect.left;
+			const chartWidth = dims.w - PRICE_AXIS_WIDTH;
+
+			// Check if mouse is over the Y-axis (price axis)
+			const isOverYAxis = mx >= chartWidth;
+
+			if (isOverYAxis) {
+				// Scroll over Y-axis: zoom price (Y-axis)
+				const factor = e.deltaY < 0 ? 1.15 : 0.87; // Scroll up = zoom in, scroll down = zoom out
+
+				setChartState((prev) => {
+					const newZoom = clamp(
+						prev.priceZoomFactor * factor,
+						0.1,
+						10.0,
+					); // Limit zoom range
+					return {
+						...prev,
+						priceZoomFactor: newZoom,
+					};
+				});
+			} else if (e.shiftKey) {
+				// Hold Shift for pan
+				const panSpeed = 1.5;
+				const delta = -e.deltaY * panSpeed;
+
+				setChartState((prev) => ({
+					...prev,
+					offsetX: prev.offsetX + delta,
+				}));
+			} else {
+				// Zoom behavior over chart (default)
+				const factor = e.deltaY < 0 ? 1.15 : 0.87;
+
+				setChartState((prev) => {
+					const oldW = prev.candleWidth;
+					const newW = clamp(
+						oldW * factor,
+						MIN_CANDLE_WIDTH,
+						MAX_CANDLE_WIDTH,
+					);
+
+					// Zoom centered on mouse
+					const oldSpacing = oldW + 2;
+					const newSpacing = newW + 2;
+					const candleIdx = (mx - prev.offsetX) / oldSpacing;
+					const newOffsetX = mx - candleIdx * newSpacing;
+
+					return {
+						...prev,
+						candleWidth: newW,
+						offsetX: newOffsetX,
+					};
+				});
+			}
+		},
+		[dims.w],
+	);
+
+	// Escape key to cancel drawing, Delete to remove selected
+	// Keyboard shortcuts
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			// Don't trigger shortcuts if user is typing in an input
+			if (
+				e.target instanceof HTMLInputElement ||
+				e.target instanceof HTMLTextAreaElement
+			)
+				return;
+
+			switch (e.key.toLowerCase()) {
+				case "escape":
+					e.preventDefault();
+					if (drawingInProgress) {
+						setDrawingInProgress(null);
+					} else if (selectedDrawingId) {
+						setSelectedDrawingId(null);
+					} else {
+						setActiveTool("crosshair");
+					}
+					break;
+				case "delete":
+				case "backspace":
+					if (selectedDrawingId) {
+						e.preventDefault();
+						setDrawings((prev) =>
+							prev.filter((d) => d.id !== selectedDrawingId),
+						);
+						setSelectedDrawingId(null);
+					}
+					break;
+				case "c":
+					if (e.ctrlKey || e.metaKey) break; // Allow copy
+					e.preventDefault();
+					setActiveTool("crosshair");
+					break;
+				case "v":
+					if (e.ctrlKey || e.metaKey) break; // Allow paste
+					e.preventDefault();
+					setActiveTool("cursor");
+					break;
+				case "t":
+					e.preventDefault();
+					setActiveTool("trendline");
+					break;
+				case "r":
+					if (e.ctrlKey || e.metaKey) break;
+					if (e.altKey) {
+						e.preventDefault();
+						resetChartView();
+					} else if (e.shiftKey) {
+						e.preventDefault();
+						setActiveTool("rect");
+					} else {
+						e.preventDefault();
+						setActiveTool("ray");
+					}
+					break;
+				case "e":
+					e.preventDefault();
+					setActiveTool("ellipse");
+					break;
+				case "h":
+					e.preventDefault();
+					setActiveTool("hline");
+					break;
+				case "l":
+					if (e.ctrlKey || e.metaKey) {
+						e.preventDefault();
+						setAllDrawingsLocked((prev) => !prev);
+					} else {
+						e.preventDefault();
+						setActiveTool("extended");
+					}
+					break;
+				case "f":
+					if (e.ctrlKey || e.metaKey) break; // Allow find
+					e.preventDefault();
+					setActiveTool("fibonacci");
+					break;
+				case "p":
+					e.preventDefault();
+					setActiveTool("pitchfork");
+					break;
+				case "m":
+					e.preventDefault();
+					setActiveTool("measure");
+					break;
+				case "z":
+					if (e.ctrlKey || e.metaKey) {
+						e.preventDefault();
+						setDrawings((prev) => prev.slice(0, -1));
+					}
+					break;
 			}
 		};
+
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [selectedDrawingId]);
+	}, [selectedDrawingId, drawingInProgress, resetChartView]);
 
-	// Prevent page scroll when mouse is over the chart component
+	// Prevent page scroll when mouse is over the chart component (only if we have data)
 	useEffect(() => {
 		const chartRoot = chartRootRef.current;
 		if (!chartRoot) return;
 
 		const handleWheel = (e: WheelEvent) => {
-			// Only prevent default to stop page scroll, but let the event bubble to canvas handler
-			e.preventDefault();
+			// Only prevent default if we have candle data
+			if (candles.length > 0) {
+				e.preventDefault();
+			}
 		};
 
 		// Add listener with passive: false to allow preventDefault
 		chartRoot.addEventListener("wheel", handleWheel, { passive: false });
 		return () => chartRoot.removeEventListener("wheel", handleWheel);
+	}, [candles.length]);
+
+	// Cleanup long press timer on unmount
+	useEffect(() => {
+		return () => {
+			if (longPressTimerRef.current) {
+				clearTimeout(longPressTimerRef.current);
+			}
+		};
 	}, []);
 
 	// ============================================================================
@@ -1704,6 +2473,7 @@ export function AdvancedPriceChart({
 		setChartState({
 			candleWidth: candleW,
 			offsetX: chartWidth - candles.length * actualSpacing,
+			priceZoomFactor: 1.0,
 		});
 	}, [candles.length, dims.w]);
 
@@ -1716,14 +2486,17 @@ export function AdvancedPriceChart({
 		setDrawings((prev) => prev.slice(0, -1));
 	}, []);
 
-	const deleteSelectedDrawing = useCallback(() => {
-		if (selectedDrawingId) {
-			setDrawings((prev) =>
-				prev.filter((d) => d.id !== selectedDrawingId),
-			);
+	const toggleLockAllDrawings = useCallback(() => {
+		setAllDrawingsLocked(!allDrawingsLocked);
+		if (!allDrawingsLocked) {
+			// Lock all drawings
+			setDrawings((prev) => prev.map((d) => ({ ...d, locked: true })));
 			setSelectedDrawingId(null);
+		} else {
+			// Unlock all drawings
+			setDrawings((prev) => prev.map((d) => ({ ...d, locked: false })));
 		}
-	}, [selectedDrawingId]);
+	}, [allDrawingsLocked]);
 
 	const toggleIndicator = useCallback((type: Indicator) => {
 		setIndicators((prev) =>
@@ -1796,12 +2569,12 @@ export function AdvancedPriceChart({
 				{
 					id: "cursor" as DrawingTool,
 					icon: MousePointer2,
-					tip: "Pan / Select",
+					tip: "Pan / Select (V)",
 				},
 				{
 					id: "crosshair" as DrawingTool,
 					icon: Crosshair,
-					tip: "Crosshair",
+					tip: "Crosshair (C)",
 				},
 			],
 		},
@@ -1811,22 +2584,22 @@ export function AdvancedPriceChart({
 				{
 					id: "trendline" as DrawingTool,
 					icon: TrendingUp,
-					tip: "Trend Line",
+					tip: "Trend Line (T)",
 				},
 				{
 					id: "ray" as DrawingTool,
 					icon: ArrowUpRight,
-					tip: "Ray (infinite one direction)",
+					tip: "Ray (R)",
 				},
 				{
 					id: "extended" as DrawingTool,
 					icon: Slash,
-					tip: "Extended Line (infinite)",
+					tip: "Extended Line (L)",
 				},
 				{
 					id: "hline" as DrawingTool,
 					icon: Minus,
-					tip: "Horizontal Line",
+					tip: "Horizontal Line (H)",
 				},
 				{
 					id: "vline" as DrawingTool,
@@ -1838,8 +2611,16 @@ export function AdvancedPriceChart({
 		{
 			label: "Shapes",
 			tools: [
-				{ id: "rect" as DrawingTool, icon: Square, tip: "Rectangle" },
-				{ id: "ellipse" as DrawingTool, icon: Circle, tip: "Ellipse" },
+				{
+					id: "rect" as DrawingTool,
+					icon: Square,
+					tip: "Rectangle (Shift+R)",
+				},
+				{
+					id: "ellipse" as DrawingTool,
+					icon: Circle,
+					tip: "Ellipse (E)",
+				},
 			],
 		},
 		{
@@ -1848,22 +2629,22 @@ export function AdvancedPriceChart({
 				{
 					id: "fibonacci" as DrawingTool,
 					icon: Activity,
-					tip: "Fibonacci Retracement",
+					tip: "Fibonacci Retracement (F)",
 				},
 				{
 					id: "pitchfork" as DrawingTool,
 					icon: GitFork,
-					tip: "Andrews Pitchfork (3 points)",
+					tip: "Andrews Pitchfork (P)",
 				},
 				{
 					id: "channel" as DrawingTool,
 					icon: Triangle,
-					tip: "Parallel Channel (3 points)",
+					tip: "Parallel Channel",
 				},
 				{
 					id: "measure" as DrawingTool,
 					icon: Ruler,
-					tip: "Price Range / Measure",
+					tip: "Price Range / Measure (M)",
 				},
 				{
 					id: "text" as DrawingTool,
@@ -1881,11 +2662,10 @@ export function AdvancedPriceChart({
 				"flex flex-col bg-[#0f0f0f] rounded-lg overflow-hidden",
 				className,
 			)}
-			style={{ height }}
 		>
 			{/* Toolbar */}
 			{showToolbar && (
-				<div className="flex items-center gap-1 px-2 py-1.5 border-b border-white/5 bg-black/40 flex-shrink-0 flex-wrap">
+				<div className="flex items-center gap-1 px-2 py-1.5 border-b border-white/5 bg-black/40 shrink-0 flex-wrap">
 					{/* Tool Dropdown */}
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
@@ -1911,6 +2691,12 @@ export function AdvancedPriceChart({
 												onClick={() => {
 													setActiveTool(id);
 													setDrawingInProgress(null);
+													setContextMenu({
+														visible: false,
+														x: 0,
+														y: 0,
+														price: 0,
+													});
 												}}
 												className={cn(
 													"flex items-center gap-2 cursor-pointer",
@@ -1950,11 +2736,18 @@ export function AdvancedPriceChart({
 								onClick={() => {
 									setActiveTool(id);
 									setDrawingInProgress(null);
+									setContextMenu({
+										visible: false,
+										x: 0,
+										y: 0,
+										price: 0,
+									});
 								}}
 								title={id}
 								className={cn(
 									"p-1.5 rounded transition-all",
-									activeTool === id
+									activeTool === id ||
+										(id === "cursor" && isPanning)
 										? "bg-[#22c55e] text-black"
 										: "text-zinc-500 hover:text-white hover:bg-white/10",
 								)}
@@ -2118,6 +2911,26 @@ export function AdvancedPriceChart({
 							<Undo2 className="w-3.5 h-3.5" />
 						</button>
 						<button
+							onClick={toggleLockAllDrawings}
+							title={
+								allDrawingsLocked
+									? "Unlock All Drawings (Ctrl+L)"
+									: "Lock All Drawings (Ctrl+L)"
+							}
+							className={cn(
+								"p-1.5 rounded transition-all",
+								allDrawingsLocked
+									? "text-amber-400 bg-amber-500/20 hover:bg-amber-500/30"
+									: "text-zinc-500 hover:text-white hover:bg-white/10",
+							)}
+						>
+							{allDrawingsLocked ? (
+								<Lock className="w-3.5 h-3.5" />
+							) : (
+								<LockOpen className="w-3.5 h-3.5" />
+							)}
+						</button>
+						<button
 							onClick={clearDrawings}
 							title="Clear All Drawings"
 							className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-white/10 rounded transition-all"
@@ -2154,18 +2967,167 @@ export function AdvancedPriceChart({
 					className="absolute inset-0 w-full h-full"
 					style={{
 						cursor:
-							activeTool === "cursor"
-								? isDragging
-									? "grabbing"
-									: "grab"
-								: "crosshair",
+							isPanning || (activeTool === "cursor" && isDragging)
+								? "grabbing"
+								: activeTool === "cursor"
+									? "grab"
+									: "crosshair",
+						touchAction: "none", // Disable default touch behaviors
 					}}
 					onMouseMove={handleMouseMove}
 					onMouseDown={handleMouseDown}
 					onMouseUp={handleMouseUp}
 					onMouseLeave={handleMouseLeave}
 					onWheel={handleWheel}
+					onContextMenu={handleContextMenu}
+					onTouchStart={handleTouchStart}
+					onTouchMove={handleTouchMove}
+					onTouchEnd={handleTouchEnd}
 				/>
+
+				{/* Context Menu */}
+				{contextMenu.visible && (
+					<div
+						className="fixed bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl py-1 z-50 min-w-50"
+						style={{
+							left: `${contextMenu.x}px`,
+							top: `${contextMenu.y}px`,
+						}}
+					>
+						<button
+							onClick={(e) => {
+								e.stopPropagation();
+								resetChartView();
+							}}
+							className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 flex items-center justify-between"
+						>
+							<span>Reset Chart View</span>
+							<span className="text-xs text-zinc-500">Alt+R</span>
+						</button>
+						<button
+							onClick={(e) => {
+								e.stopPropagation();
+								copyPriceToClipboard(contextMenu.price);
+							}}
+							className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800"
+						>
+							Copy Price {formatPrice(contextMenu.price)}
+						</button>
+						<div className="border-t border-zinc-700 my-1" />
+						<button
+							onClick={(e) => {
+								e.stopPropagation();
+								if (lockedCursorPosition) {
+									// Unlock
+									setLockedCursorPosition(null);
+								} else {
+									// Lock at current position
+									if (
+										contextMenu.candleIdx !== undefined &&
+										contextMenu.exactX !== undefined
+									) {
+										// Calculate the candle center position
+										const spacing =
+											chartState.candleWidth + 2;
+										const candleCenterX =
+											chartState.offsetX +
+											contextMenu.candleIdx * spacing +
+											chartState.candleWidth / 2;
+										// Store the offset from candle center
+										const offset =
+											contextMenu.exactX - candleCenterX;
+
+										setLockedCursorPosition({
+											candleIdx: contextMenu.candleIdx,
+											offsetFromCandleCenter: offset,
+										});
+									}
+								}
+								setContextMenu({
+									visible: false,
+									x: 0,
+									y: 0,
+									price: 0,
+								});
+							}}
+							className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 flex items-center justify-between"
+						>
+							<span>
+								{lockedCursorPosition ? "Unlock" : "Lock"}{" "}
+								Vertical Cursor
+							</span>
+							{lockedCursorPosition && (
+								<Lock className="w-3 h-3" />
+							)}
+						</button>
+						{drawings.length > 0 && (
+							<>
+								<div className="border-t border-zinc-700 my-1" />
+								<button
+									onClick={(e) => {
+										e.stopPropagation();
+										clearAllDrawings();
+									}}
+									className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-zinc-800"
+								>
+									Remove {drawings.length} Drawing
+									{drawings.length !== 1 ? "s" : ""}
+								</button>
+							</>
+						)}
+						<div className="border-t border-zinc-700 my-1" />
+						<button
+							onClick={(e) => {
+								e.stopPropagation();
+								setHideMarksOnBar((prev) => !prev);
+								setContextMenu({
+									visible: false,
+									x: 0,
+									y: 0,
+									price: 0,
+								});
+							}}
+							className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800"
+						>
+							{hideMarksOnBar ? "Show" : "Hide"} Marks on Bar
+						</button>
+					</div>
+				)}
+
+				{/* Locked Cursor Icon */}
+				{lockedCursorPosition &&
+					mousePos &&
+					candles.length > 0 &&
+					(() => {
+						const metrics = getChartMetrics();
+						const spacing = chartState.candleWidth + 2;
+						const candleCenterX =
+							chartState.offsetX +
+							lockedCursorPosition.candleIdx * spacing +
+							chartState.candleWidth / 2;
+						const lockedX =
+							candleCenterX +
+							lockedCursorPosition.offsetFromCandleCenter;
+						const chartHeight = dims.h - TIME_AXIS_HEIGHT;
+
+						if (lockedX >= 0 && lockedX <= metrics.chartWidth) {
+							return (
+								<div
+									className="absolute pointer-events-none"
+									style={{
+										left: `${lockedX}px`,
+										top: `${chartHeight - 25}px`,
+										transform: "translateX(-50%)",
+									}}
+								>
+									<div className="bg-white/90 rounded-sm p-0.5">
+										<Lock className="w-3 h-3 text-black" />
+									</div>
+								</div>
+							);
+						}
+						return null;
+					})()}
 
 				{/* Tool hint */}
 				{drawingInProgress && (
