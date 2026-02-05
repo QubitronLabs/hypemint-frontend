@@ -1757,7 +1757,12 @@ export function AdvancedPriceChart({
 							{ candleIdx, price },
 						],
 					};
+				// For measure tool, only keep one measure at a time
+				if (completed.type === 'measure') {
+					setDrawings((prev) => [...prev.filter(d => d.type !== 'measure'), completed]);
+				} else {
 					setDrawings((prev) => [...prev, completed]);
+				}
 					setDrawingInProgress(null);
 				}
 				return;
@@ -2137,7 +2142,12 @@ export function AdvancedPriceChart({
 								{ candleIdx, price },
 							],
 						};
+					// For measure tool, only keep one measure at a time
+					if (completed.type === 'measure') {
+						setDrawings((prev) => [...prev.filter(d => d.type !== 'measure'), completed]);
+					} else {
 						setDrawings((prev) => [...prev, completed]);
+					}
 						setDrawingInProgress(null);
 						setActiveTool("crosshair");
 					}
