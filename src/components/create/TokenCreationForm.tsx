@@ -322,6 +322,7 @@ export function TokenCreationForm() {
 	 * Updates automatically when user switches networks via NetworkStateSynchronizer.
 	 */
 	const { data: balance } = useNativeBalance();
+	console.log({balance})
 
 	/**
 	 * Native currency symbol for the current network (e.g., "POL", "ETH", "BNB").
