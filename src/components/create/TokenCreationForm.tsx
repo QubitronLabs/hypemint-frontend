@@ -245,16 +245,16 @@ function TokenPreviewCard({
 					<div className="flex items-center gap-2 text-xs text-muted-foreground">
 						<Clock className="h-3.5 w-3.5" />
 						<span>
-							Token will be live immediately after creation
+							Token will be live immediately after creation.
 						</span>
 					</div>
 					<div className="flex items-center gap-2 text-xs text-muted-foreground">
 						<Users className="h-3.5 w-3.5" />
-						<span>Anyone can trade on the bonding curve</span>
+						<span>Anyone can trade on the bonding curve.</span>
 					</div>
 					<div className="flex items-center gap-2 text-xs text-muted-foreground">
 						<TrendingUp className="h-3.5 w-3.5" />
-						<span>Price increases with each purchase</span>
+						<span>Price increases with each purchase.</span>
 					</div>
 				</div>
 			</div>
