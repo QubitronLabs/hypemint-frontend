@@ -123,14 +123,7 @@ export function Header() {
 
 				{/* Actions */}
 				<div className="flex items-center gap-2 md:gap-4 shrink-0">
-					{/* Network - Hidden on mobile */}
-					<motion.div
-						whileHover={{ scale: 1.05 }}
-						className="hidden lg:flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-xl border border-border/50"
-					>
-						<span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-						<span className="font-medium">Polygon</span>
-					</motion.div>
+					
 
 					{/* Create Button */}
 					<Link href="/create" className="hidden sm:block">
