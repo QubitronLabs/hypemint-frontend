@@ -22,13 +22,36 @@ interface ApiResponse<T> {
   };
 }
 
-// List tokens with filters
-export async function getTokens(params?: TokenListParams): Promise<Token[]> {
+// Paginated result type
+export interface PaginatedResult<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
+// List tokens with filters (returns tokens + pagination metadata)
+export async function getTokens(params?: TokenListParams): Promise<PaginatedResult<Token>> {
   const { data } = await apiClient.get<ApiResponse<Token[]>>(
     "/api/v1/tokens/",
     { params },
   );
-  return data.data ?? [];
+  return {
+    data: data.data ?? [],
+    pagination: data.meta?.pagination ?? {
+      page: params?.page ?? 1,
+      pageSize: params?.pageSize ?? 40,
+      totalItems: (data.data ?? []).length,
+      totalPages: 1,
+      hasNext: false,
+      hasPrev: false,
+    },
+  };
 }
 
 // Get trending tokens (sorted by 24h volume)

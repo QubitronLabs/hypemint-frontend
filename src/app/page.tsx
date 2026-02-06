@@ -15,6 +15,10 @@ import {
 	Plus,
 	LayoutGrid,
 	List,
+	ChevronLeft,
+	ChevronRight,
+	ChevronsLeft,
+	ChevronsRight,
 	// Wifi,
 	// WifiOff,
 } from "lucide-react";
@@ -61,6 +65,8 @@ const FILTER_TABS = [
 ] as const;
 
 type FilterTab = (typeof FILTER_TABS)[number]["id"];
+
+const PAGE_SIZE = 40;
 
 // Valid tabs array for the persisted tabs hook
 const VALID_TABS: readonly FilterTab[] = [
@@ -250,6 +256,19 @@ function HomePage() {
 	// View mode state: 'grid' or 'list' (default is grid)
 	const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
+	// Pagination state
+	const [currentPage, setCurrentPage] = useState(1);
+
+	// Reset page when changing tabs
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [activeFilter]);
+
+	// Scroll to top when page changes
+	useEffect(() => {
+		window.scrollTo({ top: 0, behavior: 'smooth' });
+	}, [currentPage]);
+
 	// Prevent hydration mismatch
 	useEffect(() => {
 		function blahBlah() {
@@ -264,17 +283,19 @@ function HomePage() {
 	const queryClient = useQueryClient();
 
 	// Fetch data - ONLY call API for the debounced tab (prevents rapid API calls)
-	// All tokens (for "all" tab)
-	const { data: allTokens = [], isLoading: allLoading } = useTokens(
-		{ page: 1, pageSize: 50 },
+	// All tokens (for "all" tab) — with pagination
+	const { data: allTokensResult, isLoading: allLoading } = useTokens(
+		{ page: currentPage, pageSize: PAGE_SIZE },
 		{ enabled: isHydrated && debouncedFilter === "all" },
 	);
+	const allTokens = allTokensResult?.data ?? [];
+	const pagination = allTokensResult?.pagination;
 
 	// Trending tokens (for "trending" tab)
 	const {
 		data: trendingTokens = [],
 		isLoading: trendingLoading,
-	} = useTrendingTokens(undefined, {
+	} = useTrendingTokens({ pageSize: PAGE_SIZE }, {
 		enabled: isHydrated && debouncedFilter === "trending",
 	});
 
@@ -282,7 +303,7 @@ function HomePage() {
 	const {
 		data: newTokens = [],
 		isLoading: newLoading,
-	} = useNewTokens(undefined, {
+	} = useNewTokens({ pageSize: PAGE_SIZE }, {
 		enabled: isHydrated && debouncedFilter === "new",
 	});
 
@@ -290,7 +311,7 @@ function HomePage() {
 	const {
 		data: liveTokens = [],
 		isLoading: liveLoading,
-	} = useLiveTokens(undefined, {
+	} = useLiveTokens({ limit: PAGE_SIZE }, {
 		enabled: isHydrated && debouncedFilter === "live",
 	});
 
@@ -298,7 +319,7 @@ function HomePage() {
 	const {
 		data: graduatedTokens = [],
 		isLoading: graduatedLoading,
-	} = useGraduatedTokens(undefined, {
+	} = useGraduatedTokens({ limit: PAGE_SIZE }, {
 		enabled: isHydrated && debouncedFilter === "graduated",
 	});
 
@@ -710,14 +731,15 @@ function HomePage() {
 						{/* Token Grid/List */}
 						<AnimatePresence mode="wait">
 							{isLoading ? (
+								viewMode === 'grid' ? (
 								<motion.div
-									key="loading"
+									key="loading-grid"
 									initial={{ opacity: 0 }}
 									animate={{ opacity: 1 }}
 									exit={{ opacity: 0 }}
 									className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4"
 								>
-									{Array.from({ length: 12 }).map((_, i) => (
+									{Array.from({ length: PAGE_SIZE }).map((_, i) => (
 										<div
 											key={i}
 											className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3 flex gap-3"
@@ -746,6 +768,44 @@ function HomePage() {
 										</div>
 									))}
 								</motion.div>
+								) : (
+								<motion.div
+									key="loading-list"
+									initial={{ opacity: 0 }}
+									animate={{ opacity: 1 }}
+									exit={{ opacity: 0 }}
+									className="space-y-0"
+								>
+									{/* List Header Skeleton */}
+									<div className="flex items-center gap-3 px-4 py-2.5 border-b border-[#333] bg-[#0a0a0a] min-w-[1200px]">
+										<Skeleton className="h-3 w-full" />
+									</div>
+									{Array.from({ length: PAGE_SIZE }).map((_, i) => (
+										<div
+											key={i}
+											className="flex items-center gap-3 px-4 py-3 border-b border-[#1a1a1a] min-w-[1200px]"
+										>
+											<Skeleton className="w-5 h-4 shrink-0" />
+											<Skeleton className="w-8 h-8 rounded-lg shrink-0" />
+											<div className="flex-[2.5] flex items-center gap-2">
+												<Skeleton className="h-4 w-24" />
+												<Skeleton className="h-3 w-12" />
+											</div>
+											<Skeleton className="flex-[1.5] h-8" />
+											<Skeleton className="flex-1 h-4" />
+											<Skeleton className="flex-[0.5] h-3 w-8" />
+											<Skeleton className="flex-[0.75] h-4" />
+											<Skeleton className="flex-1 h-4" />
+											<Skeleton className="flex-[0.75] h-4" />
+											<Skeleton className="flex-[0.75] h-3" />
+											<Skeleton className="flex-[0.75] h-3" />
+											<Skeleton className="flex-[0.75] h-3" />
+											<Skeleton className="flex-[0.75] h-3" />
+											<Skeleton className="flex-[0.4] h-4 w-4" />
+										</div>
+									))}
+								</motion.div>
+								)
 							) : filteredTokens.length === 0 ? (
 								<motion.div
 									key="empty"
@@ -838,12 +898,116 @@ function HomePage() {
 										<TokenListItem
 											key={token.id}
 											token={token}
-											index={index}
+											index={activeFilter === "all" ? ((currentPage - 1) * PAGE_SIZE) + index : index}
 										/>
 									))}
 								</motion.div>
 							)}
 						</AnimatePresence>
+
+						{/* Pagination Controls */}
+						{!isLoading && pagination && pagination.totalPages > 1 && (
+							<div className="flex flex-col items-center gap-2 mt-6">
+								{/* Page controls */}
+								<div className="flex items-center gap-1">
+									{/* First page */}
+									<button
+										onClick={() => setCurrentPage(1)}
+										disabled={!pagination.hasPrev}
+										className={cn(
+											"p-1.5 rounded-md transition-all",
+											pagination.hasPrev
+												? "text-muted-foreground hover:text-foreground hover:bg-muted"
+												: "text-muted-foreground/30 cursor-not-allowed"
+										)}
+										title="First page"
+									>
+										<ChevronsLeft className="w-4 h-4" />
+									</button>
+
+									{/* Previous page */}
+									<button
+										onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+										disabled={!pagination.hasPrev}
+										className={cn(
+											"p-1.5 rounded-md transition-all",
+											pagination.hasPrev
+												? "text-muted-foreground hover:text-foreground hover:bg-muted"
+												: "text-muted-foreground/30 cursor-not-allowed"
+										)}
+										title="Previous page"
+									>
+										<ChevronLeft className="w-4 h-4" />
+									</button>
+
+									{/* Page numbers */}
+									{(() => {
+										const pages: number[] = [];
+										const total = pagination.totalPages;
+										const current = pagination.page;
+										
+										// Show max 5 page numbers centered on current
+										let start = Math.max(1, current - 2);
+										let end = Math.min(total, start + 4);
+										start = Math.max(1, end - 4);
+
+										for (let i = start; i <= end; i++) {
+											pages.push(i);
+										}
+
+										return pages.map(p => (
+											<button
+												key={p}
+												onClick={() => setCurrentPage(p)}
+												className={cn(
+													"min-w-[32px] h-8 px-2 text-xs font-medium rounded-md transition-all",
+													p === current
+														? "bg-primary text-primary-foreground"
+														: "text-muted-foreground hover:text-foreground hover:bg-muted"
+												)}
+											>
+												{p}
+											</button>
+										));
+									})()}
+
+									{/* Next page */}
+									<button
+										onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
+										disabled={!pagination.hasNext}
+										className={cn(
+											"p-1.5 rounded-md transition-all",
+											pagination.hasNext
+												? "text-muted-foreground hover:text-foreground hover:bg-muted"
+												: "text-muted-foreground/30 cursor-not-allowed"
+										)}
+										title="Next page"
+									>
+										<ChevronRight className="w-4 h-4" />
+									</button>
+
+									{/* Last page */}
+									<button
+										onClick={() => setCurrentPage(pagination.totalPages)}
+										disabled={!pagination.hasNext}
+										className={cn(
+											"p-1.5 rounded-md transition-all",
+											pagination.hasNext
+												? "text-muted-foreground hover:text-foreground hover:bg-muted"
+												: "text-muted-foreground/30 cursor-not-allowed"
+										)}
+										title="Last page"
+									>
+										<ChevronsRight className="w-4 h-4" />
+									</button>
+								</div>
+
+								{/* Page info */}
+								<p className="text-xs text-muted-foreground">
+									Showing {((pagination.page - 1) * pagination.pageSize) + 1}–{Math.min(pagination.page * pagination.pageSize, pagination.totalItems)} of {pagination.totalItems} tokens
+								</p>
+							</div>
+						)}
 					</div>
 
 					{/* Right Column - Activity Feed */}
@@ -942,8 +1106,8 @@ function HomePageSkeleton() {
 						</div>
 
 						{/* Token Grid Skeleton */}
-						<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-							{Array.from({ length: 9 }).map((_, i) => (
+						<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+							{Array.from({ length: 40 }).map((_, i) => (
 								<div
 									key={i}
 									className="bg-card/40 border border-border/50 rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3"

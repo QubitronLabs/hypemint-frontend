@@ -14,6 +14,7 @@ import {
 	getTokenHolders,
 	getWalletTokenBalance,
 } from "@/lib/api/tokens";
+import type { PaginatedResult } from "@/lib/api/tokens";
 import type { TokenListParams, CreateTokenInput } from "@/types";
 
 // Query keys for cache management
@@ -48,7 +49,7 @@ export function useTokens(
 	params?: TokenListParams,
 	options?: TokenHookOptions,
 ) {
-	return useQuery({
+	return useQuery<PaginatedResult<import("@/types").Token>>({
 		queryKey: tokenKeys.list(params ?? {}),
 		queryFn: () => getTokens(params),
 		staleTime: 30 * 1000, // 30 seconds
