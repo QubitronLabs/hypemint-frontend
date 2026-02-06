@@ -323,7 +323,8 @@ export function TokenCreationForm() {
 	 */
 	const { data: balance } = useNativeBalance();
 	console.log({balance})
-
+console.log("yaha balance hai")
+	console.log(balance)
 	/**
 	 * Native currency symbol for the current network (e.g., "POL", "ETH", "BNB").
 	 * Synced from Dynamic Labs SDK via NetworkStateSynchronizer.
