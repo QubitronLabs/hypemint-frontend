@@ -17,7 +17,7 @@ interface PriceChartProps {
 	className?: string;
 }
 
-type TimeRange = "1m" | "5m" | "15m" | "1h" | "4h" | "1D";
+type TimeRange = "1m" | "5m" | "15m" | "1h" | "4h" | "1D" | "1M";
 
 interface CandleData {
 	time: number;
@@ -37,6 +37,7 @@ function getIntervalSeconds(timeRange: TimeRange): number {
     case "1h": return 3600;
     case "4h": return 14400;
     case "1D": return 86400;
+    case "1M": return 2592000;
     default: return 3600;
   }
 }
@@ -194,6 +195,7 @@ export function PriceChart({ tokenId, className }: PriceChartProps) {
 					"1h": "1h",
 					"4h": "4h",
 					"1D": "1d",
+					"1M": "1M",
 				};
 				const apiInterval = intervalMap[timeRange] || "1h";
 
@@ -254,7 +256,7 @@ export function PriceChart({ tokenId, className }: PriceChartProps) {
     loadData();
   }, [tokenId, timeRange]);
 
-	const timeRanges: TimeRange[] = ["1m", "5m", "15m", "1h", "4h", "1D"];
+	const timeRanges: TimeRange[] = ["1m", "5m", "15m", "1h", "4h", "1D", "1M"];
 
 	return (
 		<div

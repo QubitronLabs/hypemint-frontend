@@ -95,7 +95,7 @@ export async function getToken(id: string): Promise<Token | null> {
     ); // ~1B tokens default
 
     const graduationThreshold = BigInt(
-      curve.graduationThreshold || curve.graduationMarketCap || "69000000000000000000000" // 69k * 1e18
+      curve.graduationMcap || curve.graduationMarketCap || curve.graduationThreshold || "69000000000000000000000" // 69k * 1e18
     ); 
 
     let progress = 0;
@@ -143,7 +143,7 @@ export async function getToken(id: string): Promise<Token | null> {
       circulatingSupply: circulatingSupplyDecimal,
       bondingCurveAddress: curve.contractAddress || undefined,
       bondingCurveProgress: progress,
-      graduationTarget: curve.graduationMarketCap || "69000", // Default target
+      graduationTarget: curve.graduationMcap || curve.graduationMarketCap || "69000", // Default target
       currentBondingAmount: curve.currentReserve || "0",
       holdersCount: token.holdersCount || 0,
       tradesCount: token.tradesCount || 0,
