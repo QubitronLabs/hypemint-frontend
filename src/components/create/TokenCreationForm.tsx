@@ -245,16 +245,16 @@ function TokenPreviewCard({
 					<div className="flex items-center gap-2 text-xs text-muted-foreground">
 						<Clock className="h-3.5 w-3.5" />
 						<span>
-							Token will be live immediately after creation
+							Token will be live immediately after creation.
 						</span>
 					</div>
 					<div className="flex items-center gap-2 text-xs text-muted-foreground">
 						<Users className="h-3.5 w-3.5" />
-						<span>Anyone can trade on the bonding curve</span>
+						<span>Anyone can trade on the bonding curve.</span>
 					</div>
 					<div className="flex items-center gap-2 text-xs text-muted-foreground">
 						<TrendingUp className="h-3.5 w-3.5" />
-						<span>Price increases with each purchase</span>
+						<span>Price increases with each purchase.</span>
 					</div>
 				</div>
 			</div>
@@ -322,7 +322,9 @@ export function TokenCreationForm() {
 	 * Updates automatically when user switches networks via NetworkStateSynchronizer.
 	 */
 	const { data: balance } = useNativeBalance();
-
+	console.log({balance})
+console.log("yaha balance hai")
+	console.log(balance)
 	/**
 	 * Native currency symbol for the current network (e.g., "POL", "ETH", "BNB").
 	 * Synced from Dynamic Labs SDK via NetworkStateSynchronizer.
