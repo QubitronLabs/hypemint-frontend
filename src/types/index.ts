@@ -83,6 +83,8 @@ export interface Token {
 	contractAddress?: string;
 	bondingCurveAddress?: string;
 	bondingCurveProgress: number;
+	athPrice?: string;
+	athProgress?: number;
 	graduationTarget: string;
 	currentBondingAmount: string;
 	holdersCount: number;

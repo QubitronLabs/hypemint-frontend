@@ -28,7 +28,6 @@ import {
 	Activity,
 	Lock,
 	LockOpen,
-	CalendarDays,
 	X,
 } from "lucide-react";
 import {
@@ -306,26 +305,6 @@ export function AdvancedPriceChart({
 	const [allDrawingsLocked, setAllDrawingsLocked] = useState(false);
 	const [isPanning, setIsPanning] = useState(false);
 
-	// Custom date range state
-	const [showDatePicker, setShowDatePicker] = useState(false);
-	const [customFrom, setCustomFrom] = useState("");
-	const [customTo, setCustomTo] = useState("");
-	const [isCustomRange, setIsCustomRange] = useState(false);
-	const datePickerRef = useRef<HTMLDivElement>(null);
-
-	// Close date picker on click outside
-	useEffect(() => {
-		function handleClickOutside(e: MouseEvent) {
-			if (datePickerRef.current && !datePickerRef.current.contains(e.target as Node)) {
-				setShowDatePicker(false);
-			}
-		}
-		if (showDatePicker) {
-			document.addEventListener("mousedown", handleClickOutside);
-			return () => document.removeEventListener("mousedown", handleClickOutside);
-		}
-	}, [showDatePicker]);
-
 	// Indicators
 	const [indicators, setIndicators] = useState<IndicatorConfig[]>([
 		{ type: "sma", period: 20, color: COLORS.sma, enabled: false },
@@ -403,7 +382,7 @@ export function AdvancedPriceChart({
 				};
 
 				const res = await fetch(
-					`${apiUrl}/api/v1/charts/${tokenId}?interval=${intervalMap[timeRange]}&limit=500${isCustomRange && customFrom ? `&from=${customFrom}` : ""}${isCustomRange && customTo ? `&to=${customTo}` : ""}`,
+					`${apiUrl}/api/v1/charts/${tokenId}?interval=${intervalMap[timeRange]}&limit=500`,
 				);
 				if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -511,7 +490,7 @@ export function AdvancedPriceChart({
 		return () => {
 			cancelled = true;
 		};
-	}, [tokenId, timeRange, dims.w, isCustomRange, customFrom, customTo]);
+	}, [tokenId, timeRange, dims.w]);
 
 	// ============================================================================
 	// Resize Observer
@@ -3244,13 +3223,11 @@ export function AdvancedPriceChart({
 							<button
 								key={r}
 								onClick={() => {
-									setIsCustomRange(false);
-									setShowDatePicker(false);
 									setTimeRange(r);
 								}}
 								className={cn(
 									"px-2 py-1 text-[10px] font-semibold rounded transition-all",
-									timeRange === r && !isCustomRange
+									timeRange === r
 										? "bg-[#22c55e] text-black"
 										: "text-zinc-500 hover:text-white",
 								)}
@@ -3258,98 +3235,6 @@ export function AdvancedPriceChart({
 								{r}
 							</button>
 						))}
-					</div>
-
-					{/* Custom Date Range */}
-					<div className="relative" ref={datePickerRef}>
-						<button
-							onClick={() => setShowDatePicker(!showDatePicker)}
-							title="Custom Date Range"
-							className={cn(
-								"flex items-center gap-1 px-2 py-1 text-[10px] font-semibold rounded transition-all",
-								isCustomRange
-									? "bg-[#22c55e] text-black"
-									: "text-zinc-500 hover:text-white bg-white/5",
-							)}
-						>
-							<CalendarDays className="w-3 h-3" />
-							<span className="hidden sm:inline">Custom</span>
-						</button>
-
-						{showDatePicker && (
-							<div className="absolute right-0 top-full mt-1 z-50 bg-[#1a1a1a] border border-white/10 rounded-lg p-3 shadow-xl min-w-[280px]">
-								<div className="flex items-center justify-between mb-3">
-									<span className="text-xs font-semibold text-white">Custom Date Range</span>
-									<button
-										onClick={() => setShowDatePicker(false)}
-										className="text-zinc-500 hover:text-white p-0.5"
-									>
-										<X className="w-3.5 h-3.5" />
-									</button>
-								</div>
-								<div className="space-y-2">
-									<div>
-										<label className="block text-[10px] text-zinc-400 mb-1 uppercase tracking-wide">From</label>
-										<input
-											type="date"
-											value={customFrom}
-											onChange={(e) => setCustomFrom(e.target.value)}
-											className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-[#22c55e]/50 transition-colors [color-scheme:dark]"
-										/>
-									</div>
-									<div>
-										<label className="block text-[10px] text-zinc-400 mb-1 uppercase tracking-wide">To</label>
-										<input
-											type="date"
-											value={customTo}
-											onChange={(e) => setCustomTo(e.target.value)}
-											className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-[#22c55e]/50 transition-colors [color-scheme:dark]"
-										/>
-									</div>
-								</div>
-								<div className="flex gap-2 mt-3">
-									<button
-										onClick={() => {
-											setCustomFrom("");
-											setCustomTo("");
-											setIsCustomRange(false);
-											setShowDatePicker(false);
-										}}
-										className="flex-1 px-2 py-1.5 text-[10px] font-semibold rounded bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all"
-									>
-										Reset
-									</button>
-									<button
-										onClick={() => {
-											if (customFrom || customTo) {
-												setIsCustomRange(true);
-												setShowDatePicker(false);
-												// Auto-select appropriate interval based on date range
-												if (customFrom && customTo) {
-													const fromDate = new Date(customFrom);
-													const toDate = new Date(customTo);
-													const diffDays = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24));
-													if (diffDays > 90) setTimeRange("1M");
-													else if (diffDays > 14) setTimeRange("1D");
-													else if (diffDays > 3) setTimeRange("4h");
-													else if (diffDays > 1) setTimeRange("1h");
-													else setTimeRange("15m");
-												}
-											}
-										}}
-										disabled={!customFrom && !customTo}
-										className={cn(
-											"flex-1 px-2 py-1.5 text-[10px] font-semibold rounded transition-all",
-											customFrom || customTo
-												? "bg-[#22c55e] text-black hover:bg-[#22c55e]/90"
-												: "bg-white/5 text-zinc-600 cursor-not-allowed"
-										)}
-									>
-										Apply
-									</button>
-								</div>
-							</div>
-						)}
 					</div>
 
 					<div className="w-px h-5 bg-white/10 mx-1" />

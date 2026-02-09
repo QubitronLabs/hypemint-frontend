@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
 	Zap,
@@ -256,12 +257,68 @@ function HomePage() {
 	// View mode state: 'grid' or 'list' (default is grid)
 	const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-	// Pagination state
-	const [currentPage, setCurrentPage] = useState(1);
+	// Pagination synced with URL
+	const router = useRouter();
+	const routerRef = useRef(router);
+	routerRef.current = router;
 
-	// Reset page when changing tabs
+	// Page state — initialized from URL on mount
+	const [currentPage, setCurrentPageInner] = useState(() => {
+		if (typeof window === "undefined") return 1;
+		const p = new URLSearchParams(window.location.search).get("page");
+		const num = p ? parseInt(p, 10) : 1;
+		return isNaN(num) || num < 1 ? 1 : num;
+	});
+
+	// Sync page on browser back/forward only (popstate)
 	useEffect(() => {
-		setCurrentPage(1);
+		const onPop = () => {
+			const p = new URLSearchParams(window.location.search).get("page");
+			const num = p ? parseInt(p, 10) : 1;
+			setCurrentPageInner(isNaN(num) || num < 1 ? 1 : num);
+		};
+		window.addEventListener("popstate", onPop);
+		return () => window.removeEventListener("popstate", onPop);
+	}, []);
+
+	// Stable page setter for pagination button clicks
+	const setCurrentPage = useCallback(
+		(pageOrFn: number | ((prev: number) => number)) => {
+			setCurrentPageInner((prev) => {
+				const next =
+					typeof pageOrFn === "function" ? pageOrFn(prev) : pageOrFn;
+				// Read fresh URL and only modify the page param
+				const url = new URL(window.location.href);
+				if (next <= 1) {
+					url.searchParams.delete("page");
+				} else {
+					url.searchParams.set("page", String(next));
+				}
+				routerRef.current.replace(url.pathname + url.search, {
+					scroll: false,
+				});
+				return next;
+			});
+		},
+		[],
+	);
+
+	// Reset page when changing tabs — builds clean URL to avoid race with usePersistedTabs
+	const prevFilterRef = useRef(activeFilter);
+	useEffect(() => {
+		if (prevFilterRef.current === activeFilter) return;
+		prevFilterRef.current = activeFilter;
+		setCurrentPageInner(1);
+		// Construct URL from known state (avoids reading stale window.location)
+		const params = new URLSearchParams();
+		if (activeFilter !== "all") {
+			params.set("filter", activeFilter);
+		}
+		// No page param = page 1 (default)
+		const qs = params.toString();
+		routerRef.current.replace(`/${qs ? `?${qs}` : ""}`, {
+			scroll: false,
+		});
 	}, [activeFilter]);
 
 	// Scroll to top when page changes
@@ -416,23 +473,24 @@ function HomePage() {
 
 					return oldData.map((token: Token) => {
 						if (token.id === trade.tokenId) {
-							// Merge existing token with new data from WebSocket
-							// trade object now contains computed bondingCurveProgress and marketCap from backend
-							const wsProgress = trade.bondingCurveProgress;
-							const wsMarketCap = trade.marketCap;
-
 							return {
 								...token,
 								bondingCurveProgress:
-									wsProgress !== undefined
-										? wsProgress
+									trade.bondingCurveProgress !== undefined
+										? trade.bondingCurveProgress
 										: token.bondingCurveProgress,
+								athProgress:
+									trade.athProgress !== undefined
+										? trade.athProgress
+										: token.athProgress,
 								marketCap:
-									wsMarketCap !== undefined
-										? wsMarketCap
+									trade.marketCap !== undefined
+										? trade.marketCap
 										: token.marketCap,
-								// Also update volume if provided or accumulate
-								// volume24h: ... (logic complex without full data, skipping for now as progress is priority)
+								currentPrice:
+									trade.price !== undefined
+										? trade.price
+										: token.currentPrice,
 							};
 						}
 						return token;
