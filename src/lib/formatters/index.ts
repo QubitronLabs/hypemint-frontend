@@ -4,6 +4,8 @@
  * Human-readable formatting for large numbers, currency values, and balances
  */
 
+import { fromWei } from "@/lib/utils";
+
 /**
  * Format a number with K, M, B, T suffixes for human readability
  * Handles very large numbers gracefully
@@ -373,4 +375,34 @@ export function getNativeTokenSymbol(networkName?: string | null): string {
 	}
 
 	return "ETH";
+}
+
+/**
+ * Format a raw Wei market cap string into a compact display value.
+ * e.g. "1630000000000000000000000" → "$1.63M"
+ */
+export function formatCompactMarketCap(
+	rawValue: string | number | undefined | null,
+): string {
+	if (!rawValue) return "—";
+	const num = Number(fromWei(rawValue));
+	if (isNaN(num) || num <= 0) return "—";
+	return formatCompactCurrency(num);
+}
+
+/**
+ * Format a timestamp into a short relative time string.
+ * e.g. "just now", "5m ago", "3h ago", "2d ago", "about 1mo ago"
+ */
+export function formatTimeAgo(timestamp: number): string {
+	const diff = Date.now() - timestamp;
+	const minutes = Math.floor(diff / 60000);
+	if (minutes < 1) return "just now";
+	if (minutes < 60) return `${minutes}m ago`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours}h ago`;
+	const days = Math.floor(hours / 24);
+	if (days < 30) return `${days}d ago`;
+	const months = Math.floor(days / 30);
+	return `about ${months}mo ago`;
 }
