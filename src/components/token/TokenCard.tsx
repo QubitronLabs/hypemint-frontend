@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Zap, GraduationCap } from "lucide-react";
-import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { cn, fromWei, formatNumber } from "@/lib/utils";
 import { TokenImage } from "@/components/ui/token-image";
 import { formatRelativeTime } from "@/lib/formatters";
@@ -18,30 +18,45 @@ interface TokenCardProps {
 /**
  * Mini Price Chart - Smooth area chart with gradient fill (pump.fun style)
  */
-function MiniPriceChart({ data }: { data?: Array<{ timestamp: number; price: number }> }) {
+function MiniPriceChart({
+	data,
+}: {
+	data?: Array<{ timestamp: number; price: number }>;
+}) {
 	if (!data || data.length < 2) return null;
-	
+
 	// Format data for recharts
-	const chartData = data.map(d => ({ value: d.price }));
-	
+	const chartData = data.map((d) => ({ value: d.price }));
+
 	// Determine trend color
 	const isPositive = data[data.length - 1].price >= data[0].price;
-	const gradientId = `gradient-${isPositive ? 'green' : 'red'}-${Math.random().toString(36).substr(2, 9)}`;
+	const gradientId = `gradient-${isPositive ? "green" : "red"}-${Math.random().toString(36).substr(2, 9)}`;
 	const strokeColor = isPositive ? "#00ff88" : "#ff4444";
 	const fillColor = isPositive ? "#00ff88" : "#ff4444";
-	
+
 	return (
 		<ResponsiveContainer width={70} height={28}>
-			<AreaChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+			<AreaChart
+				data={chartData}
+				margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+			>
 				<defs>
 					<linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-						<stop offset="0%" stopColor={fillColor} stopOpacity={0.4} />
-						<stop offset="100%" stopColor={fillColor} stopOpacity={0} />
+						<stop
+							offset="0%"
+							stopColor={fillColor}
+							stopOpacity={0.4}
+						/>
+						<stop
+							offset="100%"
+							stopColor={fillColor}
+							stopOpacity={0}
+						/>
 					</linearGradient>
 				</defs>
-				<Area 
-					type="monotone" 
-					dataKey="value" 
+				<Area
+					type="monotone"
+					dataKey="value"
 					stroke={strokeColor}
 					strokeWidth={1.5}
 					fill={`url(#${gradientId})`}
@@ -89,7 +104,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
 		if (change === undefined || change === null || isNaN(change)) return 0;
 		return change;
 	}, [token.priceChange24h]);
-	
+
 	const priceChangePositive = priceChange >= 0;
 
 	const formattedMarketCap = useMemo(() => {
@@ -105,7 +120,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
 	}, [priceChange]);
 
 	// Check if token is graduated
-	const isGraduated = token.status === 'graduated';
+	const isGraduated = token.status === "graduated";
 
 	// ATH progress (0-100) - currentPrice / ATH price
 	const athProgress = useMemo(() => {
@@ -114,7 +129,10 @@ export function TokenCard({ token, className }: TokenCardProps) {
 	}, [token.athProgress]);
 
 	// ATH progress bar colors
-	const athColors = useMemo(() => getAthBarColors(athProgress), [athProgress]);
+	const athColors = useMemo(
+		() => getAthBarColors(athProgress),
+		[athProgress],
+	);
 
 	// Is ATH at 100%?
 	const isAtAth = athProgress >= 99.5;
@@ -172,7 +190,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
 						</span>
 					</div>
 				)}
-				
+
 				{/* Token Image - Square (responsive size) */}
 				<div className="shrink-0">
 					<TokenImage
@@ -191,7 +209,9 @@ export function TokenCard({ token, className }: TokenCardProps) {
 						<h3 className="font-bold text-white text-sm sm:text-[15px] leading-tight truncate max-w-30 sm:max-w-none">
 							{token.name}
 						</h3>
-						<p className="text-[#888] text-[9px] sm:text-[10px] font-medium">({token.symbol})</p>
+						<p className="text-[#888] text-[9px] sm:text-[10px] font-medium">
+							({token.symbol})
+						</p>
 						{token.hypeBoostEnabled && (
 							<span className="inline-flex items-center gap-0.5 px-1 sm:px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[8px] sm:text-[10px] font-medium shrink-0">
 								<Zap className="h-2 w-2 sm:h-2.5 sm:w-2.5 fill-amber-400" />
@@ -203,59 +223,63 @@ export function TokenCard({ token, className }: TokenCardProps) {
 					{/* Row 2: Creator + Time */}
 					<div className="flex items-center gap-1 sm:gap-1.5 mt-0.5 sm:mt-1 text-[10px] sm:text-xs">
 						{creatorDisplay && (
-							<span className="text-[#6b8afd] font-medium truncate max-w-20 sm:max-w-none">{creatorDisplay}</span>
+							<span className="text-[#6b8afd] font-medium truncate max-w-20 sm:max-w-none">
+								{creatorDisplay}
+							</span>
 						)}
-						{timeAgo && <span className="text-[#666] shrink-0">{timeAgo}</span>}
+						{timeAgo && (
+							<span className="text-[#666] shrink-0">
+								{timeAgo}
+							</span>
+						)}
 					</div>
 
 					{/* Row 3: Market Cap + Price Change */}
 					<div className="flex items-center gap-1 sm:gap-2 mt-1 sm:mt-1.5 flex-wrap">
-						<span className="text-[#777] text-[10px] sm:text-xs font-medium shrink-0">MC</span>
+						<span className="text-[#777] text-[10px] sm:text-xs font-medium shrink-0">
+							MC
+						</span>
 						<span className="text-[#00ff88] text-xs sm:text-sm font-bold shrink-0">
 							{formattedMarketCap}
 						</span>
 						<span
 							className={cn(
 								"text-[9px] sm:text-[10px] font-semibold shrink-0",
-								priceChangePositive ? "text-[#00ff88]" : "text-[#ff4444]"
+								priceChangePositive
+									? "text-[#00ff88]"
+									: "text-[#ff4444]",
 							)}
 						>
-							({priceChangePositive ? "+" : ""}{priceChange.toFixed(2)}%)
+							({priceChangePositive ? "+" : ""}
+							{priceChange.toFixed(2)}%)
 						</span>
 					</div>
 
 					{/* Row 4: ATH Progress Bar + Percentage */}
 					<div className="flex items-center gap-1.5 sm:gap-2 mt-1 sm:mt-1.5">
-						<div className="relative flex-1 max-w-44 h-1.5 sm:h-2 bg-[#222] rounded-full overflow-hidden shrink-0">
+						<div className="relative flex-1 max-w-44 h-1.5 sm:h-2 bg-[#222] rounded-full  shrink-0">
 							<motion.div
 								initial={{ width: 0 }}
-								animate={{ width: `${Math.max(athProgress > 0 ? 4 : 0, athProgress)}%` }}
+								animate={{
+									width: `${Math.max(athProgress > 0 ? 4 : 0, athProgress)}%`,
+								}}
 								transition={{ duration: 0.8, ease: "easeOut" }}
 								className="h-full rounded-full"
 								style={{
 									background: `linear-gradient(to right, ${athColors.from}, ${athColors.to})`,
-									minWidth: athProgress > 0 ? '3px' : '0px',
-									boxShadow: athProgress > 0
-										? `0 0 6px ${athColors.glow}`
-										: 'none',
+									minWidth: athProgress > 0 ? "3px" : "0px",
+									boxShadow:
+										athProgress > 0
+											? `0 0 6px ${athColors.glow}`
+											: "none",
 								}}
 							/>
-							{/* Spark animation at end when at ATH */}
+							{/* Sparkle gif at end of bar when at ATH */}
 							{isAtAth && (
-								<motion.div
-									className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full"
-									style={{
-										background: `radial-gradient(circle, #fff 0%, ${athColors.to} 50%, transparent 100%)`,
-									}}
-									animate={{
-										scale: [1, 1.8, 1],
-										opacity: [0.8, 1, 0.8],
-									}}
-									transition={{
-										duration: 1.2,
-										repeat: Infinity,
-										ease: "easeInOut",
-									}}
+								<img
+									src="/sparkle-small.gif"
+									alt="ATH"
+									className="absolute -right-6 top-1/2 -translate-y-1/2  sm:size-14 pointer-events-none"
 								/>
 							)}
 						</div>
