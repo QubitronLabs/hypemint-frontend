@@ -608,7 +608,7 @@ export function OnChainTradingPanel({
 						className={cn(
 							"flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2 sm:px-4 rounded-md font-medium transition-all text-sm sm:text-base",
 							tradeType === "buy"
-								? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/20"
+								? "bg-linear-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/20"
 								: "text-muted-foreground hover:text-foreground",
 						)}
 					>
@@ -620,7 +620,7 @@ export function OnChainTradingPanel({
 						className={cn(
 							"flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2 sm:px-4 rounded-md font-medium transition-all text-sm sm:text-base",
 							tradeType === "sell"
-								? "bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg shadow-red-500/20"
+								? "bg-linear-to-r from-red-500 to-rose-500 text-white shadow-lg shadow-red-500/20"
 								: "text-muted-foreground hover:text-foreground",
 						)}
 					>
@@ -829,10 +829,10 @@ export function OnChainTradingPanel({
 						className={cn(
 							"w-full h-12 text-base font-semibold cursor-pointer transition-all duration-200",
 							tradeType === "buy"
-								? "bg-gradient-to-r from-green-500 to-emerald-500 hover:opacity-90"
+								? "bg-linear-to-r from-green-500 to-emerald-500 hover:opacity-90"
 								: tradeType === "sell" && needsApproval
 									? "bg-red-600/30 hover:bg-red-600/40 text-red-400"
-									: "bg-gradient-to-r from-red-500 to-rose-500 hover:opacity-90 text-gray-100",
+									: "bg-linear-to-r from-red-500 to-rose-500 hover:opacity-90 text-gray-100",
 						)}
 					>
 						{!isAuthenticated ? (

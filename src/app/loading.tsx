@@ -28,7 +28,7 @@ export default function Loading() {
                     <motion.div
                         animate={{ scale: [1, 1.2, 1] }}
                         transition={{ duration: 1.5, repeat: Infinity }}
-                        className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/30 to-purple-600/30 blur-xl"
+                        className="absolute inset-0 rounded-2xl bg-linear-to-br from-primary/30 to-purple-600/30 blur-xl"
                     />
                 </div>
 

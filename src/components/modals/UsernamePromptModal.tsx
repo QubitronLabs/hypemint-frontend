@@ -170,7 +170,7 @@ export function UsernamePromptModal() {
                             initial={{ scale: 0, rotate: -180 }}
                             animate={{ scale: 1, rotate: 0 }}
                             transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-                            className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center border border-primary/20"
+                            className="w-20 h-20 rounded-2xl bg-linear-to-br from-primary/30 to-primary/10 flex items-center justify-center border border-primary/20"
                         >
                             <Sparkles className="h-10 w-10 text-primary" />
                         </motion.div>

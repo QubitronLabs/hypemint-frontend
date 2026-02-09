@@ -61,7 +61,7 @@ export function TokenImage({
     return (
       <div
         className={cn(
-          "flex items-center justify-center bg-gradient-to-br from-primary/20 to-purple-500/20 rounded-lg",
+          "flex items-center justify-center bg-linear-to-br from-primary/20 to-purple-500/20 rounded-lg",
           className,
         )}
         style={{ width: size, height: size }}

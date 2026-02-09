@@ -19,8 +19,8 @@ export default function NotFound() {
                 className="max-w-md w-full text-center"
             >
                 {/* 404 Icon */}
-                <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
-                    <span className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
+                <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-linear-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
+                    <span className="text-4xl font-bold bg-linear-to-r from-primary to-purple-500 bg-clip-text text-transparent">
                         404
                     </span>
                 </div>
@@ -34,7 +34,7 @@ export default function NotFound() {
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Link href="/">
-                        <Button className="gap-2 w-full bg-gradient-to-r from-primary to-purple-600">
+                        <Button className="gap-2 w-full bg-linear-to-r from-primary to-purple-600">
                             <Home className="h-4 w-4" />
                             Go Home
                         </Button>
