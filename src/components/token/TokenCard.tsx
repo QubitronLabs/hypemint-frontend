@@ -276,7 +276,14 @@ export function TokenCard({ token, className }: TokenCardProps) {
 							/>
 							{/* Sparkle gif at end of bar when at ATH */}
 							{isAtAth && (
-								<img
+								<motion.img
+									initial={{ opacity: 0 }}
+									animate={{ opacity: 1 }}
+									transition={{
+										delay: 0.8,
+										duration: 0.5,
+										ease: "easeOut",
+									}}
 									src="/sparkle-small.gif"
 									alt="ATH"
 									className="absolute -right-4 top-1/2 -translate-y-1/2  sm:size-10 pointer-events-none"

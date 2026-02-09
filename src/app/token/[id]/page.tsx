@@ -254,8 +254,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 								message.data.currentBondingAmount ??
 								oldData.currentBondingAmount,
 							athProgress:
-								message.data.athProgress ??
-								oldData.athProgress,
+								message.data.athProgress ?? oldData.athProgress,
 						};
 					},
 				);
@@ -541,58 +540,78 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 										ATH Progress
 									</p>
 									<div className="flex items-center gap-2">
-										<div className="relative w-20 sm:w-28 h-2 bg-[#222] rounded-full overflow-hidden">
+										<div className="relative w-20 sm:w-28 h-2 bg-[#222] rounded-full">
 											<motion.div
 												initial={{ width: 0 }}
-												animate={{ width: `${Math.min(100, Math.max(0, token.athProgress ?? 0))}%` }}
-												transition={{ duration: 0.8, ease: "easeOut" }}
+												animate={{
+													width: `${Math.min(100, Math.max(0, token.athProgress ?? 0))}%`,
+												}}
+												transition={{
+													duration: 0.8,
+													ease: "easeOut",
+												}}
 												className="h-full rounded-full"
 												style={{
 													background: (() => {
-														const p = token.athProgress ?? 0;
-														if (p >= 85) return "linear-gradient(to right, #ff6b00, #ff2d00)";
-														if (p >= 60) return "linear-gradient(to right, #ffd200, #ff8c00)";
+														const p =
+															token.athProgress ??
+															0;
+														if (p >= 85)
+															return "linear-gradient(to right, #ff6b00, #ff2d00)";
+														if (p >= 60)
+															return "linear-gradient(to right, #ffd200, #ff8c00)";
 														return "linear-gradient(to right, #00ff88, #00cc6a)";
 													})(),
-													boxShadow: (token.athProgress ?? 0) > 0
-														? (() => {
-															const p = token.athProgress ?? 0;
-															if (p >= 85) return "0 0 8px rgba(255, 107, 0, 0.5)";
-															if (p >= 60) return "0 0 8px rgba(255, 210, 0, 0.4)";
-															return "0 0 8px rgba(0, 255, 136, 0.4)";
-														})()
-														: "none",
+													boxShadow:
+														(token.athProgress ??
+															0) > 0
+															? (() => {
+																	const p =
+																		token.athProgress ??
+																		0;
+																	if (p >= 85)
+																		return "0 0 8px rgba(255, 107, 0, 0.5)";
+																	if (p >= 60)
+																		return "0 0 8px rgba(255, 210, 0, 0.4)";
+																	return "0 0 8px rgba(0, 255, 136, 0.4)";
+																})()
+															: "none",
 												}}
 											/>
-											{(token.athProgress ?? 0) >= 99.5 && (
-												<motion.div
-													className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full"
-													style={{
-														background: "radial-gradient(circle, #fff 0%, #ff2d00 50%, transparent 100%)",
-													}}
-													animate={{
-														scale: [1, 1.8, 1],
-														opacity: [0.8, 1, 0.8],
-													}}
+											{(token.athProgress ?? 0) >=
+												99.5 && (
+												<motion.img
+													initial={{ opacity: 0 }}
+													animate={{ opacity: 1 }}
 													transition={{
-														duration: 1.2,
-														repeat: Infinity,
-														ease: "easeInOut",
+														delay: 0.8,
+														duration: 0.5,
+														ease: "easeOut",
 													}}
+													src="/sparkle-small.gif"
+													alt="ATH"
+													className="absolute -right-3.5 top-1/2 -translate-y-1/2  sm:size-9 pointer-events-none"
 												/>
 											)}
 										</div>
-										<span className="text-sm font-semibold tabular-nums"
+										<span
+											className="text-sm font-semibold tabular-nums"
 											style={{
 												color: (() => {
-													const p = token.athProgress ?? 0;
-													if (p >= 85) return "#ff6b00";
-													if (p >= 60) return "#ffd200";
+													const p =
+														token.athProgress ?? 0;
+													if (p >= 85)
+														return "#ff6b00";
+													if (p >= 60)
+														return "#ffd200";
 													return "#00ff88";
 												})(),
 											}}
 										>
-											{(token.athProgress ?? 0).toFixed(1)}%
+											{(token.athProgress ?? 0).toFixed(
+												1,
+											)}
+											%
 										</span>
 									</div>
 								</div>

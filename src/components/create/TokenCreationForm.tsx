@@ -71,7 +71,7 @@ import {
 	Users,
 	Coins,
 	Clock,
-	Sparkles, 
+	Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -322,9 +322,9 @@ export function TokenCreationForm() {
 	 * Updates automatically when user switches networks via NetworkStateSynchronizer.
 	 */
 	const { data: balance } = useNativeBalance();
-	console.log({balance})
-console.log("yaha balance hai")
-	console.log(balance)
+	console.log({ balance });
+	console.log("yaha balance hai");
+	console.log(balance);
 	/**
 	 * Native currency symbol for the current network (e.g., "POL", "ETH", "BNB").
 	 * Synced from Dynamic Labs SDK via NetworkStateSynchronizer.
@@ -364,8 +364,6 @@ console.log("yaha balance hai")
 	const [websiteUrl, setWebsiteUrl] = useState("");
 	const [twitterUrl, setTwitterUrl] = useState("");
 	const [telegramUrl, setTelegramUrl] = useState("");
-
-
 
 	// ========================================================================
 	// INITIAL BUY (DEV BUY) STATE
@@ -582,6 +580,10 @@ console.log("yaha balance hai")
 		setImageFile(null);
 		setImagePreview(null);
 		setImageUrl("");
+		// Reset file input value so re-selecting the same file triggers onChange
+		if (fileInputRef.current) {
+			fileInputRef.current.value = "";
+		}
 	};
 
 	/**
@@ -665,7 +667,6 @@ console.log("yaha balance hai")
 				imageURI: finalImageUrl || "",
 				description: description || "",
 				hypeBoostEnabled,
-
 			});
 
 			if (result) {
@@ -695,7 +696,7 @@ console.log("yaha balance hai")
 						chainId: 80002,
 						contractAddress: result.tokenAddress,
 						bondingCurveAddress: result.bondingCurveAddress,
-						hypeBoostEnabled, 
+						hypeBoostEnabled,
 					});
 
 					if (apiResult.id) {
@@ -1313,9 +1314,6 @@ console.log("yaha balance hai")
 								</div>
 							</div>
 						</div>
-
-
-
 
 						{/* Launch Info */}
 						{isAuthenticated && (

@@ -22,7 +22,7 @@ export function Header() {
 	const { toggle } = useSidebarStore();
 
 	return (
-		<header className="fixed top-0 left-0 md:left-[70px] right-0 z-30 h-14 md:h-16 bg-card/80 backdrop-blur-xl border-b border-border/50">
+		<header className="fixed top-0 left-0 md:left-[70px] right-0 z-30 h-14 md:h-16 bg-card backdrop-blur-xl border-b border-border/50">
 			<div className="flex items-center justify-between h-full px-3 md:px-6 gap-2 md:gap-4">
 				{/* Hamburger Menu - Mobile Only */}
 				<button
@@ -39,7 +39,7 @@ export function Header() {
 
 				{/* Search Box */}
 				<div className="flex-1 max-w-lg">
-					<SearchBox />
+					<SearchBox className="shadow-lg shadow-amber-" />
 				</div>
 
 				{/* Actions */}
