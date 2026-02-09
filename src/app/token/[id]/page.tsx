@@ -117,6 +117,17 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 		}
 	}, [creatorProfile?.isFollowing]);
 
+	//  if the page is token/ then add overflow-y-clip to the body to prevent scrolling on the main page and only allow scrolling within the token detail page when it's open. This will ensure that when users open a token detail page, they can scroll through the content of that page without affecting the scroll position of the main page behind it.
+
+	useEffect(() => {
+		// Add overflow-y-clip to body when on token detail page
+		document.body.style.overflowY = "clip";
+		return () => {
+			// Remove overflow-y-clip when leaving token detail page
+			document.body.style.overflowY = "";
+		};
+	}, []);
+
 	// Follow/unfollow handler
 	const handleFollow = async () => {
 		if (!isAuthenticated || !creatorAddress) return;
