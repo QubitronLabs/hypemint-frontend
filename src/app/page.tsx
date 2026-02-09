@@ -1,16 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useRef } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
 	Zap,
 	BarChart3,
 	Sparkles,
-	Search,
-	// Rocket,
 	Flame,
-	// TrendingUp,
-	// Clock,
 	Trophy,
 	Plus,
 	LayoutGrid,
@@ -19,13 +16,15 @@ import {
 	ChevronRight,
 	ChevronsLeft,
 	ChevronsRight,
-	// Wifi,
-	// WifiOff,
+	Search,
+	AlertCircle,
+	RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TokenCard, TokenListItem } from "@/components/token";
+import { TrendingCarousel } from "@/components/token/TrendingCarousel";
 import {
 	useTrendingTokens,
 	useNewTokens,
@@ -34,7 +33,6 @@ import {
 	useGraduatedTokens,
 	tokenKeys,
 } from "@/hooks/useTokens";
-import { usePersistedTabs } from "@/hooks/usePersistedTabs";
 import {
 	useNewTokenFeed,
 	useGlobalTradeFeed,
@@ -77,37 +75,7 @@ const VALID_TABS: readonly FilterTab[] = [
 	"graduated",
 ] as const;
 
-// Live activity indicator component
-// function LiveIndicator({ isConnected }: { isConnected: boolean }) {
-// 	return (
-// 		<div
-// 			className={cn(
-// 				"flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all",
-// 				isConnected
-// 					? "bg-green-500/10 text-green-500 border border-green-500/20"
-// 					: "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20",
-// 			)}
-// 		>
-// 			{isConnected ? (
-// 				<>
-// 					<span className="relative flex h-2 w-2">
-// 						<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-// 						<span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-// 					</span>
-// 					<Wifi className="h-3 w-3" />
-// 					<span>Live</span>
-// 				</>
-// 			) : (
-// 				<>
-// 					<WifiOff className="h-3 w-3" />
-// 					<span>Connecting...</span>
-// 				</>
-// 			)}
-// 		</div>
-// 	);
-// }
-
-// Recent activity feed item
+// Activity feed item interface (for WebSocket)
 interface ActivityItem {
 	id: string;
 	type: "new_token" | "trade";
@@ -117,219 +85,171 @@ interface ActivityItem {
 	timestamp: number;
 }
 
-// function ActivityFeed({ items }: { items: ActivityItem[] }) {
-// 	if (items.length === 0) return null;
-
-// 	return (
-// 		<div className="bg-card/40 backdrop-blur-sm border border-border/50 rounded-xl p-4">
-// 			<div className="flex items-center gap-2 mb-3">
-// 				<Zap className="h-4 w-4 text-primary" />
-// 				<span className="text-sm font-medium">Live Activity</span>
-// 			</div>
-// 			<div className="space-y-2 max-h-[200px] overflow-y-auto">
-// 				<AnimatePresence mode="popLayout">
-// 					{items.slice(0, 5).map((item) => (
-// 						<motion.div
-// 							key={item.id}
-// 							initial={{ opacity: 0, x: -20, height: 0 }}
-// 							animate={{ opacity: 1, x: 0, height: "auto" }}
-// 							exit={{ opacity: 0, x: 20, height: 0 }}
-// 							className="flex items-center gap-3 text-sm py-2 border-b border-border/30 last:border-0"
-// 						>
-// 							<div
-// 								className={cn(
-// 									"w-8 h-8 rounded-lg flex items-center justify-center",
-// 									item.type === "new_token"
-// 										? "bg-primary/20 text-primary"
-// 										: "bg-green-500/20 text-green-500",
-// 								)}
-// 							>
-// 								{item.type === "new_token" ? (
-// 									<Sparkles className="h-4 w-4" />
-// 								) : (
-// 									<TrendingUp className="h-4 w-4" />
-// 								)}
-// 							</div>
-// 							<div className="flex-1 min-w-0">
-// 								<p className="text-foreground truncate">
-// 									{item.message}
-// 								</p>
-// 								<p className="text-xs text-muted-foreground">
-// 									{new Date(
-// 										item.timestamp,
-// 									).toLocaleTimeString()}
-// 								</p>
-// 							</div>
-// 						</motion.div>
-// 					))}
-// 				</AnimatePresence>
-// 			</div>
-// 		</div>
-// 	);
-// }
-
-// Stats card component
-// function StatsCard({
-// 	icon: Icon,
-// 	label,
-// 	value,
-// 	trend,
-// }: {
-// 	icon: React.ElementType;
-// 	label: string;
-// 	value: string;
-// 	trend?: number;
-// }) {
-// 	return (
-// 		<div className="bg-card/40 backdrop-blur-sm border border-border/50 rounded-xl p-3 sm:p-4">
-// 			<div className="flex items-center gap-2 sm:gap-3">
-// 				<div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-// 					<Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-// 				</div>
-// 				<div className="min-w-0">
-// 					<p className="text-lg sm:text-2xl font-bold truncate">
-// 						{value}
-// 					</p>
-// 					<p className="text-[10px] sm:text-xs text-muted-foreground truncate">
-// 						{label}
-// 					</p>
-// 				</div>
-// 				{trend !== undefined && (
-// 					<div
-// 						className={cn(
-// 							"ml-auto text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 sm:py-1 rounded shrink-0",
-// 							trend >= 0
-// 								? "bg-green-500/10 text-green-500"
-// 								: "bg-red-500/10 text-red-500",
-// 						)}
-// 					>
-// 						{trend >= 0 ? "+" : ""}
-// 						{trend}%
-// 					</div>
-// 				)}
-// 			</div>
-// 		</div>
-// 	);
-// }
-
 function HomePage() {
-	// Use persisted tabs hook for URL-based tab state persistence
-	const {
-		activeTab: activeFilter,
-		setActiveTab: setActiveFilter,
-		isHydrated,
-	} = usePersistedTabs({
-		key: "filter",
-		defaultTab: "all" as FilterTab,
-		validTabs: VALID_TABS,
-	});
+	const router = useRouter();
+	const pathname = usePathname();
+	const searchParams = useSearchParams();
 
-	// Debounced filter state to prevent rapid API calls when switching tabs quickly
-	const [debouncedFilter, setDebouncedFilter] = useState<FilterTab>(activeFilter);
+	// ─── URL-synced state ─────────────────────────────────────
+	const activeFilter = (() => {
+		const urlFilter = searchParams.get("filter");
+		if (urlFilter && VALID_TABS.includes(urlFilter as FilterTab))
+			return urlFilter as FilterTab;
+		return "all" as FilterTab;
+	})();
+
+	const currentPage = (() => {
+		const urlPage = parseInt(searchParams.get("page") || "1", 10);
+		return isNaN(urlPage) || urlPage < 1 ? 1 : urlPage;
+	})();
+
+	const viewMode = (() => {
+		const urlView = searchParams.get("view");
+		return urlView === "list" ? ("list" as const) : ("grid" as const);
+	})();
+
+	const searchQuery = searchParams.get("q") || "";
+
+	// ─── URL update helpers ───────────────────────────────────
+	const updateParam = useCallback(
+		(key: string, value: string | null) => {
+			const params = new URLSearchParams(searchParams.toString());
+			if (
+				value === null ||
+				value === "" ||
+				(key === "filter" && value === "all") ||
+				(key === "page" && value === "1") ||
+				(key === "view" && value === "grid")
+			) {
+				params.delete(key);
+			} else {
+				params.set(key, value);
+			}
+			const newUrl = params.toString()
+				? `${pathname}?${params.toString()}`
+				: pathname;
+			router.replace(newUrl, { scroll: false });
+		},
+		[searchParams, pathname, router],
+	);
+
+	const setActiveFilter = useCallback(
+		(filter: FilterTab) => {
+			const params = new URLSearchParams(searchParams.toString());
+			// Reset page when changing filter
+			params.delete("page");
+			if (filter === "all") params.delete("filter");
+			else params.set("filter", filter);
+			const newUrl = params.toString()
+				? `${pathname}?${params.toString()}`
+				: pathname;
+			router.replace(newUrl, { scroll: false });
+		},
+		[searchParams, pathname, router],
+	);
+
+	const setCurrentPage = useCallback(
+		(page: number) => {
+			updateParam("page", page.toString());
+		},
+		[updateParam],
+	);
+
+	const setViewMode = useCallback(
+		(mode: "grid" | "list") => {
+			updateParam("view", mode);
+		},
+		[updateParam],
+	);
+
+	// ─── Debounced filter state ──────────────────────────────
+	const [debouncedFilter, setDebouncedFilter] =
+		useState<FilterTab>(activeFilter);
 	const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-	// Debounce the filter changes (300ms delay)
 	useEffect(() => {
-		// Clear any existing timeout
-		if (debounceRef.current) {
-			clearTimeout(debounceRef.current);
-		}
-
-		// Set up new debounced update
+		if (debounceRef.current) clearTimeout(debounceRef.current);
 		debounceRef.current = setTimeout(() => {
 			setDebouncedFilter(activeFilter);
 		}, 300);
-
-		// Cleanup on unmount or when activeFilter changes
 		return () => {
-			if (debounceRef.current) {
-				clearTimeout(debounceRef.current);
-			}
+			if (debounceRef.current) clearTimeout(debounceRef.current);
 		};
 	}, [activeFilter]);
 
-	const [searchQuery, setSearchQuery] = useState("");
 	const [mounted, setMounted] = useState(false);
-	// const [wsConnected, setWsConnected] = useState(false);
 	const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
-	
-	// View mode state: 'grid' or 'list' (default is grid)
-	const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-
-	// Pagination state
-	const [currentPage, setCurrentPage] = useState(1);
-
-	// Reset page when changing tabs
-	useEffect(() => {
-		setCurrentPage(1);
-	}, [activeFilter]);
+	void activityFeed; // Collected from WebSocket events, available for future UI
 
 	// Scroll to top when page changes
 	useEffect(() => {
-		window.scrollTo({ top: 0, behavior: 'smooth' });
+		window.scrollTo({ top: 0, behavior: "smooth" });
 	}, [currentPage]);
 
-	// Prevent hydration mismatch
 	useEffect(() => {
-		function blahBlah() {
-			setMounted(true);
-		}
-		blahBlah();
+		setMounted(true);
 	}, []);
 
-	// Fetch data - ONLY call API for the active tab
-	// All tokens (for "all" tab)
 	// Query Client for cache updates
 	const queryClient = useQueryClient();
 
-	// Fetch data - ONLY call API for the debounced tab (prevents rapid API calls)
-	// All tokens (for "all" tab) — with pagination
-	const { data: allTokensResult, isLoading: allLoading } = useTokens(
-		{ page: currentPage, pageSize: PAGE_SIZE },
-		{ enabled: isHydrated && debouncedFilter === "all" },
+	// ─── Fetch data based on active tab ──────────────────────
+	const {
+		data: allTokensResult,
+		isLoading: allLoading,
+		isError: allError,
+		refetch: refetchAll,
+	} = useTokens(
+		{ page: currentPage, pageSize: PAGE_SIZE, ...(searchQuery ? {} : {}) },
+		{ enabled: mounted && debouncedFilter === "all" },
 	);
 	const allTokens = allTokensResult?.data ?? [];
 	const pagination = allTokensResult?.pagination;
 
-	// Trending tokens (for "trending" tab)
 	const {
 		data: trendingTokens = [],
 		isLoading: trendingLoading,
-	} = useTrendingTokens({ pageSize: PAGE_SIZE }, {
-		enabled: isHydrated && debouncedFilter === "trending",
-	});
+		isError: trendingError,
+		refetch: refetchTrending,
+	} = useTrendingTokens(
+		{ pageSize: PAGE_SIZE },
+		{ enabled: mounted && debouncedFilter === "trending" },
+	);
 
-	// New tokens (for "new" tab)
 	const {
 		data: newTokens = [],
 		isLoading: newLoading,
-	} = useNewTokens({ pageSize: PAGE_SIZE }, {
-		enabled: isHydrated && debouncedFilter === "new",
-	});
+		isError: newError,
+		refetch: refetchNew,
+	} = useNewTokens(
+		{ pageSize: PAGE_SIZE },
+		{ enabled: mounted && debouncedFilter === "new" },
+	);
 
-	// Live tokens (for "live" tab)
 	const {
 		data: liveTokens = [],
 		isLoading: liveLoading,
-	} = useLiveTokens({ limit: PAGE_SIZE }, {
-		enabled: isHydrated && debouncedFilter === "live",
-	});
+		isError: liveError,
+		refetch: refetchLive,
+	} = useLiveTokens(
+		{ limit: PAGE_SIZE },
+		{ enabled: mounted && debouncedFilter === "live" },
+	);
 
-	// Graduated tokens (for "graduated" tab)
 	const {
 		data: graduatedTokens = [],
 		isLoading: graduatedLoading,
-	} = useGraduatedTokens({ limit: PAGE_SIZE }, {
-		enabled: isHydrated && debouncedFilter === "graduated",
-	});
+		isError: graduatedError,
+		refetch: refetchGraduated,
+	} = useGraduatedTokens(
+		{ limit: PAGE_SIZE },
+		{ enabled: mounted && debouncedFilter === "graduated" },
+	);
 
-	// WebSocket: Listen for new tokens
+	// ─── WebSocket: New tokens ───────────────────────────────
 	useNewTokenFeed(
 		useCallback(
 			(newToken: any) => {
-				// setWsConnected(true);
-
-				// Add to activity feed
 				const activity: ActivityItem = {
 					id: `token-${newToken.tokenId}-${Date.now()}`,
 					type: "new_token",
@@ -338,10 +258,8 @@ function HomePage() {
 					message: `${newToken.name} ($${newToken.symbol}) just launched!`,
 					timestamp: Date.now(),
 				};
-
 				setActivityFeed((prev) => [activity, ...prev].slice(0, 20));
 
-				// Optimistically add new token to lists without refetching
 				const formattedToken: Token = {
 					id: newToken.id || newToken.tokenId,
 					name: newToken.name,
@@ -349,14 +267,12 @@ function HomePage() {
 					imageUrl: newToken.imageUrl,
 					description: newToken.description,
 					creatorId: newToken.creatorId,
-					creator: newToken.creator, // Now populated from backend
+					creator: newToken.creator,
 					chainId: newToken.chainId,
 					status: "active",
 					hypeBoostEnabled: newToken.hypeBoostEnabled || false,
 					createdAt: newToken.createdAt || new Date().toISOString(),
 					updatedAt: new Date().toISOString(),
-
-					// Defaults for new token
 					currentPrice: "0",
 					initialPrice: "0",
 					marketCap: "0",
@@ -372,14 +288,11 @@ function HomePage() {
 
 				const prependToken = (oldData: any) => {
 					if (!oldData || !Array.isArray(oldData)) return oldData;
-					// Avoid duplicate
 					if (oldData.some((t: Token) => t.id === formattedToken.id))
 						return oldData;
-
 					return [formattedToken, ...oldData];
 				};
 
-				// Prepend to All and New lists
 				queryClient.setQueriesData(
 					{ queryKey: tokenKeys.lists() },
 					prependToken,
@@ -393,12 +306,10 @@ function HomePage() {
 		),
 	);
 
-	// WebSocket: Listen for trades - update token data in cache directly without refetch
+	// ─── WebSocket: Trades ───────────────────────────────────
 	useGlobalTradeFeed(
 		useCallback(
 			(trade) => {
-				// setWsConnected(true);
-
 				const activity: ActivityItem = {
 					id: `trade-${trade.tradeId}-${Date.now()}`,
 					type: "trade",
@@ -406,40 +317,28 @@ function HomePage() {
 					message: `${trade.username || "Someone"} ${trade.type === "buy" ? "bought" : "sold"} $${trade.tokenSymbol}`,
 					timestamp: Date.now(),
 				};
-
 				setActivityFeed((prev) => [activity, ...prev].slice(0, 20));
 
-				// Optimistically update cache with new data from WS (bondingCurveProgress, marketCap)
-				// This avoids refetching the API repeatedly
 				const updateTokenInCache = (oldData: any) => {
 					if (!oldData || !Array.isArray(oldData)) return oldData;
-
 					return oldData.map((token: Token) => {
 						if (token.id === trade.tokenId) {
-							// Merge existing token with new data from WebSocket
-							// trade object now contains computed bondingCurveProgress and marketCap from backend
-							const wsProgress = trade.bondingCurveProgress;
-							const wsMarketCap = trade.marketCap;
-
 							return {
 								...token,
 								bondingCurveProgress:
-									wsProgress !== undefined
-										? wsProgress
+									trade.bondingCurveProgress !== undefined
+										? trade.bondingCurveProgress
 										: token.bondingCurveProgress,
 								marketCap:
-									wsMarketCap !== undefined
-										? wsMarketCap
+									trade.marketCap !== undefined
+										? trade.marketCap
 										: token.marketCap,
-								// Also update volume if provided or accumulate
-								// volume24h: ... (logic complex without full data, skipping for now as progress is priority)
 							};
 						}
 						return token;
 					});
 				};
 
-				// Update all relevant token list queries
 				queryClient.setQueriesData(
 					{ queryKey: tokenKeys.lists() },
 					updateTokenInCache,
@@ -455,7 +354,7 @@ function HomePage() {
 				queryClient.setQueriesData(
 					{ queryKey: tokenKeys.live({}) },
 					updateTokenInCache,
-				); // Rough match
+				);
 				queryClient.setQueriesData(
 					{ queryKey: tokenKeys.graduated({}) },
 					updateTokenInCache,
@@ -465,24 +364,21 @@ function HomePage() {
 		),
 	);
 
-	// WebSocket: Listen for token graduations
+	// ─── WebSocket: Graduations ──────────────────────────────
 	useTokenGraduations(
 		useCallback(
 			(data) => {
 				const activity: ActivityItem = {
 					id: `graduation-${data.tokenId}-${Date.now()}`,
-					type: "trade", // Re-using trade type for icon consistency or generic
+					type: "trade",
 					tokenSymbol: data.symbol,
 					message: `🎓 ${data.name} ($${data.symbol}) just GRADUATED!`,
 					timestamp: Date.now(),
 				};
-
 				setActivityFeed((prev) => [activity, ...prev].slice(0, 20));
 
-				// Update status in all lists to 'graduated'
 				const markAsGraduated = (oldData: any) => {
 					if (!oldData || !Array.isArray(oldData)) return oldData;
-
 					return oldData.map((token: Token) => {
 						if (token.id === data.tokenId) {
 							return {
@@ -521,7 +417,7 @@ function HomePage() {
 		),
 	);
 
-	// Determine display tokens based on active tab
+	// ─── Determine display tokens ────────────────────────────
 	const getDisplayTokens = (): Token[] => {
 		switch (activeFilter) {
 			case "trending":
@@ -537,10 +433,8 @@ function HomePage() {
 				return Array.isArray(allTokens) ? allTokens : [];
 		}
 	};
-
 	const tokens = getDisplayTokens();
 
-	// Determine loading state based on active tab
 	const isLoading = (() => {
 		switch (activeFilter) {
 			case "all":
@@ -558,85 +452,81 @@ function HomePage() {
 		}
 	})();
 
-	// Search filtering
-	const filteredTokens = tokens.filter(
-		(token: Token) =>
-			token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			token.symbol.toLowerCase().includes(searchQuery.toLowerCase()),
-	);
+	const isError = (() => {
+		switch (activeFilter) {
+			case "all":
+				return allError;
+			case "trending":
+				return trendingError;
+			case "new":
+				return newError;
+			case "live":
+				return liveError;
+			case "graduated":
+				return graduatedError;
+			default:
+				return false;
+		}
+	})();
 
-	if (!mounted || !isHydrated) return null;
+	const handleRetry = useCallback(() => {
+		switch (activeFilter) {
+			case "all":
+				refetchAll();
+				break;
+			case "trending":
+				refetchTrending();
+				break;
+			case "new":
+				refetchNew();
+				break;
+			case "live":
+				refetchLive();
+				break;
+			case "graduated":
+				refetchGraduated();
+				break;
+		}
+	}, [
+		activeFilter,
+		refetchAll,
+		refetchTrending,
+		refetchNew,
+		refetchLive,
+		refetchGraduated,
+	]);
+
+	// Filter by search query from URL
+	const filteredTokens = searchQuery
+		? tokens.filter(
+				(token: Token) =>
+					token.name
+						.toLowerCase()
+						.includes(searchQuery.toLowerCase()) ||
+					token.symbol
+						.toLowerCase()
+						.includes(searchQuery.toLowerCase()),
+			)
+		: tokens;
+
+	if (!mounted) return null;
 
 	return (
 		<main className="min-h-screen pb-20">
 			<div className="mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
-				{/* Hero Section - Clean and Minimal */}
+				{/* Trending Coins Carousel */}
 				<motion.div
 					initial={{ opacity: 0, y: 20 }}
 					animate={{ opacity: 1, y: 0 }}
 					className="mb-6 sm:mb-8"
 				>
-					<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4">
-						<div className="flex-1">
-							<h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">
-								Trending Coins
-							</h1>
-							<p className="text-sm sm:text-base text-muted-foreground">
-								Find the next moonshot or launch your own
-							</p>
-						</div>
-
-						 
-					</div>
+					<TrendingCarousel />
 				</motion.div>
 
-				{/* Stats Row */}
-				{/* <motion.div
-					initial={{ opacity: 0, y: 20 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ delay: 0.1 }}
-					className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-6 sm:mb-8"
-				>
-					<StatsCard
-						icon={Rocket}
-						label="Total Tokens"
-						value={tokens.length.toString()}
-					/>
-					<StatsCard
-						icon={Flame}
-						label="Trending"
-						value={
-							activeFilter === "trending"
-								? trendingTokens.length.toString()
-								: "—"
-						}
-						trend={activeFilter === "trending" ? 12 : undefined}
-					/>
-					<StatsCard
-						icon={Clock}
-						label="New Today"
-						value={
-							activeFilter === "new"
-								? newTokens.length.toString()
-								: "—"
-						}
-					/>
-					<StatsCard
-						icon={Trophy}
-						label="Graduated"
-						value={
-							activeFilter === "graduated"
-								? graduatedTokens.length.toString()
-								: "—"
-						}
-					/>
-				</motion.div> */}
-
-				{/* Main Content Grid */}
-				<div className="grid  gap-4 sm:gap-6">
-					{/* Left Column - Token Grid */}
+				{/* Main Content */}
+				<div className="grid gap-4 sm:gap-6">
 					<div className="min-w-0">
-						{/* Filter & Search Bar */}
+						{/* Filter Tabs + View Toggle */}
 						<motion.div
 							initial={{ opacity: 0 }}
 							animate={{ opacity: 1 }}
@@ -684,41 +574,28 @@ function HomePage() {
 								</div>
 							</div>
 
-							{/* Search + View Toggle */}
-							<div className="flex items-center gap-2 w-full sm:w-auto">
-								<div className="relative flex-1 sm:w-64 sm:flex-none">
-									<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-									<Input
-										placeholder="Search tokens..."
-										value={searchQuery}
-										onChange={(e) =>
-											setSearchQuery(e.target.value)
-										}
-										className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm bg-card/60 border-border/50 focus:border-primary/50"
-									/>
-								</div>
-								
-								{/* View Toggle */}
+							{/* View Toggle */}
+							<div className="flex items-center gap-2 w-full sm:w-auto justify-end">
 								<div className="flex bg-card/60 backdrop-blur-md p-0.5 rounded-lg border border-border/60 shrink-0">
 									<button
-										onClick={() => setViewMode('grid')}
+										onClick={() => setViewMode("grid")}
 										className={cn(
 											"p-1.5 sm:p-2 rounded-md transition-all",
-											viewMode === 'grid'
+											viewMode === "grid"
 												? "bg-primary text-primary-foreground"
-												: "text-muted-foreground hover:text-foreground"
+												: "text-muted-foreground hover:text-foreground",
 										)}
 										title="Grid view"
 									>
 										<LayoutGrid className="w-4 h-4" />
 									</button>
 									<button
-										onClick={() => setViewMode('list')}
+										onClick={() => setViewMode("list")}
 										className={cn(
 											"p-1.5 sm:p-2 rounded-md transition-all",
-											viewMode === 'list'
+											viewMode === "list"
 												? "bg-primary text-primary-foreground"
-												: "text-muted-foreground hover:text-foreground"
+												: "text-muted-foreground hover:text-foreground",
 										)}
 										title="List view"
 									>
@@ -728,83 +605,100 @@ function HomePage() {
 							</div>
 						</motion.div>
 
+						{/* ─── Error State ─── */}
+						{isError && !isLoading && (
+							<Alert variant="destructive" className="mb-4">
+								<AlertCircle className="h-4 w-4" />
+								<AlertDescription className="flex items-center justify-between">
+									<span>
+										Failed to load tokens. Please try again.
+									</span>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={handleRetry}
+										className="gap-1.5 ml-4"
+									>
+										<RefreshCw className="h-3.5 w-3.5" />
+										Retry
+									</Button>
+								</AlertDescription>
+							</Alert>
+						)}
+
 						{/* Token Grid/List */}
 						<AnimatePresence mode="wait">
 							{isLoading ? (
-								viewMode === 'grid' ? (
-								<motion.div
-									key="loading-grid"
-									initial={{ opacity: 0 }}
-									animate={{ opacity: 1 }}
-									exit={{ opacity: 0 }}
-									className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4"
-								>
-									{Array.from({ length: PAGE_SIZE }).map((_, i) => (
-										<div
-											key={i}
-											className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3 flex gap-3"
-										>
-											{/* Square image skeleton */}
-											<Skeleton className="w-[88px] h-[88px] rounded-lg shrink-0" />
-											{/* Content */}
-											<div className="flex-1 min-w-0 flex flex-col gap-1.5">
-												{/* Row 1: Name + Progress bar */}
-												<div className="flex items-center justify-between gap-2">
-													<Skeleton className="h-4 w-24" />
-													<Skeleton className="h-[10px] w-[150px] rounded-full" />
+								viewMode === "grid" ? (
+									<motion.div
+										key="loading-grid"
+										initial={{ opacity: 0 }}
+										animate={{ opacity: 1 }}
+										exit={{ opacity: 0 }}
+										className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4"
+									>
+										{Array.from({ length: PAGE_SIZE }).map(
+											(_, i) => (
+												<div
+													key={i}
+													className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3 flex gap-3"
+												>
+													<Skeleton className="w-[88px] h-[88px] rounded-lg shrink-0" />
+													<div className="flex-1 min-w-0 flex flex-col gap-1.5">
+														<div className="flex items-center justify-between gap-2">
+															<Skeleton className="h-4 w-24" />
+															<Skeleton className="h-[10px] w-[150px] rounded-full" />
+														</div>
+														<Skeleton className="h-3.5 w-12" />
+														<Skeleton className="h-3 w-32" />
+														<div className="flex items-center justify-between gap-2">
+															<Skeleton className="h-4 w-20" />
+															<Skeleton className="h-3.5 w-14" />
+														</div>
+														<Skeleton className="h-3 w-full" />
+													</div>
 												</div>
-												{/* Row 2: Symbol */}
-												<Skeleton className="h-3.5 w-12" />
-												{/* Row 3: Creator + Time */}
-												<Skeleton className="h-3 w-32" />
-												{/* Row 4: MC + Price Change */}
-												<div className="flex items-center justify-between gap-2">
-													<Skeleton className="h-4 w-20" />
-													<Skeleton className="h-3.5 w-14" />
-												</div>
-												{/* Row 5: Description */}
-												<Skeleton className="h-3 w-full" />
-											</div>
-										</div>
-									))}
-								</motion.div>
+											),
+										)}
+									</motion.div>
 								) : (
-								<motion.div
-									key="loading-list"
-									initial={{ opacity: 0 }}
-									animate={{ opacity: 1 }}
-									exit={{ opacity: 0 }}
-									className="space-y-0"
-								>
-									{/* List Header Skeleton */}
-									<div className="flex items-center gap-3 px-4 py-2.5 border-b border-[#333] bg-[#0a0a0a] min-w-[1200px]">
-										<Skeleton className="h-3 w-full" />
-									</div>
-									{Array.from({ length: PAGE_SIZE }).map((_, i) => (
-										<div
-											key={i}
-											className="flex items-center gap-3 px-4 py-3 border-b border-[#1a1a1a] min-w-[1200px]"
-										>
-											<Skeleton className="w-5 h-4 shrink-0" />
-											<Skeleton className="w-8 h-8 rounded-lg shrink-0" />
-											<div className="flex-[2.5] flex items-center gap-2">
-												<Skeleton className="h-4 w-24" />
-												<Skeleton className="h-3 w-12" />
-											</div>
-											<Skeleton className="flex-[1.5] h-8" />
-											<Skeleton className="flex-1 h-4" />
-											<Skeleton className="flex-[0.5] h-3 w-8" />
-											<Skeleton className="flex-[0.75] h-4" />
-											<Skeleton className="flex-1 h-4" />
-											<Skeleton className="flex-[0.75] h-4" />
-											<Skeleton className="flex-[0.75] h-3" />
-											<Skeleton className="flex-[0.75] h-3" />
-											<Skeleton className="flex-[0.75] h-3" />
-											<Skeleton className="flex-[0.75] h-3" />
-											<Skeleton className="flex-[0.4] h-4 w-4" />
+									<motion.div
+										key="loading-list"
+										initial={{ opacity: 0 }}
+										animate={{ opacity: 1 }}
+										exit={{ opacity: 0 }}
+										className="space-y-0"
+									>
+										<div className="flex items-center gap-3 px-4 py-2.5 border-b border-[#333] bg-[#0a0a0a] min-w-[1200px]">
+											<Skeleton className="h-3 w-full" />
 										</div>
-									))}
-								</motion.div>
+										{Array.from({ length: PAGE_SIZE }).map(
+											(_, i) => (
+												<div
+													key={i}
+													className="flex items-center gap-3 px-4 py-3 border-b border-[#1a1a1a] min-w-[1200px]"
+												>
+													<Skeleton className="w-5 h-4 shrink-0" />
+													<Skeleton className="w-8 h-8 rounded-lg shrink-0" />
+													<div className="flex-[2.5] flex items-center gap-2">
+														<Skeleton className="h-4 w-24" />
+														<Skeleton className="h-3 w-12" />
+													</div>
+													<Skeleton className="flex-[1.5] h-8" />
+													<Skeleton className="flex-1 h-4" />
+													<Skeleton className="flex-[0.5] h-3 w-8" />
+													<Skeleton className="flex-[0.75] h-4" />
+													<Skeleton className="flex-1 h-4" />
+													<Skeleton className="flex-[0.75] h-4" />
+													<Skeleton className="flex-[0.75] h-3" />
+													<Skeleton className="flex-[0.75] h-3" />
+													<Skeleton className="flex-[0.75] h-3" />
+													<Skeleton className="flex-[0.75] h-3" />
+													<Skeleton className="flex-[0.4] h-4 w-4" />
+												</div>
+											),
+										)}
+									</motion.div>
 								)
 							) : filteredTokens.length === 0 ? (
 								<motion.div
@@ -834,7 +728,7 @@ function HomePage() {
 										</Button>
 									</Link>
 								</motion.div>
-							) : viewMode === 'grid' ? (
+							) : viewMode === "grid" ? (
 								<motion.div
 									key="grid"
 									initial={{ opacity: 0 }}
@@ -865,40 +759,54 @@ function HomePage() {
 									animate={{ opacity: 1 }}
 									className="overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
 								>
-									{/* List Header - Fixed min-width for horizontal scrolling */}
+									{/* List Header */}
 									<div className="flex items-center gap-3 px-4 py-2.5 text-[10px] text-[#666] font-medium uppercase border-b border-[#333] bg-[#0a0a0a] sticky top-0 z-10 min-w-[1200px]">
-										{/* Coin header (2.5 parts) */}
 										<div className="flex-[2.5] min-w-0">
 											<span className="ml-14">Coin</span>
 										</div>
-										{/* Graph (1.5 parts) */}
-										<div className="flex-[1.5] text-center">Graph</div>
-										{/* MCAP (1 part) */}
-										<div className="flex-1 text-right">MCap</div>
-										{/* Age (0.5 part) */}
-										<div className="flex-[0.5] text-center">Age</div>
-										{/* TXNS (0.75 part) */}
-										<div className="flex-[0.75] text-right">Txns</div>
-										{/* 24H VOL (1 part) */}
-										<div className="flex-1 text-right">24h Vol</div>
-										{/* TRADERS (0.75 part) */}
-										<div className="flex-[0.75] text-right">Traders</div>
-										{/* 5M (0.75 part) */}
-										<div className="flex-[0.75] text-right">5m</div>
-										{/* 1H (0.75 part) */}
-										<div className="flex-[0.75] text-right">1h</div>
-										{/* 6H (0.75 part) */}
-										<div className="flex-[0.75] text-right">6h</div>
-										{/* 24H (0.75 part) */}
-										<div className="flex-[0.75] text-right">24h</div>
-										{/* Star (0.4 part) */}
+										<div className="flex-[1.5] text-center">
+											Graph
+										</div>
+										<div className="flex-1 text-right">
+											MCap
+										</div>
+										<div className="flex-[0.5] text-center">
+											Age
+										</div>
+										<div className="flex-[0.75] text-right">
+											Txns
+										</div>
+										<div className="flex-1 text-right">
+											24h Vol
+										</div>
+										<div className="flex-[0.75] text-right">
+											Traders
+										</div>
+										<div className="flex-[0.75] text-right">
+											5m
+										</div>
+										<div className="flex-[0.75] text-right">
+											1h
+										</div>
+										<div className="flex-[0.75] text-right">
+											6h
+										</div>
+										<div className="flex-[0.75] text-right">
+											24h
+										</div>
 										<div className="flex flex-[0.4] justify-center"></div>
 									</div>
 									{filteredTokens.map((token, index) => (
 										<TokenListItem
 											key={token.id}
 											token={token}
-											index={activeFilter === "all" ? ((currentPage - 1) * PAGE_SIZE) + index : index}
+											index={
+												activeFilter === "all"
+													? (currentPage - 1) *
+															PAGE_SIZE +
+														index
+													: index
+											}
 										/>
 									))}
 								</motion.div>
@@ -906,160 +814,133 @@ function HomePage() {
 						</AnimatePresence>
 
 						{/* Pagination Controls */}
-						{!isLoading && pagination && pagination.totalPages > 1 && (
-							<div className="flex flex-col items-center gap-2 mt-6">
-								{/* Page controls */}
-								<div className="flex items-center gap-1">
-									{/* First page */}
-									<button
-										onClick={() => setCurrentPage(1)}
-										disabled={!pagination.hasPrev}
-										className={cn(
-											"p-1.5 rounded-md transition-all",
-											pagination.hasPrev
-												? "text-muted-foreground hover:text-foreground hover:bg-muted"
-												: "text-muted-foreground/30 cursor-not-allowed"
-										)}
-										title="First page"
-									>
-										<ChevronsLeft className="w-4 h-4" />
-									</button>
+						{!isLoading &&
+							pagination &&
+							pagination.totalPages > 1 &&
+							filteredTokens.length > 0 && (
+								<div className="flex flex-col items-center gap-3 mt-8 pt-4 border-t border-border/30">
+									<div className="flex items-center gap-1">
+										<button
+											onClick={() => setCurrentPage(1)}
+											disabled={!pagination.hasPrev}
+											className={cn(
+												"p-1.5 rounded-md transition-all",
+												pagination.hasPrev
+													? "text-muted-foreground hover:text-foreground hover:bg-muted"
+													: "text-muted-foreground/30 cursor-not-allowed",
+											)}
+											title="First page"
+										>
+											<ChevronsLeft className="w-4 h-4" />
+										</button>
+										<button
+											onClick={() =>
+												setCurrentPage(
+													Math.max(
+														1,
+														currentPage - 1,
+													),
+												)
+											}
+											disabled={!pagination.hasPrev}
+											className={cn(
+												"p-1.5 rounded-md transition-all",
+												pagination.hasPrev
+													? "text-muted-foreground hover:text-foreground hover:bg-muted"
+													: "text-muted-foreground/30 cursor-not-allowed",
+											)}
+											title="Previous page"
+										>
+											<ChevronLeft className="w-4 h-4" />
+										</button>
 
-									{/* Previous page */}
-									<button
-										onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-										disabled={!pagination.hasPrev}
-										className={cn(
-											"p-1.5 rounded-md transition-all",
-											pagination.hasPrev
-												? "text-muted-foreground hover:text-foreground hover:bg-muted"
-												: "text-muted-foreground/30 cursor-not-allowed"
-										)}
-										title="Previous page"
-									>
-										<ChevronLeft className="w-4 h-4" />
-									</button>
+										{(() => {
+											const pages: number[] = [];
+											const total = pagination.totalPages;
+											const current = pagination.page;
+											let start = Math.max(
+												1,
+												current - 2,
+											);
+											const end = Math.min(
+												total,
+												start + 4,
+											);
+											start = Math.max(1, end - 4);
+											for (let i = start; i <= end; i++)
+												pages.push(i);
+											return pages.map((p) => (
+												<button
+													key={p}
+													onClick={() =>
+														setCurrentPage(p)
+													}
+													className={cn(
+														"min-w-[32px] h-8 px-2 text-xs font-medium rounded-md transition-all",
+														p === current
+															? "bg-primary text-primary-foreground"
+															: "text-muted-foreground hover:text-foreground hover:bg-muted",
+													)}
+												>
+													{p}
+												</button>
+											));
+										})()}
 
-									{/* Page numbers */}
-									{(() => {
-										const pages: number[] = [];
-										const total = pagination.totalPages;
-										const current = pagination.page;
-										
-										// Show max 5 page numbers centered on current
-										let start = Math.max(1, current - 2);
-										let end = Math.min(total, start + 4);
-										start = Math.max(1, end - 4);
-
-										for (let i = start; i <= end; i++) {
-											pages.push(i);
-										}
-
-										return pages.map(p => (
-											<button
-												key={p}
-												onClick={() => setCurrentPage(p)}
-												className={cn(
-													"min-w-[32px] h-8 px-2 text-xs font-medium rounded-md transition-all",
-													p === current
-														? "bg-primary text-primary-foreground"
-														: "text-muted-foreground hover:text-foreground hover:bg-muted"
-												)}
-											>
-												{p}
-											</button>
-										));
-									})()}
-
-									{/* Next page */}
-									<button
-										onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
-										disabled={!pagination.hasNext}
-										className={cn(
-											"p-1.5 rounded-md transition-all",
-											pagination.hasNext
-												? "text-muted-foreground hover:text-foreground hover:bg-muted"
-												: "text-muted-foreground/30 cursor-not-allowed"
-										)}
-										title="Next page"
-									>
-										<ChevronRight className="w-4 h-4" />
-									</button>
-
-									{/* Last page */}
-									<button
-										onClick={() => setCurrentPage(pagination.totalPages)}
-										disabled={!pagination.hasNext}
-										className={cn(
-											"p-1.5 rounded-md transition-all",
-											pagination.hasNext
-												? "text-muted-foreground hover:text-foreground hover:bg-muted"
-												: "text-muted-foreground/30 cursor-not-allowed"
-										)}
-										title="Last page"
-									>
-										<ChevronsRight className="w-4 h-4" />
-									</button>
+										<button
+											onClick={() =>
+												setCurrentPage(
+													Math.min(
+														pagination.totalPages,
+														currentPage + 1,
+													),
+												)
+											}
+											disabled={!pagination.hasNext}
+											className={cn(
+												"p-1.5 rounded-md transition-all",
+												pagination.hasNext
+													? "text-muted-foreground hover:text-foreground hover:bg-muted"
+													: "text-muted-foreground/30 cursor-not-allowed",
+											)}
+											title="Next page"
+										>
+											<ChevronRight className="w-4 h-4" />
+										</button>
+										<button
+											onClick={() =>
+												setCurrentPage(
+													pagination.totalPages,
+												)
+											}
+											disabled={!pagination.hasNext}
+											className={cn(
+												"p-1.5 rounded-md transition-all",
+												pagination.hasNext
+													? "text-muted-foreground hover:text-foreground hover:bg-muted"
+													: "text-muted-foreground/30 cursor-not-allowed",
+											)}
+											title="Last page"
+										>
+											<ChevronsRight className="w-4 h-4" />
+										</button>
+									</div>
+									<p className="text-xs text-muted-foreground">
+										Showing{" "}
+										{(pagination.page - 1) *
+											pagination.pageSize +
+											1}
+										–
+										{Math.min(
+											pagination.page *
+												pagination.pageSize,
+											pagination.totalItems,
+										)}{" "}
+										of {pagination.totalItems} tokens
+									</p>
 								</div>
-
-								{/* Page info */}
-								<p className="text-xs text-muted-foreground">
-									Showing {((pagination.page - 1) * pagination.pageSize) + 1}–{Math.min(pagination.page * pagination.pageSize, pagination.totalItems)} of {pagination.totalItems} tokens
-								</p>
-							</div>
-						)}
+							)}
 					</div>
-
-					{/* Right Column - Activity Feed */}
-					{/* <motion.div
-						initial={{ opacity: 0, x: 20 }}
-						animate={{ opacity: 1, x: 0 }}
-						transition={{ delay: 0.3 }}
-						className="hidden lg:block space-y-4"
-					>
-						<ActivityFeed items={activityFeed} />
-
-						Quick Links
-						<div className="bg-card/40 backdrop-blur-sm border border-border/50 rounded-xl p-4">
-							<h3 className="text-sm font-medium mb-3">
-								Quick Actions
-							</h3>
-							<div className="space-y-2">
-								<Link href="/create" className="block">
-									<Button
-										variant="outline"
-										className="w-full justify-start gap-2 h-10"
-									>
-										<Plus className="h-4 w-4" />
-										Create New Token
-									</Button>
-								</Link>
-								<Link href="/profile" className="block">
-									<Button
-										variant="ghost"
-										className="w-full justify-start gap-2 h-10"
-									>
-										<BarChart3 className="h-4 w-4" />
-										View Profile
-									</Button>
-								</Link>
-							</div>
-						</div>
-
-						Tips
-						<div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
-							<div className="flex items-center gap-2 mb-2">
-								<Sparkles className="h-4 w-4 text-primary" />
-								<span className="text-sm font-medium">
-									Pro Tip
-								</span>
-							</div>
-							<p className="text-xs text-muted-foreground">
-								Enable HypeBoost when creating tokens to protect
-								against bots and ensure fair distribution.
-							</p>
-						</div>
-					</motion.div> */}
 				</div>
 			</div>
 		</main>
@@ -1071,107 +952,44 @@ function HomePageSkeleton() {
 	return (
 		<main className="min-h-screen pb-20">
 			<div className="mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
-				{/* Hero Section Skeleton */}
+				{/* Carousel Skeleton */}
 				<div className="mb-6 sm:mb-8">
-					<Skeleton className="h-8 sm:h-10 md:h-12 w-48 sm:w-64 mb-2" />
-					<Skeleton className="h-4 sm:h-5 w-64 sm:w-80" />
+					<Skeleton className="h-7 w-40 mb-4" />
+					<div className="flex gap-4 overflow-hidden">
+						{Array.from({ length: 6 }).map((_, i) => (
+							<div
+								key={i}
+								className="min-w-[200px] rounded-xl overflow-hidden"
+							>
+								<Skeleton className="h-[140px] w-[200px]" />
+							</div>
+						))}
+					</div>
 				</div>
 
-				{/* Stats Row Skeleton */}
-				<div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-6 sm:mb-8">
-					{[1, 2, 3, 4].map((i) => (
+				{/* Filter Tabs Skeleton */}
+				<div className="flex justify-between items-center gap-4 mb-6">
+					<Skeleton className="h-10 w-80 rounded-xl" />
+					<Skeleton className="h-10 w-20 rounded-lg" />
+				</div>
+
+				{/* Token Grid Skeleton */}
+				<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+					{Array.from({ length: 40 }).map((_, i) => (
 						<div
 							key={i}
-							className="bg-card/40 border border-border/50 rounded-xl p-3 sm:p-4"
+							className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3 flex gap-3"
 						>
-							<div className="flex items-center gap-2 sm:gap-3">
-								<Skeleton className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg shrink-0" />
-								<div className="flex-1 space-y-1.5">
-									<Skeleton className="h-5 sm:h-7 w-12 sm:w-16" />
-									<Skeleton className="h-2.5 sm:h-3 w-16 sm:w-20" />
-								</div>
+							<Skeleton className="w-[88px] h-[88px] rounded-lg shrink-0" />
+							<div className="flex-1 min-w-0 flex flex-col gap-1.5">
+								<Skeleton className="h-4 w-24" />
+								<Skeleton className="h-3.5 w-12" />
+								<Skeleton className="h-3 w-32" />
+								<Skeleton className="h-4 w-20" />
+								<Skeleton className="h-3 w-full" />
 							</div>
 						</div>
 					))}
-				</div>
-
-				{/* Main Content Grid */}
-				<div className="grid lg:grid-cols-[1fr_300px] gap-4 sm:gap-6">
-					{/* Left Column - Token Grid */}
-					<div>
-						{/* Filter & Search Bar Skeleton */}
-						<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-							<Skeleton className="h-10 sm:h-11 w-full sm:w-80 rounded-lg sm:rounded-xl" />
-							<Skeleton className="h-9 sm:h-10 w-full sm:w-64 rounded-lg" />
-						</div>
-
-						{/* Token Grid Skeleton */}
-						<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
-							{Array.from({ length: 40 }).map((_, i) => (
-								<div
-									key={i}
-									className="bg-card/40 border border-border/50 rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3"
-								>
-									<div className="flex items-center gap-2 sm:gap-3">
-										<Skeleton className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg" />
-										<div className="flex-1 space-y-1.5 sm:space-y-2">
-											<Skeleton className="h-3 sm:h-4 w-20 sm:w-24" />
-											<Skeleton className="h-2.5 sm:h-3 w-14 sm:w-16" />
-										</div>
-									</div>
-									<Skeleton className="h-6 sm:h-8 w-full" />
-									<div className="flex justify-between">
-										<Skeleton className="h-3 sm:h-4 w-14 sm:w-16" />
-										<Skeleton className="h-3 sm:h-4 w-14 sm:w-16" />
-									</div>
-								</div>
-							))}
-						</div>
-					</div>
-
-					{/* Right Column - Activity Feed Skeleton */}
-					<div className="hidden lg:block space-y-4">
-						{/* Activity Feed Skeleton */}
-						<div className="bg-card/40 border border-border/50 rounded-xl p-4">
-							<div className="flex items-center gap-2 mb-3">
-								<Skeleton className="h-4 w-4 rounded" />
-								<Skeleton className="h-4 w-24" />
-							</div>
-							<div className="space-y-3">
-								{[1, 2, 3].map((i) => (
-									<div
-										key={i}
-										className="flex items-center gap-3 py-2"
-									>
-										<Skeleton className="w-8 h-8 rounded-lg shrink-0" />
-										<div className="flex-1 space-y-1.5">
-											<Skeleton className="h-3.5 w-full" />
-											<Skeleton className="h-2.5 w-16" />
-										</div>
-									</div>
-								))}
-							</div>
-						</div>
-
-						{/* Quick Actions Skeleton */}
-						<div className="bg-card/40 border border-border/50 rounded-xl p-4">
-							<Skeleton className="h-4 w-28 mb-3" />
-							<div className="space-y-2">
-								<Skeleton className="h-10 w-full rounded-lg" />
-								<Skeleton className="h-10 w-full rounded-lg" />
-							</div>
-						</div>
-
-						{/* Tips Skeleton */}
-						<div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
-							<div className="flex items-center gap-2 mb-2">
-								<Skeleton className="h-4 w-4 rounded" />
-								<Skeleton className="h-4 w-16" />
-							</div>
-							<Skeleton className="h-3 w-full" />
-							<Skeleton className="h-3 w-3/4 mt-1" />
-						</div>
-					</div>
 				</div>
 			</div>
 		</main>

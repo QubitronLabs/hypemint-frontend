@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   // Disable React compiler in production to prevent code splitting issues with Dynamic SDK 
   images: {
+    dangerouslyAllowSVG: true,
     remotePatterns: [
       {
         protocol: "http",
