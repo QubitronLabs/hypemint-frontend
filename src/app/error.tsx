@@ -30,7 +30,7 @@ export default function Error({ error, reset }: ErrorPageProps) {
                 className="max-w-md w-full text-center"
             >
                 {/* Error Icon */}
-                <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-destructive/20 to-red-500/20 flex items-center justify-center">
+                <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-linear-to-br from-destructive/20 to-red-500/20 flex items-center justify-center">
                     <AlertTriangle className="h-10 w-10 text-destructive" />
                 </div>
 
@@ -53,7 +53,7 @@ export default function Error({ error, reset }: ErrorPageProps) {
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Button
                         onClick={reset}
-                        className="gap-2 bg-gradient-to-r from-primary to-purple-600"
+                        className="gap-2 bg-linear-to-r from-primary to-purple-600"
                     >
                         <RefreshCcw className="h-4 w-4" />
                         Try Again

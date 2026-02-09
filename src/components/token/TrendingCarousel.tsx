@@ -170,7 +170,7 @@ export function TrendingCarousel() {
 										</div>
 
 										{/* Gradient overlay for text readability */}
-										<div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+										<div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/30 to-transparent" />
 
 										{/* Overlaid info at bottom */}
 										<div className="absolute bottom-0 left-0 right-0 p-3.5">
@@ -231,7 +231,7 @@ function BannerImage({
 
 	if (!imageUrl || hasError) {
 		return (
-			<div className="absolute inset-0 bg-gradient-to-br from-[#1a1a1a] to-[#2a2a2a] flex items-center justify-center">
+			<div className="absolute inset-0 bg-linear-to-br from-[#1a1a1a] to-[#2a2a2a] flex items-center justify-center">
 				<div className="flex flex-col items-center gap-1.5 text-muted-foreground/40">
 					<Coins className="h-10 w-10" />
 					<span className="text-sm font-semibold">{symbol}</span>

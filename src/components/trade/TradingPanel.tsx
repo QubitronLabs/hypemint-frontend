@@ -203,7 +203,7 @@ export function TradingPanel({
             className={cn(
               "flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-all duration-200",
               tradeType === "buy"
-                ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/25"
+                ? "bg-linear-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/25"
                 : "text-muted-foreground hover:text-foreground hover:bg-background/50",
             )}
           >
@@ -217,7 +217,7 @@ export function TradingPanel({
             className={cn(
               "flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-all duration-200",
               tradeType === "sell"
-                ? "bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg shadow-red-500/25"
+                ? "bg-linear-to-r from-red-500 to-rose-500 text-white shadow-lg shadow-red-500/25"
                 : "text-muted-foreground hover:text-foreground hover:bg-background/50",
             )}
           >
@@ -315,8 +315,8 @@ export function TradingPanel({
               className={cn(
                 "w-full h-14 text-base font-bold rounded-xl shadow-lg transition-all duration-200",
                 tradeType === "buy"
-                  ? "bg-gradient-to-r from-green-500 to-emerald-500 hover:shadow-green-500/30 hover:shadow-xl"
-                  : "bg-gradient-to-r from-red-500 to-rose-500 hover:shadow-red-500/30 hover:shadow-xl",
+                  ? "bg-linear-to-r from-green-500 to-emerald-500 hover:shadow-green-500/30 hover:shadow-xl"
+                  : "bg-linear-to-r from-red-500 to-rose-500 hover:shadow-red-500/30 hover:shadow-xl",
               )}
             >
               {isExecuting ? (

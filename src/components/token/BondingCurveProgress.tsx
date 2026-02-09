@@ -48,7 +48,7 @@ export function BondingCurveProgress({
 					initial={{ width: 0 }}
 					animate={{ width: `${formattedProgress}%` }}
 					transition={{ duration: 0.8, ease: "easeOut" }}
-					className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary/80 to-primary rounded-full"
+					className="absolute inset-y-0 left-0 bg-linear-to-r from-primary/80 to-primary rounded-full"
 				/>
 
 				{/* Glow effect */}

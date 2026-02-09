@@ -63,7 +63,7 @@ export default function ProfilePage() {
 						<Skeleton key={i} className="h-16 md:h-20" />
 					))}
 				</div>
-				<Skeleton className="h-[300px] md:h-[400px] rounded-xl" />
+				<Skeleton className="h-75 md:h-100 rounded-xl" />
 			</div>
 		);
 	}
@@ -111,7 +111,7 @@ export default function ProfilePage() {
 								src={user?.avatarUrl}
 								alt={displayName || shortAddress}
 							/>
-							<AvatarFallback className="bg-gradient-to-br from-primary/20 to-purple-500/20 text-2xl md:text-3xl">
+							<AvatarFallback className="bg-linear-to-br from-primary/20 to-purple-500/20 text-2xl md:text-3xl">
 								{displayName?.slice(0, 2) || "🐸"}
 							</AvatarFallback>
 						</Avatar>

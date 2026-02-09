@@ -135,7 +135,7 @@ function TokenPreviewCard({
 			className="sticky top-24 bg-card border border-border rounded-2xl overflow-hidden"
 		>
 			{/* Preview Header */}
-			<div className="bg-gradient-to-r from-primary/10 to-purple-500/10 px-4 py-3 border-b border-border">
+			<div className="bg-linear-to-r from-primary/10 to-purple-500/10 px-4 py-3 border-b border-border">
 				<div className="flex items-center gap-2">
 					<Sparkles className="h-4 w-4 text-primary" />
 					<span className="text-sm font-medium">Live Preview</span>
@@ -155,7 +155,7 @@ function TokenPreviewCard({
 									className="w-12 h-12 rounded-xl object-cover"
 								/>
 							) : (
-								<div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
+								<div className="w-12 h-12 rounded-xl bg-linear-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
 									<Coins className="h-6 w-6 text-muted-foreground" />
 								</div>
 							)}
@@ -214,7 +214,7 @@ function TokenPreviewCard({
 							<span>0%</span>
 						</div>
 						<div className="h-2 bg-muted rounded-full overflow-hidden">
-							<div className="h-full bg-gradient-to-r from-primary to-purple-500 w-0 transition-all" />
+							<div className="h-full bg-linear-to-r from-primary to-purple-500 w-0 transition-all" />
 						</div>
 					</div>
 
@@ -1219,7 +1219,7 @@ console.log("yaha balance hai")
 																	opacity: 1,
 																	y: 0,
 																}}
-																className="p-4 bg-gradient-to-br from-primary/10 to-purple-500/10 border border-primary/20 rounded-xl"
+																className="p-4 bg-linear-to-br from-primary/10 to-purple-500/10 border border-primary/20 rounded-xl"
 															>
 																<div className="flex items-center gap-2 mb-3">
 																	<TrendingUp className="h-4 w-4 text-primary" />
@@ -1424,7 +1424,7 @@ console.log("yaha balance hai")
 										isBuyConfirming
 									: false
 							}
-							className="w-full h-12 text-base font-semibold gap-2 bg-gradient-to-r from-primary to-purple-600 hover:opacity-90"
+							className="w-full h-12 text-base font-semibold gap-2 bg-linear-to-r from-primary to-purple-600 hover:opacity-90"
 						>
 							{!isAuthenticated ? (
 								<>Please connect your wallet to continue</>

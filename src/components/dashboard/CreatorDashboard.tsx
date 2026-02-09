@@ -234,7 +234,7 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
 						</TabsList>
 
 						<Link href="/create">
-							<Button className="gap-2 bg-gradient-to-r from-primary to-purple-600">
+							<Button className="gap-2 bg-linear-to-r from-primary to-purple-600">
 								<Plus className="h-4 w-4" />
 								Create Token
 							</Button>
@@ -254,7 +254,7 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
 									creator fees from every trade!
 								</p>
 								<Link href="/create">
-									<Button className="gap-2 bg-gradient-to-r from-primary to-purple-600">
+									<Button className="gap-2 bg-linear-to-r from-primary to-purple-600">
 										<Plus className="h-4 w-4" />
 										Create Your First Token
 									</Button>

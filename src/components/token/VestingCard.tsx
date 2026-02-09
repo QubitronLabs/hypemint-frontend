@@ -96,7 +96,7 @@ export function VestingCard({ bondingCurveAddress, symbol }: VestingCardProps) {
 	const isVestingComplete = elapsed >= VESTING_DURATION;
 
 	return (
-		<Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-background">
+		<Card className="border-primary/20 bg-linear-to-br from-primary/5 to-background">
 			<CardHeader className="pb-2">
 				<CardTitle className="text-lg flex items-center gap-2">
 					<Lock className="h-4 w-4 text-primary" />
