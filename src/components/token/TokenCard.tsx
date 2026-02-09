@@ -279,7 +279,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
 								<img
 									src="/sparkle-small.gif"
 									alt="ATH"
-									className="absolute -right-6 top-1/2 -translate-y-1/2  sm:size-14 pointer-events-none"
+									className="absolute -right-4 top-1/2 -translate-y-1/2  sm:size-10 pointer-events-none"
 								/>
 							)}
 						</div>
