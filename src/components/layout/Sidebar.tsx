@@ -40,7 +40,8 @@ export function Sidebar() {
 			document.body.style.overflow = "clip";
 		} else {
 			// Re-enable scrolling
-			document.body.style.overflow = "unset";
+			document.body.style.overflowY = "unset";
+			document.body.style.overflowX = "clip";
 		}
 
 		// Cleanup function to restore scrolling when component unmounts
@@ -120,7 +121,7 @@ export function Sidebar() {
 								href={item.disabled ? "#" : item.href}
 								onClick={handleNavClick}
 								className={cn(
-									"relative flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200",
+									"relative flex flex-col items-center justify-center p-3  rounded-xl transition-all duration-200",
 									isActive
 										? "text-primary bg-primary/10"
 										: "text-muted-foreground hover:text-foreground hover:bg-accent/50",
@@ -128,7 +129,7 @@ export function Sidebar() {
 										"opacity-40 cursor-not-allowed",
 								)}
 							>
-								{isActive && (
+								{/* {isActive && (
 									<motion.div
 										layoutId="active-indicator"
 										className="absolute left-0 w-1 h-6 bg-primary rounded-r-full"
@@ -139,7 +140,7 @@ export function Sidebar() {
 											damping: 25,
 										}}
 									/>
-								)}
+								)} */}
 								<motion.div
 									whileHover={{ scale: 1.1 }}
 									whileTap={{ scale: 0.9 }}
