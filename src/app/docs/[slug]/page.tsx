@@ -40,13 +40,13 @@ export async function generateMetadata({
 	const { slug } = await params;
 
 	try {
-		// Fetch page data and SEO data in parallel
+		// Fetch page data and SEO data in parallel (no-store ensures fresh data after admin edits)
 		const [pageRes, seoRes] = await Promise.all([
 			fetch(`${API_BASE}/api/v1/pages/${slug}`, {
-				next: { revalidate: 3600 },
+				cache: "no-store",
 			}),
 			fetch(`${API_BASE}/api/v1/pages/${slug}/seo`, {
-				next: { revalidate: 3600 },
+				cache: "no-store",
 			}),
 		]);
 
@@ -55,6 +55,7 @@ export async function generateMetadata({
 		}
 
 		const pageJson = await pageRes.json();
+		console.log("Fetched page data for slug:", {slug}, {pageJson});
 		const pageData: DocData | null = pageJson?.data ?? null;
 
 		let seoData: SeoData | null = null;
@@ -105,8 +106,7 @@ export async function generateMetadata({
 async function getPageData(slug: string): Promise<DocData | null> {
 	try {
 		const response = await fetch(`${API_BASE}/api/v1/pages/${slug}`, {
-			next: { revalidate: 3600 },
-			cache: "force-cache",
+			cache: "no-store",
 		});
 
 		if (!response.ok) return null;
@@ -127,8 +127,7 @@ async function getSeoSchema(
 		const response = await fetch(
 			`${API_BASE}/api/v1/pages/${slug}/seo`,
 			{
-				next: { revalidate: 3600 },
-				cache: "force-cache",
+				cache: "no-store",
 			},
 		);
 
