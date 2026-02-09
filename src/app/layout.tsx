@@ -14,6 +14,7 @@ import {
 } from "@/providers";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { Footer } from "@/components/layout/Footer";
 import "./globals.css";
 import { IsBrowser } from "@dynamic-labs/sdk-react-core";
 
@@ -93,6 +94,8 @@ export default function RootLayout({
 										<main className="md:ml-17.5 w-full md:w-[calc(100vw-70px)] md:max-w-[calc(100vw-90px)] mx-auto pt-14 md:pt-16 min-h-screen overflow-x-clip px-3 md:px-0">
 											{children}
 										</main>
+										{/* Footer */}
+										<Footer />
 									</IsBrowser>
 									{/* Toast Notifications */}
 									<Toaster richColors position="top-right" />

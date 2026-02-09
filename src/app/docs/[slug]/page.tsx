@@ -7,10 +7,31 @@ interface DocPageProps {
 
 interface DocData {
 	title: string;
+	slug: string;
 	content: string;
-	description?: string;
 	updatedAt?: string;
 }
+
+interface SeoData {
+	pageTitle?: string;
+	metaDescription?: string;
+	keywords?: string[];
+	canonicalUrl?: string;
+	robots?: string;
+	ogTitle?: string;
+	ogDescription?: string;
+	ogImage?: string;
+	ogType?: string;
+	ogUrl?: string;
+	twitterCard?: string;
+	twitterTitle?: string;
+	twitterDescription?: string;
+	twitterImage?: string;
+	schemaJson?: Record<string, unknown>;
+}
+
+const API_BASE =
+	process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 // Generate metadata for SEO
 export async function generateMetadata({
@@ -19,65 +40,131 @@ export async function generateMetadata({
 	const { slug } = await params;
 
 	try {
-		const response = await fetch(
-			`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/api/docs/${slug}`,
-			{
-				next: { revalidate: 3600 }, // Revalidate every hour
-			},
-		);
+		// Fetch page data and SEO data in parallel
+		const [pageRes, seoRes] = await Promise.all([
+			fetch(`${API_BASE}/api/v1/pages/${slug}`, {
+				next: { revalidate: 3600 },
+			}),
+			fetch(`${API_BASE}/api/v1/pages/${slug}/seo`, {
+				next: { revalidate: 3600 },
+			}),
+		]);
 
-		if (!response.ok) {
-			return {
-				title: "Documentation Not Found",
-			};
+		if (!pageRes.ok) {
+			return { title: "Page Not Found" };
 		}
 
-		const data: DocData = await response.json();
+		const pageJson = await pageRes.json();
+		const pageData: DocData | null = pageJson?.data ?? null;
+
+		let seoData: SeoData | null = null;
+		if (seoRes.ok) {
+			const seoJson = await seoRes.json();
+			seoData = seoJson?.data ?? null;
+		}
+
+		const title = seoData?.pageTitle || pageData?.title || "HypeMint";
+		const description =
+			seoData?.metaDescription ||
+			`${pageData?.title || slug} — HypeMint`;
 
 		return {
-			title: `${data.title} | HypeMint Docs`,
-			description: data.description || `Documentation for ${data.title}`,
+			title: `${title} | HypeMint`,
+			description,
+			keywords: seoData?.keywords,
+			robots: seoData?.robots,
+			alternates: seoData?.canonicalUrl
+				? { canonical: seoData.canonicalUrl }
+				: undefined,
+			openGraph: {
+				title: seoData?.ogTitle || title,
+				description: seoData?.ogDescription || description,
+				images: seoData?.ogImage ? [seoData.ogImage] : undefined,
+				type: (seoData?.ogType as "website" | "article") || "website",
+				url: seoData?.ogUrl || undefined,
+			},
+			twitter: {
+				card:
+					(seoData?.twitterCard as
+						| "summary"
+						| "summary_large_image") || "summary_large_image",
+				title: seoData?.twitterTitle || title,
+				description: seoData?.twitterDescription || description,
+				images: seoData?.twitterImage
+					? [seoData.twitterImage]
+					: undefined,
+			},
 		};
 	} catch (error) {
-		console.error("Error fetching doc metadata:", error);
-		return {
-			title: "Documentation | HypeMint",
-		};
+		console.error("Error fetching page metadata:", error);
+		return { title: "HypeMint" };
 	}
 }
 
-// Fetch doc data server-side
-async function getDocData(slug: string): Promise<DocData | null> {
+// Fetch page data server-side
+async function getPageData(slug: string): Promise<DocData | null> {
+	try {
+		const response = await fetch(`${API_BASE}/api/v1/pages/${slug}`, {
+			next: { revalidate: 3600 },
+			cache: "force-cache",
+		});
+
+		if (!response.ok) return null;
+
+		const json = await response.json();
+		return json?.data ?? null;
+	} catch (error) {
+		console.error("Error fetching page data:", error);
+		return null;
+	}
+}
+
+// Fetch SEO schema for structured data
+async function getSeoSchema(
+	slug: string,
+): Promise<Record<string, unknown> | null> {
 	try {
 		const response = await fetch(
-			`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/api/docs/${slug}`,
+			`${API_BASE}/api/v1/pages/${slug}/seo`,
 			{
-				next: { revalidate: 3600 }, // Revalidate every hour
+				next: { revalidate: 3600 },
 				cache: "force-cache",
 			},
 		);
 
-		if (!response.ok) {
-			return null;
-		}
+		if (!response.ok) return null;
 
-		return await response.json();
+		const json = await response.json();
+		return json?.data?.schemaJson ?? null;
 	} catch (error) {
-		console.error("Error fetching doc data:", error);
 		return null;
 	}
 }
 
 export default async function DocPage({ params }: DocPageProps) {
 	const { slug } = await params;
-	const docData = await getDocData(slug);
 
-	if (!docData) {
+	const [pageData, schemaJson] = await Promise.all([
+		getPageData(slug),
+		getSeoSchema(slug),
+	]);
+
+	if (!pageData) {
 		notFound();
 	}
 
 	return (
 		<div className="container mx-auto px-4 py-8 max-w-4xl">
+			{/* Structured data */}
+			{schemaJson && (
+				<script
+					type="application/ld+json"
+					dangerouslySetInnerHTML={{
+						__html: JSON.stringify(schemaJson),
+					}}
+				/>
+			)}
+
 			<article
 				className="
 					prose prose-invert prose-zinc 
@@ -108,12 +195,12 @@ export default async function DocPage({ params }: DocPageProps) {
 				{/* Header */}
 				<header className="mb-8 border-b border-zinc-800 pb-6 not-prose">
 					<h1 className="text-4xl font-bold mb-2 text-white">
-						{docData.title}
+						{pageData.title}
 					</h1>
-					{docData.updatedAt && (
+					{pageData.updatedAt && (
 						<p className="text-sm text-muted-foreground">
 							Last updated:{" "}
-							{new Date(docData.updatedAt).toLocaleDateString(
+							{new Date(pageData.updatedAt).toLocaleDateString(
 								"en-US",
 								{
 									year: "numeric",
@@ -126,7 +213,7 @@ export default async function DocPage({ params }: DocPageProps) {
 				</header>
 
 				{/* Content */}
-				<div dangerouslySetInnerHTML={{ __html: docData.content }} />
+				<div dangerouslySetInnerHTML={{ __html: pageData.content }} />
 			</article>
 		</div>
 	);

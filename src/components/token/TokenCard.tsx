@@ -54,7 +54,33 @@ function MiniPriceChart({ data }: { data?: Array<{ timestamp: number; price: num
 }
 
 /**
- * TokenCard - Pump.fun style token card with image, creator info, and bonding curve progress
+ * Get ATH progress bar color based on percentage.
+ * Green (0-60%) → Yellow (60-85%) → Orange/Red (85-100%)
+ */
+function getAthBarColors(progress: number) {
+	if (progress >= 85) {
+		return {
+			from: "#ff6b00",
+			to: "#ff2d00",
+			glow: "rgba(255, 107, 0, 0.5)",
+		};
+	}
+	if (progress >= 60) {
+		return {
+			from: "#ffd200",
+			to: "#ff8c00",
+			glow: "rgba(255, 210, 0, 0.4)",
+		};
+	}
+	return {
+		from: "#00ff88",
+		to: "#00cc6a",
+		glow: "rgba(0, 255, 136, 0.4)",
+	};
+}
+
+/**
+ * TokenCard - Pump.fun style token card with ATH progress bar
  */
 export function TokenCard({ token, className }: TokenCardProps) {
 	// Use priceChange24h from API (it's already calculated on backend)
@@ -81,12 +107,17 @@ export function TokenCard({ token, className }: TokenCardProps) {
 	// Check if token is graduated
 	const isGraduated = token.status === 'graduated';
 
-	// Bonding curve progress (0-100) - from backend API
-	const bondingProgress = useMemo(() => {
-		const progress = token.bondingCurveProgress ?? 0;
-		// Ensure it's a valid number between 0-100
+	// ATH progress (0-100) - currentPrice / ATH price
+	const athProgress = useMemo(() => {
+		const progress = token.athProgress ?? 0;
 		return Math.min(100, Math.max(0, progress));
-	}, [token.bondingCurveProgress]);
+	}, [token.athProgress]);
+
+	// ATH progress bar colors
+	const athColors = useMemo(() => getAthBarColors(athProgress), [athProgress]);
+
+	// Is ATH at 100%?
+	const isAtAth = athProgress >= 99.5;
 
 	// Format creator display name
 	const creatorDisplay = useMemo(() => {
@@ -118,7 +149,6 @@ export function TokenCard({ token, className }: TokenCardProps) {
 			<motion.div
 				initial={{ opacity: 0, y: 10 }}
 				animate={{ opacity: 1, y: 0 }}
-				// whileHover={{ scale: 1.01 }}
 				whileTap={{ scale: 0.99 }}
 				transition={{
 					type: "spring",
@@ -133,12 +163,15 @@ export function TokenCard({ token, className }: TokenCardProps) {
 					className,
 				)}
 			>
-				{/* Mini Chart - Top Right Corner BC */}
-				{/* {token.priceHistory && token.priceHistory.length > 0 && (
+				{/* Graduated Badge - Top Right Corner */}
+				{isGraduated && (
 					<div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 z-10">
-						<MiniPriceChart data={token.priceHistory} />
+						<span className="inline-flex items-center gap-0.5 px-1.5 sm:px-2 py-0.5 rounded-md bg-green-500/20 text-green-400 text-[8px] sm:text-[10px] font-semibold border border-green-500/30 backdrop-blur-sm">
+							<GraduationCap className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+							GRADUATED
+						</span>
 					</div>
-				)} */}
+				)}
 				
 				{/* Token Image - Square (responsive size) */}
 				<div className="shrink-0">
@@ -189,64 +222,53 @@ export function TokenCard({ token, className }: TokenCardProps) {
 						>
 							({priceChangePositive ? "+" : ""}{priceChange.toFixed(2)}%)
 						</span>
-						{/* Mini Progress Bar */}
-						{/* hide this on mobile */}
-						<div className="relative hidden md:block w-10 sm:w-22 h-1 sm:h-1.5 bg-[#222] rounded-full overflow-hidden shrink-0">
+					</div>
+
+					{/* Row 4: ATH Progress Bar + Percentage */}
+					<div className="flex items-center gap-1.5 sm:gap-2 mt-1 sm:mt-1.5">
+						<div className="relative flex-1 max-w-44 h-1.5 sm:h-2 bg-[#222] rounded-full overflow-hidden shrink-0">
 							<motion.div
 								initial={{ width: 0 }}
-								animate={{ width: `${Math.max(bondingProgress > 0 ? 4 : 0, bondingProgress)}%` }}
+								animate={{ width: `${Math.max(athProgress > 0 ? 4 : 0, athProgress)}%` }}
 								transition={{ duration: 0.8, ease: "easeOut" }}
-								className="h-full rounded-full bg-linear-to-r from-[#00ff88] to-[#00cc6a]"
+								className="h-full rounded-full"
 								style={{
-									minWidth: bondingProgress > 0 ? '3px' : '0px',
-									boxShadow: bondingProgress > 0 
-										? '0 0 6px rgba(0, 255, 136, 0.4)'
-										: 'none'
+									background: `linear-gradient(to right, ${athColors.from}, ${athColors.to})`,
+									minWidth: athProgress > 0 ? '3px' : '0px',
+									boxShadow: athProgress > 0
+										? `0 0 6px ${athColors.glow}`
+										: 'none',
 								}}
 							/>
+							{/* Spark animation at end when at ATH */}
+							{isAtAth && (
+								<motion.div
+									className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full"
+									style={{
+										background: `radial-gradient(circle, #fff 0%, ${athColors.to} 50%, transparent 100%)`,
+									}}
+									animate={{
+										scale: [1, 1.8, 1],
+										opacity: [0.8, 1, 0.8],
+									}}
+									transition={{
+										duration: 1.2,
+										repeat: Infinity,
+										ease: "easeInOut",
+									}}
+								/>
+							)}
 						</div>
-						<span className="text-[9px] sm:text-[10px] hidden md:block text-[#999] font-medium shrink-0">
-							{bondingProgress.toFixed(1)}%
+						<span className="text-[9px] sm:text-[10px] text-[#999] font-medium shrink-0">
+							{athProgress.toFixed(1)}%
 						</span>
 					</div>
 
-					{/* Row 4: Progress Bar + Percentage + Graduated Badge */}
-					<div className="flex items-center gap-1.5 sm:gap-2 mt-1 sm:mt-1.5">
-						{/* Mini Progress Bar */}
-						<div className="relative w-42 h-1 sm:h-1.5 bg-[#222] rounded-full overflow-hidden shrink-0 md:hidden block">
-							<motion.div
-								initial={{ width: 0 }}
-								animate={{ width: `${Math.max(bondingProgress > 0 ? 4 : 0, bondingProgress)}%` }}
-								transition={{ duration: 0.8, ease: "easeOut" }}
-								className="h-full rounded-full bg-linear-to-r from-[#00ff88] to-[#00cc6a]"
-								style={{
-									minWidth: bondingProgress > 0 ? '3px' : '0px',
-									boxShadow: bondingProgress > 0 
-										? '0 0 6px rgba(0, 255, 136, 0.4)'
-										: 'none'
-								}}
-							/>
-						</div>
-						<span className="text-[9px] sm:text-[10px] text-[#999] font-medium shrink-0 md:hidden ">
-							{bondingProgress.toFixed(1)}%
-						</span>
-						
-						{/* Graduated Badge */}
-						{isGraduated && (
-							<span className="inline-flex items-center gap-0.5 px-1 sm:px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 text-[8px] sm:text-[10px] font-medium shrink-0 ml-auto">
-								<GraduationCap className="h-2 w-2 sm:h-2.5 sm:w-2.5" />
-								<span className="hidden sm:inline">GRADUATED</span>
-								<span className="sm:hidden">GRAD</span>
-							</span>
-						)}
-					</div>
 					{truncatedDescription && (
-						<p className="text-[#666] text-[10px] sm:text-xs leading-relaxed line-clamp-1 hidden sm:block">
+						<p className="text-[#666] text-[10px] sm:text-xs leading-relaxed line-clamp-1 hidden sm:block mt-0.5">
 							{truncatedDescription}
 						</p>
 					)}
-
-					 
 				</div>
 			</motion.div>
 		</Link>

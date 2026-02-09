@@ -329,10 +329,18 @@ function HomePage() {
 									trade.bondingCurveProgress !== undefined
 										? trade.bondingCurveProgress
 										: token.bondingCurveProgress,
+								athProgress:
+									trade.athProgress !== undefined
+										? trade.athProgress
+										: token.athProgress,
 								marketCap:
 									trade.marketCap !== undefined
 										? trade.marketCap
 										: token.marketCap,
+								currentPrice:
+									trade.price !== undefined
+										? trade.price
+										: token.currentPrice,
 							};
 						}
 						return token;

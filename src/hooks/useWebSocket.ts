@@ -384,6 +384,7 @@ export function useGlobalTradeFeed(
     totalValue: string;
     timestamp: number;
     bondingCurveProgress?: number;
+    athProgress?: number;
     marketCap?: string;
   }) => void,
 ) {
