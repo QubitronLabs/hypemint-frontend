@@ -52,6 +52,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Token } from "@/types";
+import { useAuth } from "@/hooks";
 
 // Filter tabs configuration
 const FILTER_TABS = [
@@ -449,6 +450,7 @@ function HomePage() {
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
+	const { isAuthenticated } = useAuth();
 
 	// ─── URL-synced state ─────────────────────────────────────
 	const activeFilter = (() => {
@@ -973,7 +975,7 @@ function HomePage() {
 							</div>
 
 							{/* View Toggle + Filters */}
-							<div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+							<div className="flex items-center gap-2 w-full sm:w-auto  flex-wrap">
 								<TokenFilterPanel
 									appliedMcap={appliedMcap}
 									appliedVol={appliedVol}
@@ -1130,17 +1132,21 @@ function HomePage() {
 									<p className="text-muted-foreground text-xs sm:text-sm max-w-sm mb-3 sm:mb-4 px-4">
 										{searchQuery
 											? `No tokens match "${searchQuery}"`
-											: "Be the first to launch a token!"}
+											: !isAuthenticated
+												? `Connect your wallet to launch a token!`
+												: "Be the first to launch a token!"}
 									</p>
-									<Link href="/create">
-										<Button
-											variant="outline"
-											className="gap-1.5 sm:gap-2 text-sm h-9"
-										>
-											<Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-											Create Token
-										</Button>
-									</Link>
+									{isAuthenticated && (
+										<Link href="/create">
+											<Button
+												variant="outline"
+												className="gap-1.5 sm:gap-2 text-sm h-9"
+											>
+												<Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+												Create Token
+											</Button>
+										</Link>
+									)}
 								</motion.div>
 							) : viewMode === "grid" ? (
 								<motion.div

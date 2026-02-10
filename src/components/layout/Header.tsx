@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSidebarStore } from "@/lib/sidebar";
 import { SearchBox } from "@/components/search";
+import { useAuth } from "@/hooks";
 
 // Dynamic import DynamicWidget to prevent SSR issues
 const DynamicWidget = dynamic(
@@ -20,6 +21,7 @@ const DynamicWidget = dynamic(
 
 export function Header() {
 	const { toggle } = useSidebarStore();
+	const { isAuthenticated } = useAuth();
 
 	return (
 		<header className="fixed top-0 left-0 md:left-[70px] right-0 z-30 h-14 md:h-16 bg-card backdrop-blur-xl border-b border-border/50">
@@ -49,18 +51,20 @@ export function Header() {
 				{/* Actions */}
 				<div className="flex items-center gap-2 md:gap-4 shrink-0">
 					{/* Create Button */}
-					<Link href="/create" className="hidden sm:block">
-						<motion.div
-							whileHover={{ scale: 1.02 }}
-							whileTap={{ scale: 0.98 }}
-							className="h-9 md:h-10 px-3 md:px-4 rounded-lg bg-primary hover:bg-primary/90 transition-colors flex items-center gap-2 cursor-pointer"
-						>
-							<Plus className="h-4 w-4 text-primary-foreground" />
-							<span className="hidden md:inline font-semibold text-sm text-primary-foreground">
-								Create
-							</span>
-						</motion.div>
-					</Link>
+					{isAuthenticated && (
+						<Link href="/create" className="hidden sm:block">
+							<motion.div
+								whileHover={{ scale: 1.02 }}
+								whileTap={{ scale: 0.98 }}
+								className="h-9 md:h-10 px-3 md:px-4 rounded-lg bg-primary hover:bg-primary/90 transition-colors flex items-center gap-2 cursor-pointer"
+							>
+								<Plus className="h-4 w-4 text-primary-foreground" />
+								<span className="hidden md:inline font-semibold text-sm text-primary-foreground">
+									Create
+								</span>
+							</motion.div>
+						</Link>
+					)}
 
 					{/* Wallet - Compact on mobile */}
 					<div className="[&_button]:!h-9 md:[&_button]:!h-10 [&_button]:!rounded-xl [&_button]:!border-border/50 [&_button]:!bg-muted/50 [&_button]:!px-2 md:[&_button]:!px-3">

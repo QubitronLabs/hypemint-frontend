@@ -110,6 +110,8 @@ export function OnChainTradingPanel({
 	const [tradeType, setTradeType] = useState<TradeType>("buy");
 	const [amount, setAmount] = useState("");
 	const [slippage, setSlippage] = useState(5); // 5% default
+	// Track if approval just completed to prevent button flicker
+	const [justApproved, setJustApproved] = useState(false);
 
 	// Get dynamic native currency symbol
 	const nativeSymbol = useNativeCurrencySymbol();
@@ -204,6 +206,8 @@ export function OnChainTradingPanel({
 	// Check if needs approval for sell
 	const needsApproval = useMemo(() => {
 		if (tradeType !== "sell") return false;
+		// If approval just completed, don't require approval again
+		if (justApproved) return false;
 
 		// If no amount entered, check if allowance is zero or insufficient for any meaningful trade
 		if (!amount) {
@@ -217,7 +221,7 @@ export function OnChainTradingPanel({
 		} catch {
 			return false;
 		}
-	}, [tradeType, amount, allowance]);
+	}, [tradeType, amount, allowance, justApproved]);
 
 	// Calculate trade metrics with safety checks
 	const tradeMetrics = useMemo(() => {
@@ -455,11 +459,16 @@ export function OnChainTradingPanel({
 			console.log(
 				"[OnChainTrading] Approve confirmed, refetching allowance",
 			);
-			setTimeout(() => {
-				refetchAllowance();
-			}, 2000); // Wait 2s for blockchain state to update
+			// Set flag immediately to prevent button flicker
+			setJustApproved(true);
+			// Refetch allowance immediately (blockchain state is updated by now)
+			refetchAllowance();
 			toast.success("Approval confirmed! You can now sell tokens.");
 			resetApprove();
+			// Reset flag after a short delay
+			setTimeout(() => {
+				setJustApproved(false);
+			}, 3000);
 		}
 	}, [isApproveConfirmed, refetchAllowance, resetApprove]);
 
@@ -591,6 +600,8 @@ export function OnChainTradingPanel({
 		resetBuy();
 		resetSell();
 		resetApprove();
+		// Reset justApproved flag when switching trade types
+		setJustApproved(false);
 	}, [tradeType]);
 
 	return (

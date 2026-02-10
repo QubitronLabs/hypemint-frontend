@@ -101,7 +101,7 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
 	}, [createdTokens]);
 
 	// Not connected state
-	if (!isAuthenticated ) {
+	if (!isAuthenticated) {
 		return (
 			<div
 				className={cn(
@@ -233,12 +233,12 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
 							</TabsTrigger>
 						</TabsList>
 
-						<Link href="/create">
-							<Button className="gap-2 bg-linear-to-r from-primary to-purple-600">
+						{/* <Link href="/create">
+							<Button className="gap-2 ">
 								<Plus className="h-4 w-4" />
 								Create Token
 							</Button>
-						</Link>
+						</Link> */}
 					</div>
 
 					{/* Overview Tab */}
@@ -253,12 +253,6 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
 									Create your first memecoin and start earning
 									creator fees from every trade!
 								</p>
-								<Link href="/create">
-									<Button className="gap-2 bg-linear-to-r from-primary to-purple-600">
-										<Plus className="h-4 w-4" />
-										Create Your First Token
-									</Button>
-								</Link>
 							</div>
 						) : (
 							<>
@@ -368,12 +362,12 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
 									Launch your first token and start building
 									your community!
 								</p>
-								<Link href="/create">
+								{/* <Link href="/create">
 									<Button className="gap-2">
 										<Plus className="h-4 w-4" />
 										Create Token
 									</Button>
-								</Link>
+								</Link> */}
 							</div>
 						) : (
 							<div className="grid md:grid-cols-2 gap-4">

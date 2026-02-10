@@ -48,6 +48,37 @@ export function TrendingCarousel() {
 		return pickRandom(source as Token[], 20);
 	}, [trendingTokens]);
 
+	// Detect if screen is tablet or larger (>= 768px)
+	const [isTabletOrLarger, setIsTabletOrLarger] = useState(false);
+
+	useEffect(() => {
+		const mediaQuery = window.matchMedia("(min-width: 768px)");
+
+		// Set initial value
+		setIsTabletOrLarger(mediaQuery.matches);
+
+		// Listen for changes
+		const handleChange = (e: MediaQueryListEvent) => {
+			setIsTabletOrLarger(e.matches);
+		};
+
+		mediaQuery.addEventListener("change", handleChange);
+		return () => mediaQuery.removeEventListener("change", handleChange);
+	}, []);
+
+	// Conditionally enable autoplay only on tablet+ screens
+	const plugins = useMemo(() => {
+		if (!isTabletOrLarger) return [];
+
+		return [
+			Autoplay({
+				delay: 4000,
+				stopOnInteraction: false,
+				stopOnMouseEnter: true,
+			}),
+		];
+	}, [isTabletOrLarger]);
+
 	const [emblaRef, emblaApi] = useEmblaCarousel(
 		{
 			align: "start",
@@ -56,13 +87,7 @@ export function TrendingCarousel() {
 			containScroll: "trimSnaps",
 			slidesToScroll: 1,
 		},
-		[
-			Autoplay({
-				delay: 4000,
-				stopOnInteraction: false,
-				stopOnMouseEnter: true,
-			}),
-		],
+		plugins,
 	);
 
 	const [canScrollPrev, setCanScrollPrev] = useState(false);

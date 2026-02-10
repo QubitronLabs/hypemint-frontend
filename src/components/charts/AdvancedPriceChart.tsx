@@ -2923,8 +2923,6 @@ export function AdvancedPriceChart({
 		if (!isFinite(price) || price <= 0) return;
 
 		setCandles((prev) => {
-			if (prev.length === 0) return prev;
-
 			const intervalSec = (
 				{
 					"1m": 60,
@@ -2938,6 +2936,20 @@ export function AdvancedPriceChart({
 			)[timeRange];
 			const now = Math.floor(Date.now() / 1000);
 			const currentBar = Math.floor(now / intervalSec) * intervalSec;
+
+			// If no candles yet, create the first candle
+			if (prev.length === 0) {
+				return [
+					{
+						time: currentBar,
+						open: price,
+						high: price,
+						low: price,
+						close: price,
+						volume: 0,
+					},
+				];
+			}
 
 			const last = prev[prev.length - 1];
 			if (last.time === currentBar) {

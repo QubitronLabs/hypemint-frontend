@@ -125,14 +125,30 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 		}
 	}, [creatorProfile?.isFollowing]);
 
-	//  if the page is token/ then add overflow-y-clip to the body to prevent scrolling on the main page and only allow scrolling within the token detail page when it's open. This will ensure that when users open a token detail page, they can scroll through the content of that page without affecting the scroll position of the main page behind it.
-
+	// Prevent background scrolling on lg+ screens only (not on mobile)
 	useEffect(() => {
-		// Add overflow-y-clip to body when on token detail page
-		document.body.style.overflowY = "clip";
+		const mediaQuery = window.matchMedia("(min-width: 1024px)");
+
+		const applyOverflow = () => {
+			if (mediaQuery.matches) {
+				// Only apply overflow clip on lg+ screens
+				document.body.style.overflowY = "clip";
+			} else {
+				// Remove overflow clip on mobile/tablet
+				document.body.style.overflowY = "";
+			}
+		};
+
+		// Apply initial state
+		applyOverflow();
+
+		// Listen for screen size changes
+		mediaQuery.addEventListener("change", applyOverflow);
+
 		return () => {
-			// Remove overflow-y-clip when leaving token detail page
+			// Cleanup: remove overflow and listener
 			document.body.style.overflowY = "";
+			mediaQuery.removeEventListener("change", applyOverflow);
 		};
 	}, []);
 
@@ -382,6 +398,10 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 												? "linear-gradient(135deg, #ffd200, #ffb800, #ffe066)"
 												: "linear-gradient(135deg, #00ff88, #00cc6a, #22c55e)";
 
+									const bondingAmount = fromWei(
+										token.currentBondingAmount || "0",
+									);
+
 									return (
 										<div className="w-14 h-14 rounded-lg shrink-0 relative">
 											{/* Gradient border background */}
@@ -396,7 +416,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 											/>
 											{/* Inner image area - no pointer events propagation to border */}
 											<div
-												className="absolute inset-[2px] rounded-[6px] bg-muted overflow-hidden cursor-pointer z-[1]"
+												className="absolute inset-[2px] p-1 rounded-lg bg-muted overflow-hidden cursor-pointer z-[1]"
 												onClick={() =>
 													setShowImageModal(true)
 												}
@@ -414,7 +434,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 														width={52}
 														height={52}
 														unoptimized
-														className="object-cover w-full h-full"
+														className="object-cover w-full h-full rounded-[6px]"
 													/>
 												) : (
 													<div className="w-full h-full flex items-center justify-center text-lg font-bold text-muted-foreground">
@@ -425,44 +445,68 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 													</div>
 												)}
 											</div>
-											{/* Border-only hover zone for graduated tooltip */}
-											{isGraduated && (
-												<TooltipProvider>
-													<Tooltip>
-														<TooltipTrigger asChild>
-															<div
-																className="absolute inset-0 rounded-lg z-[2] pointer-events-none"
-																style={
-																	{
-																		/* Ring that only catches pointer events on the 2px border */
-																	}
+											{/* Border-only hover zone with tooltip - always shown */}
+											<TooltipProvider>
+												<Tooltip>
+													<TooltipTrigger asChild>
+														<div
+															className="absolute inset-0 rounded-lg z-[2] pointer-events-none"
+															style={
+																{
+																	/* Ring that only catches pointer events on the 2px border */
 																}
-															>
-																{/* Top edge */}
-																<div className="absolute top-0 left-0 right-0 h-[2px] pointer-events-auto cursor-help" />
-																{/* Bottom edge */}
-																<div className="absolute bottom-0 left-0 right-0 h-[2px] pointer-events-auto cursor-help" />
-																{/* Left edge */}
-																<div className="absolute top-0 left-0 bottom-0 w-[2px] pointer-events-auto cursor-help" />
-																{/* Right edge */}
-																<div className="absolute top-0 right-0 bottom-0 w-[2px] pointer-events-auto cursor-help" />
-															</div>
-														</TooltipTrigger>
-														<TooltipContent
-															side="top"
-															className="bg-zinc-900 border-zinc-700 text-white text-xs"
-															arrowClassName="bg-zinc-900 fill-zinc-900"
+															}
 														>
+															{/* Top edge */}
+															<div className="absolute top-0 left-0 right-0 h-[2px] pointer-events-auto cursor-help" />
+															{/* Bottom edge */}
+															<div className="absolute bottom-0 left-0 right-0 h-[2px] pointer-events-auto cursor-help" />
+															{/* Left edge */}
+															<div className="absolute top-0 left-0 bottom-0 w-[2px] pointer-events-auto cursor-help" />
+															{/* Right edge */}
+															<div className="absolute top-0 right-0 bottom-0 w-[2px] pointer-events-auto cursor-help" />
+														</div>
+													</TooltipTrigger>
+													<TooltipContent
+														side="top"
+														className="bg-zinc-900 border-zinc-700 text-white text-xs"
+														arrowClassName="bg-zinc-900 fill-zinc-900"
+													>
+														{isGraduated ? (
 															<p>
 																This coin has
 																graduated from
 																the bonding
 																curve
 															</p>
-														</TooltipContent>
-													</Tooltip>
-												</TooltipProvider>
-											)}
+														) : (
+															<div>
+																<p className="font-semibold">
+																	Bonding
+																	Curve
+																	Progress:{" "}
+																	{progress.toFixed(
+																		1,
+																	)}
+																	%
+																</p>
+																<p className="text-zinc-400 mt-0.5">
+																	There is{" "}
+																	{bondingAmount.toFixed(
+																		4,
+																	)}{" "}
+																	{
+																		nativeSymbol
+																	}{" "}
+																	in the
+																	bonding
+																	curve
+																</p>
+															</div>
+														)}
+													</TooltipContent>
+												</Tooltip>
+											</TooltipProvider>
 										</div>
 									);
 								})()}
@@ -630,7 +674,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 										<TooltipProvider>
 											<Tooltip>
 												<TooltipTrigger asChild>
-													<div className="relative w-24 sm:w-34 h-2 bg-[#222] rounded-full cursor-help">
+													<div className="relative w-48 sm:w-68 h-2 bg-[#222] rounded-full cursor-help">
 														<motion.div
 															initial={{
 																width: 0,
@@ -699,7 +743,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 																}}
 																src="/spark.gif"
 																alt="ATH"
-																className="absolute -right-3.5 top-1/2 -translate-y-1/2  sm:size-9 pointer-events-none"
+																className="absolute -right-3.5 top-1/2 -translate-y-1/2 size-9 pointer-events-none"
 															/>
 														)}
 													</div>

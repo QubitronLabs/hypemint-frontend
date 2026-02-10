@@ -286,7 +286,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
 									}}
 									src="/spark.gif"
 									alt="ATH"
-									className="absolute -right-4 top-1/2 -translate-y-1/2  sm:size-10 pointer-events-none"
+									className="absolute -right-4 top-1/2 -translate-y-1/2 size-10 pointer-events-none"
 								/>
 							)}
 						</div>

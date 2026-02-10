@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useSidebarStore } from "@/lib/sidebar";
+import { useAuth } from "@/hooks";
 
 const navItems = [
 	{ icon: Home, label: "Home", href: "/" },
@@ -24,12 +25,13 @@ const navItems = [
 	{ icon: Video, label: "Live", href: "/livestreams", disabled: true },
 	{ icon: Terminal, label: "Terminal", href: "/terminal", disabled: true },
 	{ icon: User, label: "Profile", href: "/profile" },
-	{ icon: HelpCircle, label: "Help", href: "/support", disabled: true },
+	{ icon: HelpCircle, label: "Help", href: "/docs/faq", disabled: false },
 ];
 
 export function Sidebar() {
 	const pathname = usePathname();
 	const { isOpen, close } = useSidebarStore();
+	const { isAuthenticated } = useAuth();
 
 	// Prevent body scroll on mobile when sidebar is open
 	useEffect(() => {
@@ -93,7 +95,7 @@ export function Sidebar() {
 						<motion.div
 							whileHover={{ scale: 1.05 }}
 							whileTap={{ scale: 0.95 }}
-							className="w-10 h-10 rounded-xl flex items-center justify-center"
+							className="size-8.5 rounded-xl flex items-center justify-center"
 						>
 							<img src="/hypemint-logo.webp" alt="HypeMint" />
 						</motion.div>
@@ -162,18 +164,20 @@ export function Sidebar() {
 
 				{/* Create Button */}
 				<div className="p-3 border-t border-border/50">
-					<Link href="/create" onClick={handleNavClick}>
-						<motion.div
-							whileHover={{ scale: 1.03 }}
-							whileTap={{ scale: 0.97 }}
-							className="w-full h-11 flex flex-col items-center justify-center gap-0.5 rounded-lg bg-primary hover:bg-primary/90 transition-colors cursor-pointer"
-						>
-							<Plus className="h-4 w-4 text-primary-foreground" />
-							<span className="text-[9px] font-semibold text-primary-foreground">
-								Create
-							</span>
-						</motion.div>
-					</Link>
+					{isAuthenticated && (
+						<Link href="/create" onClick={handleNavClick}>
+							<motion.div
+								whileHover={{ scale: 1.03 }}
+								whileTap={{ scale: 0.97 }}
+								className="w-full h-11 flex flex-col items-center justify-center gap-0.5 rounded-lg bg-primary hover:bg-primary/90 transition-colors cursor-pointer"
+							>
+								<Plus className="h-4 w-4 text-primary-foreground" />
+								<span className="text-[9px] font-semibold text-primary-foreground">
+									Create
+								</span>
+							</motion.div>
+						</Link>
+					)}
 				</div>
 			</aside>
 		</>
