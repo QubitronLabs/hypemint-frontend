@@ -22,6 +22,13 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 // import { AdvancedPriceChart } from "@/components/charts";
 const AdvancedPriceChart = dynamic(
 	() => import("@/components/charts").then((mod) => mod.AdvancedPriceChart),
@@ -74,6 +81,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 	const [localIsFollowing, setLocalIsFollowing] = useState(false);
 	const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 	const [showBubbleMap, setShowBubbleMap] = useState(false);
+	const [showImageModal, setShowImageModal] = useState(false);
 	const nativeSymbol = useNativeCurrencySymbol();
 
 	// Auth and follow hooks
@@ -359,27 +367,106 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						<div className="flex flex-col md:flex-row items-start justify-between gap-4">
 							{/* Left side: Image, Name, Symbol, Creator, Time */}
 							<div className="flex items-center gap-3 min-w-0">
-								<div className="w-12 h-12 rounded-lg bg-muted overflow-hidden shrink-0">
-									{token.imageUrl ? (
-										<Image
-											src={token.imageUrl.replace(
-												"0.0.0.0",
-												"localhost",
-											)}
-											alt={token.name || "Token"}
-											width={48}
-											height={48}
-											unoptimized
-											className="object-cover w-full h-full"
-										/>
-									) : (
-										<div className="w-full h-full flex items-center justify-center text-lg font-bold text-muted-foreground">
-											{token.symbol?.slice(0, 2) || "??"}
-										</div>
-									)}
-								</div>
+								{/* Token Image with dynamic gradient border */}
+								{(() => {
+									const progress =
+										token.bondingCurveProgress ?? 0;
+									const isGraduated =
+										token.status === "graduated" ||
+										progress >= 100;
+									const borderGradient = isGraduated
+										? "linear-gradient(135deg, #ffd700, #ff8c00, #ffd700)"
+										: progress > 80
+											? "linear-gradient(135deg, #ff8c00, #ff6b00, #ffa040)"
+											: progress > 60
+												? "linear-gradient(135deg, #ffd200, #ffb800, #ffe066)"
+												: "linear-gradient(135deg, #00ff88, #00cc6a, #22c55e)";
 
-								<div className="min-w-0">
+									return (
+										<div className="w-14 h-14 rounded-lg shrink-0 relative">
+											{/* Gradient border background */}
+											<div
+												className="absolute inset-0 rounded-lg cursor-pointer transition-transform hover:scale-105"
+												style={{
+													background: borderGradient,
+												}}
+												onClick={() =>
+													setShowImageModal(true)
+												}
+											/>
+											{/* Inner image area - no pointer events propagation to border */}
+											<div
+												className="absolute inset-[2px] rounded-[6px] bg-muted overflow-hidden cursor-pointer z-[1]"
+												onClick={() =>
+													setShowImageModal(true)
+												}
+											>
+												{token.imageUrl ? (
+													<Image
+														src={token.imageUrl.replace(
+															"0.0.0.0",
+															"localhost",
+														)}
+														alt={
+															token.name ||
+															"Token"
+														}
+														width={52}
+														height={52}
+														unoptimized
+														className="object-cover w-full h-full"
+													/>
+												) : (
+													<div className="w-full h-full flex items-center justify-center text-lg font-bold text-muted-foreground">
+														{token.symbol?.slice(
+															0,
+															2,
+														) || "??"}
+													</div>
+												)}
+											</div>
+											{/* Border-only hover zone for graduated tooltip */}
+											{isGraduated && (
+												<TooltipProvider>
+													<Tooltip>
+														<TooltipTrigger asChild>
+															<div
+																className="absolute inset-0 rounded-lg z-[2] pointer-events-none"
+																style={
+																	{
+																		/* Ring that only catches pointer events on the 2px border */
+																	}
+																}
+															>
+																{/* Top edge */}
+																<div className="absolute top-0 left-0 right-0 h-[2px] pointer-events-auto cursor-help" />
+																{/* Bottom edge */}
+																<div className="absolute bottom-0 left-0 right-0 h-[2px] pointer-events-auto cursor-help" />
+																{/* Left edge */}
+																<div className="absolute top-0 left-0 bottom-0 w-[2px] pointer-events-auto cursor-help" />
+																{/* Right edge */}
+																<div className="absolute top-0 right-0 bottom-0 w-[2px] pointer-events-auto cursor-help" />
+															</div>
+														</TooltipTrigger>
+														<TooltipContent
+															side="top"
+															className="bg-zinc-900 border-zinc-700 text-white text-xs"
+															arrowClassName="bg-zinc-900 fill-zinc-900"
+														>
+															<p>
+																This coin has
+																graduated from
+																the bonding
+																curve
+															</p>
+														</TooltipContent>
+													</Tooltip>
+												</TooltipProvider>
+											)}
+										</div>
+									);
+								})()}
+								<div>
 									<div className="flex items-center gap-2 flex-wrap">
 										<h1 className="text-lg font-bold truncate">
 											{token.name}
@@ -540,60 +627,97 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 										ATH Progress
 									</p>
 									<div className="flex items-center gap-2">
-										<div className="relative w-20 sm:w-28 h-2 bg-[#222] rounded-full">
-											<motion.div
-												initial={{ width: 0 }}
-												animate={{
-													width: `${Math.min(100, Math.max(0, token.athProgress ?? 0))}%`,
-												}}
-												transition={{
-													duration: 0.8,
-													ease: "easeOut",
-												}}
-												className="h-full rounded-full"
-												style={{
-													background: (() => {
-														const p =
-															token.athProgress ??
-															0;
-														if (p >= 85)
-															return "linear-gradient(to right, #ff6b00, #ff2d00)";
-														if (p >= 60)
-															return "linear-gradient(to right, #ffd200, #ff8c00)";
-														return "linear-gradient(to right, #00ff88, #00cc6a)";
-													})(),
-													boxShadow:
-														(token.athProgress ??
-															0) > 0
-															? (() => {
-																	const p =
-																		token.athProgress ??
-																		0;
-																	if (p >= 85)
-																		return "0 0 8px rgba(255, 107, 0, 0.5)";
-																	if (p >= 60)
-																		return "0 0 8px rgba(255, 210, 0, 0.4)";
-																	return "0 0 8px rgba(0, 255, 136, 0.4)";
-																})()
-															: "none",
-												}}
-											/>
-											{(token.athProgress ?? 0) >=
-												99.5 && (
-												<motion.img
-													initial={{ opacity: 0 }}
-													animate={{ opacity: 1 }}
-													transition={{
-														delay: 0.8,
-														duration: 0.5,
-														ease: "easeOut",
-													}}
-													src="/sparkle-small.gif"
-													alt="ATH"
-													className="absolute -right-3.5 top-1/2 -translate-y-1/2  sm:size-9 pointer-events-none"
-												/>
-											)}
-										</div>
+										<TooltipProvider>
+											<Tooltip>
+												<TooltipTrigger asChild>
+													<div className="relative w-24 sm:w-34 h-2 bg-[#222] rounded-full cursor-help">
+														<motion.div
+															initial={{
+																width: 0,
+															}}
+															animate={{
+																width: `${Math.min(100, Math.max(0, token.athProgress ?? 0))}%`,
+															}}
+															transition={{
+																duration: 0.8,
+																ease: "easeOut",
+															}}
+															className="h-full rounded-full"
+															style={{
+																background:
+																	(() => {
+																		const p =
+																			token.athProgress ??
+																			0;
+																		if (
+																			p >=
+																			85
+																		)
+																			return "linear-gradient(to right, #ff6b00, #ff2d00)";
+																		if (
+																			p >=
+																			60
+																		)
+																			return "linear-gradient(to right, #ffd200, #ff8c00)";
+																		return "linear-gradient(to right, #00ff88, #00cc6a)";
+																	})(),
+																boxShadow:
+																	(token.athProgress ??
+																		0) > 0
+																		? (() => {
+																				const p =
+																					token.athProgress ??
+																					0;
+																				if (
+																					p >=
+																					85
+																				)
+																					return "0 0 8px rgba(255, 107, 0, 0.5)";
+																				if (
+																					p >=
+																					60
+																				)
+																					return "0 0 8px rgba(255, 210, 0, 0.4)";
+																				return "0 0 8px rgba(0, 255, 136, 0.4)";
+																			})()
+																		: "none",
+															}}
+														/>
+														{(token.athProgress ??
+															0) >= 99.5 && (
+															<motion.img
+																initial={{
+																	opacity: 0,
+																}}
+																animate={{
+																	opacity: 1,
+																}}
+																transition={{
+																	delay: 0.8,
+																	duration: 0.5,
+																	ease: "easeOut",
+																}}
+																src="/spark.gif"
+																alt="ATH"
+																className="absolute -right-3.5 top-1/2 -translate-y-1/2  sm:size-9 pointer-events-none"
+															/>
+														)}
+													</div>
+												</TooltipTrigger>
+
+												<TooltipContent
+													side="top"
+													className="bg-zinc-900 border-zinc-700 text-white text-xs"
+													arrowClassName="bg-zinc-900 fill-zinc-900"
+												>
+													<p>
+														This bar shows the
+														current market cap
+														relative to ATH
+													</p>
+												</TooltipContent>
+											</Tooltip>
+										</TooltipProvider>
 										<span
 											className="text-sm font-semibold tabular-nums"
 											style={{
@@ -1028,6 +1152,41 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 
 			{/* Share Modal */}
 			<ShareMenuComponent />
+
+			{/* Image Preview Modal */}
+			<Dialog open={showImageModal} onOpenChange={setShowImageModal}>
+				<DialogContent className="sm:max-w-lg bg-card/95 backdrop-blur-xl border-border p-0 overflow-hidden">
+					<DialogTitle className="sr-only">
+						{token.name} Preview
+					</DialogTitle>
+					<div className="flex flex-col items-center">
+						<div className="text-center py-4">
+							<h2 className="text-lg font-bold">{token.name}</h2>
+							<p className="text-sm text-muted-foreground">
+								${token.symbol}
+							</p>
+						</div>
+						{token.imageUrl ? (
+							<div className="w-full aspect-square max-h-[70vh] relative">
+								<Image
+									src={token.imageUrl.replace(
+										"0.0.0.0",
+										"localhost",
+									)}
+									alt={token.name || "Token"}
+									fill
+									unoptimized
+									className="object-contain"
+								/>
+							</div>
+						) : (
+							<div className="w-full aspect-square flex items-center justify-center text-6xl font-bold text-muted-foreground bg-muted">
+								{token.symbol?.slice(0, 2) || "??"}
+							</div>
+						)}
+					</div>
+				</DialogContent>
+			</Dialog>
 
 			{/* Bubble Map Dialog */}
 			<BubbleMapDialog

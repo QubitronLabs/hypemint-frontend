@@ -19,10 +19,20 @@ import {
 	Search,
 	AlertCircle,
 	RefreshCw,
+	SlidersHorizontal,
+	X,
+	Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Slider } from "@/components/ui/slider";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
 import { TokenCard, TokenListItem } from "@/components/token";
 import { TrendingCarousel } from "@/components/token/TrendingCarousel";
 import {
@@ -83,6 +93,356 @@ interface ActivityItem {
 	tokenName?: string;
 	message: string;
 	timestamp: number;
+}
+
+// ─── Filter Constants ─────────────────────────────────────
+const MCAP_MIN = 1000;
+const MCAP_MAX = 50000000;
+const VOL_MIN = 0;
+const VOL_MAX = 500000;
+
+function formatFilterValue(v: number): string {
+	if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+	if (v >= 1e3) return `$${(v / 1e3).toFixed(1)}K`;
+	return `$${v}`;
+}
+
+function parseFilterInput(val: string): number {
+	const cleaned = val.replace(/[^0-9.kmb]/gi, "");
+	const match = cleaned.match(/^([\d.]+)\s*(k|m|b)?$/i);
+	if (!match) return NaN;
+	const num = parseFloat(match[1]);
+	const suffix = (match[2] || "").toLowerCase();
+	if (suffix === "k") return num * 1000;
+	if (suffix === "m") return num * 1000000;
+	if (suffix === "b") return num * 1000000000;
+	return num;
+}
+
+// ─── Token Filter Panel Component ─────────────────────────
+interface TokenFilterPanelProps {
+	appliedMcap: [number, number] | null;
+	appliedVol: [number, number] | null;
+	onApply: (
+		mcap: [number, number] | null,
+		vol: [number, number] | null,
+	) => void;
+	onRemove: (type: "mcap" | "vol") => void;
+}
+
+function TokenFilterPanel({
+	appliedMcap,
+	appliedVol,
+	onApply,
+	onRemove,
+}: TokenFilterPanelProps) {
+	const [filterOpen, setFilterOpen] = useState(false);
+	const [mcapRange, setMcapRange] = useState<[number, number]>(
+		appliedMcap ?? [MCAP_MIN, MCAP_MAX],
+	);
+	const [volRange, setVolRange] = useState<[number, number]>(
+		appliedVol ?? [VOL_MIN, VOL_MAX],
+	);
+	const [mcapMinInput, setMcapMinInput] = useState("");
+	const [mcapMaxInput, setMcapMaxInput] = useState("");
+	const [volMinInput, setVolMinInput] = useState("");
+	const [volMaxInput, setVolMaxInput] = useState("");
+
+	const activeFilterCount = (appliedMcap ? 1 : 0) + (appliedVol ? 1 : 0);
+
+	const syncMcapInputs = (range: [number, number]) => {
+		setMcapMinInput(
+			range[0] <= MCAP_MIN
+				? ""
+				: formatFilterValue(range[0]).replace("$", ""),
+		);
+		setMcapMaxInput(
+			range[1] >= MCAP_MAX
+				? ""
+				: formatFilterValue(range[1]).replace("$", ""),
+		);
+	};
+
+	const syncVolInputs = (range: [number, number]) => {
+		setVolMinInput(
+			range[0] <= VOL_MIN
+				? ""
+				: formatFilterValue(range[0]).replace("$", ""),
+		);
+		setVolMaxInput(
+			range[1] >= VOL_MAX
+				? ""
+				: formatFilterValue(range[1]).replace("$", ""),
+		);
+	};
+
+	const handleApply = () => {
+		const isMcapDefault =
+			mcapRange[0] <= MCAP_MIN && mcapRange[1] >= MCAP_MAX;
+		const isVolDefault = volRange[0] <= VOL_MIN && volRange[1] >= VOL_MAX;
+		onApply(
+			isMcapDefault ? null : [...mcapRange],
+			isVolDefault ? null : [...volRange],
+		);
+		setFilterOpen(false);
+	};
+
+	const handleClear = () => {
+		setMcapRange([MCAP_MIN, MCAP_MAX]);
+		setVolRange([VOL_MIN, VOL_MAX]);
+		setMcapMinInput("");
+		setMcapMaxInput("");
+		setVolMinInput("");
+		setVolMaxInput("");
+		onApply(null, null);
+		setFilterOpen(false);
+	};
+
+	return (
+		<>
+			{/* Active Filter Pills */}
+			{appliedMcap && (
+				<button
+					onClick={() => onRemove("mcap")}
+					className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary text-xs font-medium hover:bg-primary/25 transition-all"
+				>
+					<span>
+						MCap: {formatFilterValue(appliedMcap[0])} -{" "}
+						{formatFilterValue(appliedMcap[1])}
+					</span>
+					<X className="w-3 h-3" />
+				</button>
+			)}
+			{appliedVol && (
+				<button
+					onClick={() => onRemove("vol")}
+					className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary text-xs font-medium hover:bg-primary/25 transition-all"
+				>
+					<span>
+						Vol: {formatFilterValue(appliedVol[0])} -{" "}
+						{formatFilterValue(appliedVol[1])}
+					</span>
+					<X className="w-3 h-3" />
+				</button>
+			)}
+
+			{/* Filter Popover */}
+			<Popover open={filterOpen} onOpenChange={setFilterOpen}>
+				<PopoverTrigger asChild>
+					<button
+						className={cn(
+							"flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all border",
+							activeFilterCount > 0
+								? "bg-primary/10 border-primary/30 text-primary"
+								: "bg-card/60 border-border/60 text-muted-foreground hover:text-foreground",
+						)}
+					>
+						{activeFilterCount > 0 ? (
+							<>
+								<span>Filtered {activeFilterCount}</span>
+								<SlidersHorizontal className="w-3.5 h-3.5" />
+							</>
+						) : (
+							<>
+								<span>Filter</span>
+								<SlidersHorizontal className="w-3.5 h-3.5" />
+							</>
+						)}
+					</button>
+				</PopoverTrigger>
+				<PopoverContent
+					align="end"
+					className="w-[340px] sm:w-[400px] p-4 bg-card border-border"
+					sideOffset={8}
+				>
+					<div className="space-y-5">
+						{/* Mcap Filter */}
+						<div className="space-y-3">
+							<div className="flex items-center justify-between">
+								<span className="text-sm font-semibold">
+									Mcap
+								</span>
+								<span className="text-xs text-muted-foreground">
+									{formatFilterValue(mcapRange[0])} -{" "}
+									{formatFilterValue(mcapRange[1])}+
+								</span>
+							</div>
+							<Slider
+								value={mcapRange}
+								min={MCAP_MIN}
+								max={MCAP_MAX}
+								step={1000}
+								onValueChange={(val) => {
+									const v = val as [number, number];
+									setMcapRange(v);
+									syncMcapInputs(v);
+								}}
+								className="w-full"
+							/>
+							<div className="flex items-center justify-between text-[11px] text-muted-foreground">
+								<span>$1.0K</span>
+								<span>$50.0M+</span>
+							</div>
+							<div className="grid grid-cols-2 gap-3">
+								<div>
+									<label className="text-[11px] text-muted-foreground mb-1 block">
+										Minimum
+									</label>
+									<Input
+										placeholder="e.g., 10k, 1m"
+										value={mcapMinInput}
+										onChange={(e) => {
+											setMcapMinInput(e.target.value);
+											const parsed = parseFilterInput(
+												e.target.value,
+											);
+											if (
+												!isNaN(parsed) &&
+												parsed >= MCAP_MIN &&
+												parsed < mcapRange[1]
+											) {
+												setMcapRange([
+													parsed,
+													mcapRange[1],
+												]);
+											}
+										}}
+										className="h-8 text-xs bg-muted/50"
+									/>
+								</div>
+								<div>
+									<label className="text-[11px] text-muted-foreground mb-1 block">
+										Maximum
+									</label>
+									<Input
+										placeholder="e.g., 10k, 1m"
+										value={mcapMaxInput}
+										onChange={(e) => {
+											setMcapMaxInput(e.target.value);
+											const parsed = parseFilterInput(
+												e.target.value,
+											);
+											if (
+												!isNaN(parsed) &&
+												parsed <= MCAP_MAX &&
+												parsed > mcapRange[0]
+											) {
+												setMcapRange([
+													mcapRange[0],
+													parsed,
+												]);
+											}
+										}}
+										className="h-8 text-xs bg-muted/50"
+									/>
+								</div>
+							</div>
+						</div>
+
+						{/* Volume Filter */}
+						<div className="space-y-3">
+							<div className="flex items-center justify-between">
+								<span className="text-sm font-semibold">
+									24h Vol
+								</span>
+								<span className="text-xs text-muted-foreground">
+									{formatFilterValue(volRange[0])} -{" "}
+									{formatFilterValue(volRange[1])}+
+								</span>
+							</div>
+							<Slider
+								value={volRange}
+								min={VOL_MIN}
+								max={VOL_MAX}
+								step={500}
+								onValueChange={(val) => {
+									const v = val as [number, number];
+									setVolRange(v);
+									syncVolInputs(v);
+								}}
+								className="w-full"
+							/>
+							<div className="flex items-center justify-between text-[11px] text-muted-foreground">
+								<span>$0</span>
+								<span>$500.0K+</span>
+							</div>
+							<div className="grid grid-cols-2 gap-3">
+								<div>
+									<label className="text-[11px] text-muted-foreground mb-1 block">
+										Minimum
+									</label>
+									<Input
+										placeholder="e.g., 5k, 100k"
+										value={volMinInput}
+										onChange={(e) => {
+											setVolMinInput(e.target.value);
+											const parsed = parseFilterInput(
+												e.target.value,
+											);
+											if (
+												!isNaN(parsed) &&
+												parsed >= VOL_MIN &&
+												parsed < volRange[1]
+											) {
+												setVolRange([
+													parsed,
+													volRange[1],
+												]);
+											}
+										}}
+										className="h-8 text-xs bg-muted/50"
+									/>
+								</div>
+								<div>
+									<label className="text-[11px] text-muted-foreground mb-1 block">
+										Maximum
+									</label>
+									<Input
+										placeholder="e.g., 5k, 100k"
+										value={volMaxInput}
+										onChange={(e) => {
+											setVolMaxInput(e.target.value);
+											const parsed = parseFilterInput(
+												e.target.value,
+											);
+											if (
+												!isNaN(parsed) &&
+												parsed <= VOL_MAX &&
+												parsed > volRange[0]
+											) {
+												setVolRange([
+													volRange[0],
+													parsed,
+												]);
+											}
+										}}
+										className="h-8 text-xs bg-muted/50"
+									/>
+								</div>
+							</div>
+						</div>
+
+						{/* Actions */}
+						<div className="flex gap-3 pt-1">
+							<Button
+								variant="outline"
+								className="flex-1 h-9"
+								onClick={handleClear}
+							>
+								Clear
+							</Button>
+							<Button
+								className="flex-1 h-9"
+								onClick={handleApply}
+							>
+								Apply
+							</Button>
+						</div>
+					</div>
+				</PopoverContent>
+			</Popover>
+		</>
+	);
 }
 
 function HomePage() {
@@ -180,6 +540,25 @@ function HomePage() {
 	const [mounted, setMounted] = useState(false);
 	const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
 	void activityFeed; // Collected from WebSocket events, available for future UI
+
+	// ─── Filter state (managed here, UI delegated to TokenFilterPanel) ──
+	const [appliedMcap, setAppliedMcap] = useState<[number, number] | null>(
+		null,
+	);
+	const [appliedVol, setAppliedVol] = useState<[number, number] | null>(null);
+
+	const handleFilterApply = useCallback(
+		(mcap: [number, number] | null, vol: [number, number] | null) => {
+			setAppliedMcap(mcap);
+			setAppliedVol(vol);
+		},
+		[],
+	);
+
+	const handleFilterRemove = useCallback((type: "mcap" | "vol") => {
+		if (type === "mcap") setAppliedMcap(null);
+		else setAppliedVol(null);
+	}, []);
 
 	// Scroll to top when page changes
 	useEffect(() => {
@@ -505,7 +884,7 @@ function HomePage() {
 	]);
 
 	// Filter by search query from URL
-	const filteredTokens = searchQuery
+	const searchFilteredTokens = searchQuery
 		? tokens.filter(
 				(token: Token) =>
 					token.name
@@ -516,6 +895,17 @@ function HomePage() {
 						.includes(searchQuery.toLowerCase()),
 			)
 		: tokens;
+
+	// Apply client-side mcap + volume filters
+	const filteredTokens = searchFilteredTokens.filter((token: Token) => {
+		const mcap = parseFloat(token.marketCap || "0");
+		const vol = parseFloat(token.volume24h || "0");
+		if (appliedMcap && (mcap < appliedMcap[0] || mcap > appliedMcap[1]))
+			return false;
+		if (appliedVol && (vol < appliedVol[0] || vol > appliedVol[1]))
+			return false;
+		return true;
+	});
 
 	if (!mounted) return null;
 
@@ -582,8 +972,16 @@ function HomePage() {
 								</div>
 							</div>
 
-							{/* View Toggle */}
-							<div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+							{/* View Toggle + Filters */}
+							<div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+								<TokenFilterPanel
+									appliedMcap={appliedMcap}
+									appliedVol={appliedVol}
+									onApply={handleFilterApply}
+									onRemove={handleFilterRemove}
+								/>
+
+								{/* View Toggle */}
 								<div className="flex bg-card/60 backdrop-blur-md p-0.5 rounded-lg border border-border/60 shrink-0">
 									<button
 										onClick={() => setViewMode("grid")}
@@ -610,6 +1008,14 @@ function HomePage() {
 										<List className="w-4 h-4" />
 									</button>
 								</div>
+
+								{/* Settings icon */}
+								<button
+									className="p-1.5 sm:p-2 rounded-lg bg-card/60 border border-border/60 text-muted-foreground hover:text-foreground transition-all"
+									title="Settings"
+								>
+									<Settings className="w-4 h-4" />
+								</button>
 							</div>
 						</motion.div>
 

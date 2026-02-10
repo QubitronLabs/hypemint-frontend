@@ -22,7 +22,7 @@ import {
 	Type,
 	GitFork,
 	ChevronDown,
-	Settings2,
+	ChevronUp,
 	LineChart,
 	Undo2,
 	Activity,
@@ -35,9 +35,13 @@ import {
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
-	DropdownMenuSeparator,
-	DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ============================================================================
 // Types
@@ -289,6 +293,7 @@ export function AdvancedPriceChart({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const chartRootRef = useRef<HTMLDivElement>(null);
+	const sidebarRef = useRef<HTMLDivElement>(null);
 	const rafRef = useRef<number>(0);
 
 	// State
@@ -303,6 +308,10 @@ export function AdvancedPriceChart({
 		null,
 	);
 	const [allDrawingsLocked, setAllDrawingsLocked] = useState(false);
+
+	// Sidebar scroll indicator state
+	const [canScrollUp, setCanScrollUp] = useState(false);
+	const [canScrollDown, setCanScrollDown] = useState(false);
 	const [isPanning, setIsPanning] = useState(false);
 
 	// Indicators
@@ -2664,8 +2673,7 @@ export function AdvancedPriceChart({
 		[dims.w],
 	);
 
-	// Escape key to cancel drawing, Delete to remove selected
-	// Keyboard shortcuts
+	// Keyboard shortcuts — TradingView-style Alt+key combos for drawing tools
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			// Don't trigger shortcuts if user is typing in an input
@@ -2675,7 +2683,10 @@ export function AdvancedPriceChart({
 			)
 				return;
 
-			switch (e.key.toLowerCase()) {
+			const key = e.key.toLowerCase();
+
+			// --- Non-Alt shortcuts (always active) ---
+			switch (key) {
 				case "escape":
 					e.preventDefault();
 					if (drawingInProgress) {
@@ -2683,9 +2694,9 @@ export function AdvancedPriceChart({
 					} else if (selectedDrawingId) {
 						setSelectedDrawingId(null);
 					} else {
-						setActiveTool("crosshair");
+						setActiveTool("cursor");
 					}
-					break;
+					return;
 				case "delete":
 				case "backspace":
 					if (selectedDrawingId) {
@@ -2695,70 +2706,72 @@ export function AdvancedPriceChart({
 						);
 						setSelectedDrawingId(null);
 					}
-					break;
-				case "c":
-					if (e.ctrlKey || e.metaKey) break; // Allow copy
-					e.preventDefault();
-					setActiveTool("crosshair");
-					break;
-				case "v":
-					if (e.ctrlKey || e.metaKey) break; // Allow paste
-					e.preventDefault();
-					setActiveTool("cursor");
-					break;
-				case "t":
-					e.preventDefault();
-					setActiveTool("trendline");
-					break;
-				case "r":
-					if (e.ctrlKey || e.metaKey) break;
-					if (e.altKey) {
-						e.preventDefault();
-						resetChartView();
-					} else if (e.shiftKey) {
-						e.preventDefault();
-						setActiveTool("rect");
-					} else {
-						e.preventDefault();
-						setActiveTool("ray");
-					}
-					break;
-				case "e":
-					e.preventDefault();
-					setActiveTool("ellipse");
-					break;
-				case "h":
-					e.preventDefault();
-					setActiveTool("hline");
-					break;
-				case "l":
-					if (e.ctrlKey || e.metaKey) {
-						e.preventDefault();
-						setAllDrawingsLocked((prev) => !prev);
-					} else {
-						e.preventDefault();
-						setActiveTool("extended");
-					}
-					break;
-				case "f":
-					if (e.ctrlKey || e.metaKey) break; // Allow find
-					e.preventDefault();
-					setActiveTool("fibonacci");
-					break;
-				case "p":
-					e.preventDefault();
-					setActiveTool("pitchfork");
-					break;
-				case "m":
-					e.preventDefault();
-					setActiveTool("measure");
-					break;
+					return;
 				case "z":
 					if (e.ctrlKey || e.metaKey) {
 						e.preventDefault();
 						setDrawings((prev) => prev.slice(0, -1));
 					}
-					break;
+					return;
+			}
+
+			// --- Alt+key drawing tool shortcuts (TradingView convention) ---
+			if (e.altKey) {
+				switch (key) {
+					case "c":
+						e.preventDefault();
+						setActiveTool("crosshair");
+						break;
+					case "t":
+						e.preventDefault();
+						setActiveTool("trendline");
+						break;
+					case "r":
+						if (e.shiftKey) {
+							e.preventDefault();
+							setActiveTool("rect");
+						} else {
+							e.preventDefault();
+							setActiveTool("ray");
+						}
+						break;
+					case "h":
+						e.preventDefault();
+						setActiveTool("hline");
+						break;
+					case "v":
+						e.preventDefault();
+						setActiveTool("vline");
+						break;
+					case "l":
+						e.preventDefault();
+						setActiveTool("extended");
+						break;
+					case "e":
+						e.preventDefault();
+						setActiveTool("ellipse");
+						break;
+					case "f":
+						e.preventDefault();
+						setActiveTool("fibonacci");
+						break;
+					case "p":
+						e.preventDefault();
+						setActiveTool("pitchfork");
+						break;
+					case "k":
+						e.preventDefault();
+						setActiveTool("channel");
+						break;
+					case "m":
+						e.preventDefault();
+						setActiveTool("measure");
+						break;
+					case "n":
+						e.preventDefault();
+						setActiveTool("text");
+						break;
+				}
 			}
 		};
 
@@ -2782,6 +2795,48 @@ export function AdvancedPriceChart({
 		chartRoot.addEventListener("wheel", handleWheel, { passive: false });
 		return () => chartRoot.removeEventListener("wheel", handleWheel);
 	}, [candles.length]);
+
+	// Allow native scroll on the sidebar by stopping wheel propagation before it reaches chartRoot
+	useEffect(() => {
+		const sidebar = sidebarRef.current;
+		if (!sidebar) return;
+
+		const stopWheel = (e: WheelEvent) => {
+			e.stopPropagation();
+		};
+
+		sidebar.addEventListener("wheel", stopWheel, { passive: true });
+		return () => sidebar.removeEventListener("wheel", stopWheel);
+	}, []);
+
+	// Track sidebar scroll position for arrow indicators
+	const updateScrollIndicators = useCallback(() => {
+		const el = sidebarRef.current;
+		if (!el) return;
+		const threshold = 4;
+		setCanScrollUp(el.scrollTop > threshold);
+		setCanScrollDown(
+			el.scrollTop + el.clientHeight < el.scrollHeight - threshold,
+		);
+	}, []);
+
+	useEffect(() => {
+		const el = sidebarRef.current;
+		if (!el) return;
+		// Check on mount, after layout settles
+		const raf = requestAnimationFrame(updateScrollIndicators);
+		el.addEventListener("scroll", updateScrollIndicators, {
+			passive: true,
+		});
+		// Also re-check on resize
+		const ro = new ResizeObserver(updateScrollIndicators);
+		ro.observe(el);
+		return () => {
+			cancelAnimationFrame(raf);
+			el.removeEventListener("scroll", updateScrollIndicators);
+			ro.disconnect();
+		};
+	}, [updateScrollIndicators]);
 
 	// Cleanup long press timer on unmount
 	useEffect(() => {
@@ -2870,15 +2925,17 @@ export function AdvancedPriceChart({
 		setCandles((prev) => {
 			if (prev.length === 0) return prev;
 
-			const intervalSec = ({
-				"1m": 60,
-				"5m": 300,
-				"15m": 900,
-				"1h": 3600,
-				"4h": 14400,
-				"1D": 86400,
-				"1M": 2592000,
-			} as Record<TimeRange, number>)[timeRange];
+			const intervalSec = (
+				{
+					"1m": 60,
+					"5m": 300,
+					"15m": 900,
+					"1h": 3600,
+					"4h": 14400,
+					"1D": 86400,
+					"1M": 2592000,
+				} as Record<TimeRange, number>
+			)[timeRange];
 			const now = Math.floor(Date.now() / 1000);
 			const currentBar = Math.floor(now / intervalSec) * intervalSec;
 
@@ -2926,12 +2983,12 @@ export function AdvancedPriceChart({
 				{
 					id: "cursor" as DrawingTool,
 					icon: MousePointer2,
-					tip: "Pan / Select (V)",
+					tip: "Pan / Select (Esc)",
 				},
 				{
 					id: "crosshair" as DrawingTool,
 					icon: Crosshair,
-					tip: "Crosshair (C)",
+					tip: "Crosshair (Alt+C)",
 				},
 			],
 		},
@@ -2941,27 +2998,27 @@ export function AdvancedPriceChart({
 				{
 					id: "trendline" as DrawingTool,
 					icon: TrendingUp,
-					tip: "Trend Line (T)",
+					tip: "Trend Line (Alt+T)",
 				},
 				{
 					id: "ray" as DrawingTool,
 					icon: ArrowUpRight,
-					tip: "Ray (R)",
+					tip: "Ray (Alt+R)",
 				},
 				{
 					id: "extended" as DrawingTool,
 					icon: Slash,
-					tip: "Extended Line (L)",
+					tip: "Extended Line (Alt+L)",
 				},
 				{
 					id: "hline" as DrawingTool,
 					icon: Minus,
-					tip: "Horizontal Line (H)",
+					tip: "Horizontal Line (Alt+H)",
 				},
 				{
 					id: "vline" as DrawingTool,
 					icon: MoveVertical,
-					tip: "Vertical Line",
+					tip: "Vertical Line (Alt+V)",
 				},
 			],
 		},
@@ -2971,12 +3028,12 @@ export function AdvancedPriceChart({
 				{
 					id: "rect" as DrawingTool,
 					icon: Square,
-					tip: "Rectangle (Shift+R)",
+					tip: "Rectangle (Alt+Shift+R)",
 				},
 				{
 					id: "ellipse" as DrawingTool,
 					icon: Circle,
-					tip: "Ellipse (E)",
+					tip: "Ellipse (Alt+E)",
 				},
 			],
 		},
@@ -2986,27 +3043,27 @@ export function AdvancedPriceChart({
 				{
 					id: "fibonacci" as DrawingTool,
 					icon: Activity,
-					tip: "Fibonacci Retracement (F)",
+					tip: "Fibonacci Retracement (Alt+F)",
 				},
 				{
 					id: "pitchfork" as DrawingTool,
 					icon: GitFork,
-					tip: "Andrews Pitchfork (P)",
+					tip: "Andrews Pitchfork (Alt+P)",
 				},
 				{
 					id: "channel" as DrawingTool,
 					icon: Triangle,
-					tip: "Parallel Channel",
+					tip: "Parallel Channel (Alt+K)",
 				},
 				{
 					id: "measure" as DrawingTool,
 					icon: Ruler,
-					tip: "Price Range / Measure (M)",
+					tip: "Price Range / Measure (Alt+M)",
 				},
 				{
 					id: "text" as DrawingTool,
 					icon: Type,
-					tip: "Text Annotation",
+					tip: "Text Annotation (Alt+N)",
 				},
 			],
 		},
@@ -3020,134 +3077,9 @@ export function AdvancedPriceChart({
 				className,
 			)}
 		>
-			{/* Toolbar */}
+			{/* Top Bar — Indicators, Price, Time Ranges, Zoom/Fit/Undo */}
 			{showToolbar && (
 				<div className="flex items-center gap-1 px-2 py-1.5 border-b border-white/5 bg-black/40 shrink-0 flex-wrap">
-					{/* Tool Dropdown */}
-					<DropdownMenu>
-						<DropdownMenuTrigger asChild>
-							<button className="flex items-center gap-1 px-2 py-1 bg-white/5 hover:bg-white/10 rounded text-zinc-400 hover:text-white transition-all text-xs">
-								<Settings2 className="w-3.5 h-3.5" />
-								<span className="hidden sm:inline">Tools</span>
-								<ChevronDown className="w-3 h-3" />
-							</button>
-						</DropdownMenuTrigger>
-						<DropdownMenuContent className="bg-zinc-900 border-zinc-700">
-							{toolGroups.map((group, gi) => (
-								<div key={group.label}>
-									{gi > 0 && (
-										<DropdownMenuSeparator className="bg-zinc-700" />
-									)}
-									<DropdownMenuLabel className="text-zinc-500 text-[10px]">
-										{group.label}
-									</DropdownMenuLabel>
-									{group.tools.map(
-										({ id, icon: Icon, tip }) => (
-											<DropdownMenuItem
-												key={id}
-												onClick={() => {
-													setActiveTool(id);
-													setDrawingInProgress(null);
-													setContextMenu({
-														visible: false,
-														x: 0,
-														y: 0,
-														price: 0,
-													});
-												}}
-												className={cn(
-													"flex items-center gap-2 cursor-pointer",
-													activeTool === id
-														? "bg-[#22c55e]/20 text-[#22c55e]"
-														: "text-zinc-300",
-												)}
-											>
-												<Icon className="w-4 h-4" />
-												<span>{tip}</span>
-											</DropdownMenuItem>
-										),
-									)}
-								</div>
-							))}
-						</DropdownMenuContent>
-					</DropdownMenu>
-
-					{/* Quick Tools */}
-					<div className="flex items-center bg-white/5 rounded p-0.5">
-						{[
-							{
-								id: "cursor" as DrawingTool,
-								icon: MousePointer2,
-							},
-							{ id: "crosshair" as DrawingTool, icon: Crosshair },
-							{
-								id: "trendline" as DrawingTool,
-								icon: TrendingUp,
-							},
-							{ id: "hline" as DrawingTool, icon: Minus },
-							{ id: "fibonacci" as DrawingTool, icon: Activity },
-							{ id: "measure" as DrawingTool, icon: Ruler },
-						].map(({ id, icon: Icon }) => (
-							<button
-								key={id}
-								onClick={() => {
-									setActiveTool(id);
-									setDrawingInProgress(null);
-									setContextMenu({
-										visible: false,
-										x: 0,
-										y: 0,
-										price: 0,
-									});
-								}}
-								title={id}
-								className={cn(
-									"p-1.5 rounded transition-all",
-									activeTool === id ||
-										(id === "cursor" && isPanning)
-										? "bg-[#22c55e] text-black"
-										: "text-zinc-500 hover:text-white hover:bg-white/10",
-								)}
-							>
-								<Icon className="w-3.5 h-3.5" />
-							</button>
-						))}
-					</div>
-
-					{/* Color Picker */}
-					<DropdownMenu>
-						<DropdownMenuTrigger asChild>
-							<button
-								className="p-1.5 rounded hover:bg-white/10 transition-all"
-								title="Drawing Color"
-							>
-								<div
-									className="w-4 h-4 rounded-sm border border-white/20"
-									style={{ backgroundColor: drawingColor }}
-								/>
-							</button>
-						</DropdownMenuTrigger>
-						<DropdownMenuContent className="bg-zinc-900 border-zinc-700 p-2">
-							<div className="grid grid-cols-4 gap-1">
-								{DRAWING_COLORS.map((color) => (
-									<button
-										key={color}
-										onClick={() => setDrawingColor(color)}
-										className={cn(
-											"w-6 h-6 rounded border-2 transition-all",
-											drawingColor === color
-												? "border-white scale-110"
-												: "border-transparent hover:scale-105",
-										)}
-										style={{ backgroundColor: color }}
-									/>
-								))}
-							</div>
-						</DropdownMenuContent>
-					</DropdownMenu>
-
-					<div className="w-px h-5 bg-white/10 mx-1" />
-
 					{/* Indicators Dropdown */}
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
@@ -3239,7 +3171,7 @@ export function AdvancedPriceChart({
 
 					<div className="w-px h-5 bg-white/10 mx-1" />
 
-					{/* Actions */}
+					{/* Zoom / Fit / Undo */}
 					<div className="flex items-center gap-0.5">
 						<button
 							onClick={zoomIn}
@@ -3269,33 +3201,6 @@ export function AdvancedPriceChart({
 						>
 							<Undo2 className="w-3.5 h-3.5" />
 						</button>
-						<button
-							onClick={toggleLockAllDrawings}
-							title={
-								allDrawingsLocked
-									? "Unlock All Drawings (Ctrl+L)"
-									: "Lock All Drawings (Ctrl+L)"
-							}
-							className={cn(
-								"p-1.5 rounded transition-all",
-								allDrawingsLocked
-									? "text-amber-400 bg-amber-500/20 hover:bg-amber-500/30"
-									: "text-zinc-500 hover:text-white hover:bg-white/10",
-							)}
-						>
-							{allDrawingsLocked ? (
-								<Lock className="w-3.5 h-3.5" />
-							) : (
-								<LockOpen className="w-3.5 h-3.5" />
-							)}
-						</button>
-						<button
-							onClick={clearDrawings}
-							title="Clear All Drawings"
-							className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-white/10 rounded transition-all"
-						>
-							<Trash2 className="w-3.5 h-3.5" />
-						</button>
 					</div>
 
 					<div className="text-[10px] text-zinc-200 ml-2">
@@ -3304,221 +3209,445 @@ export function AdvancedPriceChart({
 				</div>
 			)}
 
-			{/* Chart Canvas */}
-			<div ref={containerRef} className="relative flex-1 min-h-0">
-				{isLoading && (
-					<div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
-						<Loader2 className="w-6 h-6 text-[#22c55e] animate-spin" />
-					</div>
-				)}
-
-				{error && !isLoading && (
-					<div className="absolute inset-0 flex flex-col items-center justify-center z-10">
-						<p className="text-zinc-400 text-sm">
-							Failed to load chart
-						</p>
-						<p className="text-zinc-600 text-xs mt-1">{error}</p>
-					</div>
-				)}
-
-				<canvas
-					ref={canvasRef}
-					className="absolute inset-0 w-full h-full"
-					style={{
-						cursor:
-							isPanning || (activeTool === "cursor" && isDragging)
-								? "grabbing"
-								: activeTool === "cursor"
-									? "grab"
-									: "crosshair",
-						touchAction: "none", // Disable default touch behaviors
-					}}
-					onMouseMove={handleMouseMove}
-					onMouseDown={handleMouseDown}
-					onMouseUp={handleMouseUp}
-					onMouseLeave={handleMouseLeave}
-					onWheel={handleWheel}
-					onContextMenu={handleContextMenu}
-					onTouchStart={handleTouchStart}
-					onTouchMove={handleTouchMove}
-					onTouchEnd={handleTouchEnd}
-				/>
-
-				{/* Context Menu */}
-				{contextMenu.visible && (
-					<div
-						className="fixed bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl py-1 z-50 min-w-50"
-						style={{
-							left: `${contextMenu.x}px`,
-							top: `${contextMenu.y}px`,
-						}}
-					>
-						<button
-							onClick={(e) => {
-								e.stopPropagation();
-								resetChartView();
-							}}
-							className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 flex items-center justify-between"
-						>
-							<span>Reset Chart View</span>
-							<span className="text-xs text-zinc-500">Alt+R</span>
-						</button>
-						<button
-							onClick={(e) => {
-								e.stopPropagation();
-								copyPriceToClipboard(contextMenu.price);
-							}}
-							className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800"
-						>
-							Copy Price {formatPrice(contextMenu.price)}
-						</button>
-						<div className="border-t border-zinc-700 my-1" />
-						<button
-							onClick={(e) => {
-								e.stopPropagation();
-								if (lockedCursorPosition) {
-									// Unlock
-									setLockedCursorPosition(null);
-								} else {
-									// Lock at current position
-									if (
-										contextMenu.candleIdx !== undefined &&
-										contextMenu.exactX !== undefined
-									) {
-										// Calculate the candle center position
-										const spacing =
-											chartState.candleWidth + 2;
-										const candleCenterX =
-											chartState.offsetX +
-											contextMenu.candleIdx * spacing +
-											chartState.candleWidth / 2;
-										// Store the offset from candle center
-										const offset =
-											contextMenu.exactX - candleCenterX;
-
-										setLockedCursorPosition({
-											candleIdx: contextMenu.candleIdx,
-											offsetFromCandleCenter: offset,
-										});
-									}
-								}
-								setContextMenu({
-									visible: false,
-									x: 0,
-									y: 0,
-									price: 0,
-								});
-							}}
-							className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 flex items-center justify-between"
-						>
-							<span>
-								{lockedCursorPosition ? "Unlock" : "Lock"}{" "}
-								Vertical Cursor
-							</span>
-							{lockedCursorPosition && (
-								<Lock className="w-3 h-3" />
-							)}
-						</button>
-						{drawings.length > 0 && (
-							<>
-								<div className="border-t border-zinc-700 my-1" />
-								<button
-									onClick={(e) => {
-										e.stopPropagation();
-										clearAllDrawings();
-									}}
-									className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-zinc-800"
-								>
-									Remove {drawings.length} Drawing
-									{drawings.length !== 1 ? "s" : ""}
-								</button>
-							</>
-						)}
-						<div className="border-t border-zinc-700 my-1" />
-						<button
-							onClick={(e) => {
-								e.stopPropagation();
-								setHideMarksOnBar((prev) => !prev);
-								setContextMenu({
-									visible: false,
-									x: 0,
-									y: 0,
-									price: 0,
-								});
-							}}
-							className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800"
-						>
-							{hideMarksOnBar ? "Show" : "Hide"} Marks on Bar
-						</button>
-					</div>
-				)}
-
-				{/* Locked Cursor Icon */}
-				{lockedCursorPosition &&
-					mousePos &&
-					candles.length > 0 &&
-					(() => {
-						const metrics = getChartMetrics();
-						const spacing = chartState.candleWidth + 2;
-						const candleCenterX =
-							chartState.offsetX +
-							lockedCursorPosition.candleIdx * spacing +
-							chartState.candleWidth / 2;
-						const lockedX =
-							candleCenterX +
-							lockedCursorPosition.offsetFromCandleCenter;
-						const chartHeight = dims.h - TIME_AXIS_HEIGHT;
-
-						if (lockedX >= 0 && lockedX <= metrics.chartWidth) {
-							return (
-								<div
-									className="absolute pointer-events-none"
-									style={{
-										left: `${lockedX}px`,
-										top: `${chartHeight - 25}px`,
-										transform: "translateX(-50%)",
-									}}
-								>
-									<div className="bg-white/90 rounded-sm p-0.5">
-										<Lock className="w-3 h-3 text-black" />
-									</div>
-								</div>
-							);
-						}
-						return null;
-					})()}
-
-				{/* Tool hint */}
-				{drawingInProgress && (
-					<div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/80 text-zinc-300 text-xs px-3 py-1.5 rounded-full border border-white/10 pointer-events-none">
-						{drawingInProgress.type === "pitchfork" ||
-						drawingInProgress.type === "channel"
-							? `Click point ${drawingInProgress.points.length + 1} of 3 • ESC to cancel`
-							: "Click to complete • ESC to cancel"}
-					</div>
-				)}
-
-				{/* Active indicators legend */}
-				{indicators.some((i) => i.enabled) && (
-					<div className="absolute top-2 right-20 flex flex-col gap-1 pointer-events-none">
-						{indicators
-							.filter((i) => i.enabled)
-							.map((ind) => (
-								<div
-									key={ind.type}
-									className="flex items-center gap-1.5 bg-black/60 px-2 py-0.5 rounded text-[10px]"
-								>
+			{/* Main area: Left Sidebar + Canvas */}
+			<div className="flex flex-row flex-1 min-h-0 overflow-hidden">
+				{/* Left Sidebar — Drawing Tools */}
+				{showToolbar && (
+					<div className="relative shrink-0 border-r border-white/5 bg-black/40">
+						<TooltipProvider delayDuration={200}>
+							<div
+								ref={sidebarRef}
+								className="flex flex-col items-center gap-0.5 py-1.5 px-1 overflow-y-auto overscroll-contain [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] h-full"
+							>
+								{toolGroups.map((group, gi) => (
 									<div
-										className="w-2 h-2 rounded-full"
-										style={{ backgroundColor: ind.color }}
-									/>
-									<span className="text-zinc-400">
-										{ind.type.toUpperCase()}({ind.period})
-									</span>
-								</div>
-							))}
+										key={group.label}
+										className="flex flex-col items-center gap-0.5"
+									>
+										{gi > 0 && (
+											<div className="w-5 h-px bg-white/10 my-1" />
+										)}
+										{group.tools.map(
+											({ id, icon: Icon, tip }) => {
+												const shortcut =
+													tip.match(
+														/\(([^)]+)\)/,
+													)?.[1];
+												return (
+													<Tooltip key={id}>
+														<TooltipTrigger asChild>
+															<button
+																onClick={() => {
+																	setActiveTool(
+																		id,
+																	);
+																	setDrawingInProgress(
+																		null,
+																	);
+																	setContextMenu(
+																		{
+																			visible: false,
+																			x: 0,
+																			y: 0,
+																			price: 0,
+																		},
+																	);
+																}}
+																className={cn(
+																	"p-1.5 rounded transition-all",
+																	activeTool ===
+																		id ||
+																		(id ===
+																			"cursor" &&
+																			isPanning)
+																		? "bg-[#22c55e] text-black"
+																		: "text-zinc-500 hover:text-white hover:bg-white/10",
+																)}
+															>
+																<Icon className="w-3.5 h-3.5" />
+															</button>
+														</TooltipTrigger>
+														<TooltipContent
+															side="right"
+															className="bg-zinc-900 border-zinc-700 text-white text-xs"
+															arrowClassName="bg-zinc-900 fill-zinc-900"
+														>
+															<span>
+																{tip.replace(
+																	/\s*\([^)]*\)/,
+																	"",
+																)}
+															</span>
+															{shortcut && (
+																<kbd className="ml-1.5 px-1 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px] font-mono">
+																	{shortcut}
+																</kbd>
+															)}
+														</TooltipContent>
+													</Tooltip>
+												);
+											},
+										)}
+									</div>
+								))}
+
+								{/* Separator before utility tools */}
+								<div className="w-5 h-px bg-white/10 my-1" />
+
+								{/* Color Picker */}
+								<DropdownMenu>
+									<DropdownMenuTrigger asChild>
+										<button
+											className="p-1.5 rounded hover:bg-white/10 transition-all"
+											title="Drawing Color"
+										>
+											<div
+												className="w-4 h-4 rounded-sm border border-white/20"
+												style={{
+													backgroundColor:
+														drawingColor,
+												}}
+											/>
+										</button>
+									</DropdownMenuTrigger>
+									<DropdownMenuContent
+										side="right"
+										className="bg-zinc-900 border-zinc-700 p-2"
+									>
+										<div className="grid grid-cols-4 gap-1">
+											{DRAWING_COLORS.map((color) => (
+												<button
+													key={color}
+													onClick={() =>
+														setDrawingColor(color)
+													}
+													className={cn(
+														"w-6 h-6 rounded border-2 transition-all",
+														drawingColor === color
+															? "border-white scale-110"
+															: "border-transparent hover:scale-105",
+													)}
+													style={{
+														backgroundColor: color,
+													}}
+												/>
+											))}
+										</div>
+									</DropdownMenuContent>
+								</DropdownMenu>
+
+								{/* Lock All Drawings */}
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<button
+											onClick={toggleLockAllDrawings}
+											className={cn(
+												"p-1.5 rounded transition-all",
+												allDrawingsLocked
+													? "text-amber-400 bg-amber-500/20 hover:bg-amber-500/30"
+													: "text-zinc-500 hover:text-white hover:bg-white/10",
+											)}
+										>
+											{allDrawingsLocked ? (
+												<Lock className="w-3.5 h-3.5" />
+											) : (
+												<LockOpen className="w-3.5 h-3.5" />
+											)}
+										</button>
+									</TooltipTrigger>
+									<TooltipContent
+										side="right"
+										arrowClassName="bg-zinc-900 fill-zinc-900"
+										className="bg-zinc-900 border-zinc-700 text-white text-xs"
+									>
+										<span>
+											{allDrawingsLocked
+												? "Unlock All"
+												: "Lock All"}
+										</span>
+										<kbd className="ml-1.5 px-1 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px] font-mono">
+											Ctrl+L
+										</kbd>
+									</TooltipContent>
+								</Tooltip>
+
+								{/* Clear All Drawings */}
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<button
+											onClick={clearDrawings}
+											className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-white/10 rounded transition-all"
+										>
+											<Trash2 className="w-3.5 h-3.5" />
+										</button>
+									</TooltipTrigger>
+									<TooltipContent
+										side="right"
+										className="bg-zinc-900 border-zinc-700 text-white text-xs"
+										arrowClassName="bg-zinc-900 fill-zinc-900"
+									>
+										Clear All Drawings
+									</TooltipContent>
+								</Tooltip>
+							</div>
+						</TooltipProvider>
+
+						{/* Scroll-up indicator */}
+						{canScrollUp && (
+							<div
+								className="absolute top-0 left-0 right-0 flex items-center justify-center h-5 pointer-events-none z-10"
+								style={{
+									background:
+										"linear-gradient(to bottom, rgba(50,50,50,0.85), transparent)",
+								}}
+							>
+								<ChevronUp className="w-3 h-3 text-zinc-300 animate-pulse" />
+							</div>
+						)}
+
+						{/* Scroll-down indicator */}
+						{canScrollDown && (
+							<div
+								className="absolute bottom-0 left-0 right-0 flex items-center justify-center h-5 pointer-events-none z-10"
+								style={{
+									background:
+										"linear-gradient(to top, rgba(50,50,50,0.85), transparent)",
+								}}
+							>
+								<ChevronDown className="w-3 h-3 text-zinc-300 animate-pulse" />
+							</div>
+						)}
 					</div>
 				)}
+
+				{/* Chart Canvas */}
+				<div ref={containerRef} className="relative flex-1 min-h-0">
+					{isLoading && (
+						<div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
+							<Loader2 className="w-6 h-6 text-[#22c55e] animate-spin" />
+						</div>
+					)}
+
+					{error && !isLoading && (
+						<div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+							<p className="text-zinc-400 text-sm">
+								Failed to load chart
+							</p>
+							<p className="text-zinc-600 text-xs mt-1">
+								{error}
+							</p>
+						</div>
+					)}
+
+					<canvas
+						ref={canvasRef}
+						className="absolute inset-0 w-full h-full"
+						style={{
+							cursor:
+								isPanning ||
+								(activeTool === "cursor" && isDragging)
+									? "grabbing"
+									: activeTool === "cursor"
+										? "grab"
+										: "crosshair",
+							touchAction: "none", // Disable default touch behaviors
+						}}
+						onMouseMove={handleMouseMove}
+						onMouseDown={handleMouseDown}
+						onMouseUp={handleMouseUp}
+						onMouseLeave={handleMouseLeave}
+						onWheel={handleWheel}
+						onContextMenu={handleContextMenu}
+						onTouchStart={handleTouchStart}
+						onTouchMove={handleTouchMove}
+						onTouchEnd={handleTouchEnd}
+					/>
+
+					{/* Context Menu */}
+					{contextMenu.visible && (
+						<div
+							className="fixed bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl py-1 z-50 min-w-50"
+							style={{
+								left: `${contextMenu.x}px`,
+								top: `${contextMenu.y}px`,
+							}}
+						>
+							<button
+								onClick={(e) => {
+									e.stopPropagation();
+									resetChartView();
+								}}
+								className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 flex items-center justify-between"
+							>
+								<span>Reset Chart View</span>
+								<span className="text-xs text-zinc-500">
+									Alt+R
+								</span>
+							</button>
+							<button
+								onClick={(e) => {
+									e.stopPropagation();
+									copyPriceToClipboard(contextMenu.price);
+								}}
+								className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800"
+							>
+								Copy Price {formatPrice(contextMenu.price)}
+							</button>
+							<div className="border-t border-zinc-700 my-1" />
+							<button
+								onClick={(e) => {
+									e.stopPropagation();
+									if (lockedCursorPosition) {
+										// Unlock
+										setLockedCursorPosition(null);
+									} else {
+										// Lock at current position
+										if (
+											contextMenu.candleIdx !==
+												undefined &&
+											contextMenu.exactX !== undefined
+										) {
+											// Calculate the candle center position
+											const spacing =
+												chartState.candleWidth + 2;
+											const candleCenterX =
+												chartState.offsetX +
+												contextMenu.candleIdx *
+													spacing +
+												chartState.candleWidth / 2;
+											// Store the offset from candle center
+											const offset =
+												contextMenu.exactX -
+												candleCenterX;
+
+											setLockedCursorPosition({
+												candleIdx:
+													contextMenu.candleIdx,
+												offsetFromCandleCenter: offset,
+											});
+										}
+									}
+									setContextMenu({
+										visible: false,
+										x: 0,
+										y: 0,
+										price: 0,
+									});
+								}}
+								className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 flex items-center justify-between"
+							>
+								<span>
+									{lockedCursorPosition ? "Unlock" : "Lock"}{" "}
+									Vertical Cursor
+								</span>
+								{lockedCursorPosition && (
+									<Lock className="w-3 h-3" />
+								)}
+							</button>
+							{drawings.length > 0 && (
+								<>
+									<div className="border-t border-zinc-700 my-1" />
+									<button
+										onClick={(e) => {
+											e.stopPropagation();
+											clearAllDrawings();
+										}}
+										className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-zinc-800"
+									>
+										Remove {drawings.length} Drawing
+										{drawings.length !== 1 ? "s" : ""}
+									</button>
+								</>
+							)}
+							<div className="border-t border-zinc-700 my-1" />
+							<button
+								onClick={(e) => {
+									e.stopPropagation();
+									setHideMarksOnBar((prev) => !prev);
+									setContextMenu({
+										visible: false,
+										x: 0,
+										y: 0,
+										price: 0,
+									});
+								}}
+								className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800"
+							>
+								{hideMarksOnBar ? "Show" : "Hide"} Marks on Bar
+							</button>
+						</div>
+					)}
+
+					{/* Locked Cursor Icon */}
+					{lockedCursorPosition &&
+						mousePos &&
+						candles.length > 0 &&
+						(() => {
+							const metrics = getChartMetrics();
+							const spacing = chartState.candleWidth + 2;
+							const candleCenterX =
+								chartState.offsetX +
+								lockedCursorPosition.candleIdx * spacing +
+								chartState.candleWidth / 2;
+							const lockedX =
+								candleCenterX +
+								lockedCursorPosition.offsetFromCandleCenter;
+							const chartHeight = dims.h - TIME_AXIS_HEIGHT;
+
+							if (lockedX >= 0 && lockedX <= metrics.chartWidth) {
+								return (
+									<div
+										className="absolute pointer-events-none"
+										style={{
+											left: `${lockedX}px`,
+											top: `${chartHeight - 25}px`,
+											transform: "translateX(-50%)",
+										}}
+									>
+										<div className="bg-white/90 rounded-sm p-0.5">
+											<Lock className="w-3 h-3 text-black" />
+										</div>
+									</div>
+								);
+							}
+							return null;
+						})()}
+
+					{/* Tool hint */}
+					{drawingInProgress && (
+						<div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/80 text-zinc-300 text-xs px-3 py-1.5 rounded-full border border-white/10 pointer-events-none">
+							{drawingInProgress.type === "pitchfork" ||
+							drawingInProgress.type === "channel"
+								? `Click point ${drawingInProgress.points.length + 1} of 3 • ESC to cancel`
+								: "Click to complete • ESC to cancel"}
+						</div>
+					)}
+
+					{/* Active indicators legend */}
+					{indicators.some((i) => i.enabled) && (
+						<div className="absolute top-2 right-20 flex flex-col gap-1 pointer-events-none">
+							{indicators
+								.filter((i) => i.enabled)
+								.map((ind) => (
+									<div
+										key={ind.type}
+										className="flex items-center gap-1.5 bg-black/60 px-2 py-0.5 rounded text-[10px]"
+									>
+										<div
+											className="w-2 h-2 rounded-full"
+											style={{
+												backgroundColor: ind.color,
+											}}
+										/>
+										<span className="text-zinc-400">
+											{ind.type.toUpperCase()}(
+											{ind.period})
+										</span>
+									</div>
+								))}
+						</div>
+					)}
+				</div>
 			</div>
 		</div>
 	);

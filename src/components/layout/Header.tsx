@@ -34,7 +34,11 @@ export function Header() {
 
 				{/* Logo - Mobile Only */}
 				<Link href="/" className="md:hidden shrink-0">
-					<img src="/logo2.png" alt="HypeMint" className="w-8 h-8" />
+					<img
+						src="/hypemint-logo.webp"
+						alt="HypeMint"
+						className="w-8 h-8"
+					/>
 				</Link>
 
 				{/* Search Box */}

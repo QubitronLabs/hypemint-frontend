@@ -95,7 +95,7 @@ export function Sidebar() {
 							whileTap={{ scale: 0.95 }}
 							className="w-10 h-10 rounded-xl flex items-center justify-center"
 						>
-							<img src="/logo2.png" alt="HypeMint" />
+							<img src="/hypemint-logo.webp" alt="HypeMint" />
 						</motion.div>
 					</Link>
 					{/* Close button - mobile only when sidebar is open */}
