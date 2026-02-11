@@ -1158,7 +1158,12 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							</div>
 						) : holders.length > 0 ? (
 							<div className="space-y-1">
-								{holders.slice(0, 20).map((holder, index) => (
+								{holders.slice(0, 20).map((holder, index) => {
+									const isCreator =
+										creatorAddress &&
+										holder.address.toLowerCase() ===
+											creatorAddress.toLowerCase();
+									return (
 									<div
 										key={holder.address}
 										className="flex items-center justify-between py-1"
@@ -1167,7 +1172,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 											href={`/user/${holder.address}`}
 											className="font-mono text-sm hover:text-primary text-muted-foreground"
 										>
-											{index === 0 ? (
+											{index === 0 && !isCreator ? (
 												<span className="flex items-center gap-1.5">
 													Liquidity pool{" "}
 													<span className="text-blue-400">
@@ -1175,14 +1180,34 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 													</span>
 												</span>
 											) : (
-												`${holder.address.slice(0, 4)}...${holder.address.slice(-4)}`
+												<span className="flex items-center gap-1.5">
+													{`${holder.address.slice(0, 4)}...${holder.address.slice(-4)}`}
+													{isCreator && (
+														// <span
+														// 	className="text-base"
+														// 	title="Developer (initial purchase)"
+														// >
+														// 	🎩
+														// </span>
+														<div className="text-foreground flex text-xs gap-2 items-center">
+															(
+																<span>
+
+														DEV
+															</span>
+														 <img src="/hacker.png" alt="" className="w-4 h-4 bg-white rounded-full" />
+														 )
+														</div>
+													)}
+												</span>
 											)}
 										</Link>
 										<span className="text-sm tabular-nums">
 											{holder.percentage.toFixed(2)}%
 										</span>
 									</div>
-								))}
+									);
+								})}
 							</div>
 						) : (
 							<div className="text-center py-6">
