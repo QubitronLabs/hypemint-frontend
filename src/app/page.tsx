@@ -553,14 +553,16 @@ function HomePage() {
 		(mcap: [number, number] | null, vol: [number, number] | null) => {
 			setAppliedMcap(mcap);
 			setAppliedVol(vol);
+			setCurrentPage(1); // Reset to first page when filters change
 		},
-		[],
+		[setCurrentPage],
 	);
 
 	const handleFilterRemove = useCallback((type: "mcap" | "vol") => {
 		if (type === "mcap") setAppliedMcap(null);
 		else setAppliedVol(null);
-	}, []);
+		setCurrentPage(1); // Reset to first page when filters change
+	}, [setCurrentPage]);
 
 	// Scroll to top when page changes
 	useEffect(() => {
@@ -581,7 +583,13 @@ function HomePage() {
 		isError: allError,
 		refetch: refetchAll,
 	} = useTokens(
-		{ page: currentPage, pageSize: PAGE_SIZE, ...(searchQuery ? {} : {}) },
+		{
+			page: currentPage,
+			pageSize: PAGE_SIZE,
+			...(searchQuery ? {} : {}),
+			...(appliedMcap ? { minMarketCap: appliedMcap[0], maxMarketCap: appliedMcap[1] } : {}),
+			...(appliedVol ? { minVolume24h: appliedVol[0], maxVolume24h: appliedVol[1] } : {}),
+		},
 		{ enabled: mounted && debouncedFilter === "all" },
 	);
 	const allTokens = allTokensResult?.data ?? [];
@@ -898,16 +906,18 @@ function HomePage() {
 			)
 		: tokens;
 
-	// Apply client-side mcap + volume filters
-	const filteredTokens = searchFilteredTokens.filter((token: Token) => {
-		const mcap = parseFloat(token.marketCap || "0");
-		const vol = parseFloat(token.volume24h || "0");
-		if (appliedMcap && (mcap < appliedMcap[0] || mcap > appliedMcap[1]))
-			return false;
-		if (appliedVol && (vol < appliedVol[0] || vol > appliedVol[1]))
-			return false;
-		return true;
-	});
+	// Apply client-side mcap + volume filters (only for non-"all" tabs which don't go through the API filter)
+	const filteredTokens = activeFilter === "all"
+		? searchFilteredTokens
+		: searchFilteredTokens.filter((token: Token) => {
+			const mcap = parseFloat(token.marketCap || "0");
+			const vol = parseFloat(token.volume24h || "0");
+			if (appliedMcap && (mcap < appliedMcap[0] || mcap > appliedMcap[1]))
+				return false;
+			if (appliedVol && (vol < appliedVol[0] || vol > appliedVol[1]))
+				return false;
+			return true;
+		});
 
 	if (!mounted) return null;
 

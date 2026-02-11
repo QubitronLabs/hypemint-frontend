@@ -120,6 +120,10 @@ export interface TokenListParams {
 	status?: TokenStatus;
 	orderBy?: OrderBy;
 	orderDir?: OrderDir;
+	minMarketCap?: number;
+	maxMarketCap?: number;
+	minVolume24h?: number;
+	maxVolume24h?: number;
 }
 
 export interface CreateTokenInput {
