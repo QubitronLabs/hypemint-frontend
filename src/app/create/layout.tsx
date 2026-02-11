@@ -1,23 +1,7 @@
-import type { Metadata } from "next";
-
-export const metadata: Metadata = {
-	title: "Create Token | HypeMint",
-	description:
-		"Launch your own memecoin on HypeMint with instant bonding curves. Set up your token name, symbol, and start trading in seconds.",
-	openGraph: {
-		title: "Create Token | HypeMint",
-		description:
-			"Launch your own memecoin on HypeMint with instant bonding curves.",
-		type: "website",
-	},
-	twitter: {
-		card: "summary_large_image",
-		title: "Create Token | HypeMint",
-		description:
-			"Launch your own memecoin on HypeMint with instant bonding curves.",
-	},
-};
-
+/**
+ * Create Layout — SEO handled centrally by app/layout.tsx
+ * @see src/lib/seo/defaults.ts → getCreatePageMetadata()
+ */
 export default function CreateLayout({
 	children,
 }: {

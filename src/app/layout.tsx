@@ -15,6 +15,7 @@ import {
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { resolveMetadata } from "@/lib/seo";
 import "./globals.css";
 import { IsBrowser } from "@dynamic-labs/sdk-react-core";
 
@@ -54,46 +55,17 @@ const displayFont = Space_Grotesk({
 	display: "swap",
 });
 
-export const metadata: Metadata = {
-	title: "HypeMint - Memecoin Launchpad",
-	description:
-		"Launch and trade memecoins with instant bonding curves. The fastest way to create and discover new tokens.",
-	keywords: [
-		"memecoin",
-		"crypto",
-		"launchpad",
-		"trading",
-		"bonding curve",
-		"defi",
-	],
-	icons: {
-		icon: [
-			{ url: "/favicon.ico" },
-			{
-				url: "/favicon-16x16.png",
-				sizes: "16x16",
-				type: "image/png",
-			},
-			{
-				url: "/favicon-32x32.png",
-				sizes: "32x32",
-				type: "image/png",
-			},
-			{
-				url: "/android-chrome-192x192.png",
-				sizes: "192x192",
-				type: "image/png",
-			},
-			{
-				url: "/android-chrome-512x512.png",
-				sizes: "512x512",
-				type: "image/png",
-			},
-		],
-		apple: [{ url: "/apple-touch-icon.png" }],
-	},
-	manifest: "/site.webmanifest",
-};
+/**
+ * Dynamic SEO — resolved per-route by the centralized SEO router.
+ * All SEO logic lives in lib/seo/ — this is the single entry point.
+ *
+ * @see src/lib/seo/router.ts for route → metadata mapping
+ * @see src/lib/seo/defaults.ts to change default values
+ * @see src/lib/api/seo.ts for API fetch functions
+ */
+export async function generateMetadata(): Promise<Metadata> {
+	return resolveMetadata();
+}
 
 export default function RootLayout({
 	children,

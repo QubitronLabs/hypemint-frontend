@@ -1,3 +1,12 @@
+// SEO types
+export type {
+	SeoApiResponse,
+	SeoPageData,
+	SeoDefaults,
+	SeoTokenData,
+	SeoUserData,
+} from "./seo";
+
 // Token types based on API spec
 export type TokenStatus =
 	| "pending"

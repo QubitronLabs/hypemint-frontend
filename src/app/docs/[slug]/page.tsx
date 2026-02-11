@@ -1,109 +1,23 @@
-import { Metadata } from "next";
+/**
+ * Docs Page
+ *
+ * SEO metadata handled centrally by app/layout.tsx
+ * @see src/lib/seo/router.ts → handleDocsPage()
+ *
+ * This component only renders page content + JSON-LD structured data.
+ */
+
 import { notFound } from "next/navigation";
+import type { SeoPageData } from "@/types/seo";
 
 interface DocPageProps {
 	params: Promise<{ slug: string }>;
 }
 
-interface DocData {
-	title: string;
-	slug: string;
-	content: string;
-	updatedAt?: string;
-}
-
-interface SeoData {
-	pageTitle?: string;
-	metaDescription?: string;
-	keywords?: string[];
-	canonicalUrl?: string;
-	robots?: string;
-	ogTitle?: string;
-	ogDescription?: string;
-	ogImage?: string;
-	ogType?: string;
-	ogUrl?: string;
-	twitterCard?: string;
-	twitterTitle?: string;
-	twitterDescription?: string;
-	twitterImage?: string;
-	schemaJson?: Record<string, unknown>;
-}
-
-const API_BASE =
-	process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-
-// Generate metadata for SEO
-export async function generateMetadata({
-	params,
-}: DocPageProps): Promise<Metadata> {
-	const { slug } = await params;
-
-	try {
-		// Fetch page data and SEO data in parallel (no-store ensures fresh data after admin edits)
-		const [pageRes, seoRes] = await Promise.all([
-			fetch(`${API_BASE}/api/v1/pages/${slug}`, {
-				cache: "no-store",
-			}),
-			fetch(`${API_BASE}/api/v1/pages/${slug}/seo`, {
-				cache: "no-store",
-			}),
-		]);
-
-		if (!pageRes.ok) {
-			return { title: "Page Not Found" };
-		}
-
-		const pageJson = await pageRes.json();
-		 
-		const pageData: DocData | null = pageJson?.data ?? null;
-
-		let seoData: SeoData | null = null;
-		if (seoRes.ok) {
-			const seoJson = await seoRes.json();
-			seoData = seoJson?.data ?? null;
-		}
-
-		const title = seoData?.pageTitle || pageData?.title || "HypeMint";
-		const description =
-			seoData?.metaDescription ||
-			`${pageData?.title || slug} — HypeMint`;
-
-		return {
-			title: `${title} | HypeMint`,
-			description,
-			keywords: seoData?.keywords,
-			robots: seoData?.robots,
-			alternates: seoData?.canonicalUrl
-				? { canonical: seoData.canonicalUrl }
-				: undefined,
-			openGraph: {
-				title: seoData?.ogTitle || title,
-				description: seoData?.ogDescription || description,
-				images: seoData?.ogImage ? [seoData.ogImage] : undefined,
-				type: (seoData?.ogType as "website" | "article") || "website",
-				url: seoData?.ogUrl || undefined,
-			},
-			twitter: {
-				card:
-					(seoData?.twitterCard as
-						| "summary"
-						| "summary_large_image") || "summary_large_image",
-				title: seoData?.twitterTitle || title,
-				description: seoData?.twitterDescription || description,
-				images: seoData?.twitterImage
-					? [seoData.twitterImage]
-					: undefined,
-			},
-		};
-	} catch (error) {
-		console.error("Error fetching page metadata:", error);
-		return { title: "HypeMint" };
-	}
-}
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 // Fetch page data server-side
-async function getPageData(slug: string): Promise<DocData | null> {
+async function getPageData(slug: string): Promise<SeoPageData | null> {
 	try {
 		const response = await fetch(`${API_BASE}/api/v1/pages/${slug}`, {
 			cache: "no-store",
@@ -113,8 +27,8 @@ async function getPageData(slug: string): Promise<DocData | null> {
 
 		const json = await response.json();
 		return json?.data ?? null;
-	} catch (error) {
-		console.error("Error fetching page data:", error);
+	} catch {
+		console.error("Error fetching page data");
 		return null;
 	}
 }
@@ -124,18 +38,15 @@ async function getSeoSchema(
 	slug: string,
 ): Promise<Record<string, unknown> | null> {
 	try {
-		const response = await fetch(
-			`${API_BASE}/api/v1/pages/${slug}/seo`,
-			{
-				cache: "no-store",
-			},
-		);
+		const response = await fetch(`${API_BASE}/api/v1/pages/${slug}/seo`, {
+			cache: "no-store",
+		});
 
 		if (!response.ok) return null;
 
 		const json = await response.json();
 		return json?.data?.schemaJson ?? null;
-	} catch (error) {
+	} catch {
 		return null;
 	}
 }
@@ -143,10 +54,15 @@ async function getSeoSchema(
 export default async function DocPage({ params }: DocPageProps) {
 	const { slug } = await params;
 
-	const [pageData, schemaJson] = await Promise.all([
+	const [pageResult, schemaResult] = await Promise.allSettled([
 		getPageData(slug),
 		getSeoSchema(slug),
 	]);
+
+	const pageData =
+		pageResult.status === "fulfilled" ? pageResult.value : null;
+	const schemaJson =
+		schemaResult.status === "fulfilled" ? schemaResult.value : null;
 
 	if (!pageData) {
 		notFound();

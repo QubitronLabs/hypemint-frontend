@@ -201,7 +201,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
 					<div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 z-10">
 						<span className="inline-flex items-center gap-0.5 px-1.5 sm:px-2 py-0.5 rounded-md bg-green-500/20 text-green-400 text-[8px] sm:text-[10px] font-semibold border border-green-500/30 backdrop-blur-sm">
 							<GraduationCap className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-							GRADUATED
+							<span className="sm:hidden lg:inline"> GRADUATED</span>
 						</span>
 					</div>
 				)}
@@ -280,11 +280,15 @@ export function TokenCard({ token, className }: TokenCardProps) {
 										animate={{
 											width: `${Math.max(athProgress > 0 ? 4 : 0, athProgress)}%`,
 										}}
-										transition={{ duration: 0.8, ease: "easeOut" }}
+										transition={{
+											duration: 0.8,
+											ease: "easeOut",
+										}}
 										className="h-full rounded-full"
 										style={{
 											background: `linear-gradient(to right, ${athColors.from}, ${athColors.to})`,
-											minWidth: athProgress > 0 ? "3px" : "0px",
+											minWidth:
+												athProgress > 0 ? "3px" : "0px",
 											boxShadow:
 												athProgress > 0
 													? `0 0 6px ${athColors.glow}`
@@ -313,8 +317,12 @@ export function TokenCard({ token, className }: TokenCardProps) {
 								sideOffset={6}
 								className="bg-[#1a1a1a] text-white border border-[#333] px-3 py-2 rounded-lg text-[11px] max-w-[200px] shadow-xl"
 							>
-								<p className="font-medium text-white/90">ATH Progress ({athProgress.toFixed(1)}%)</p>
-								<p className="text-white/50 mt-0.5">Current price / all-time high price</p>
+								<p className="font-medium text-white/90">
+									ATH Progress ({athProgress.toFixed(1)}%)
+								</p>
+								<p className="text-white/50 mt-0.5">
+									Current price / all-time high price
+								</p>
 							</TooltipContent>
 						</Tooltip>
 						<Tooltip>
@@ -336,7 +344,9 @@ export function TokenCard({ token, className }: TokenCardProps) {
 								sideOffset={6}
 								className="bg-[#1a1a1a] text-white border border-[#333] px-3 py-2 rounded-lg text-[11px] shadow-xl"
 							>
-								<p className="font-medium text-white/90">5 min price change</p>
+								<p className="font-medium text-white/90">
+									5 min price change
+								</p>
 							</TooltipContent>
 						</Tooltip>
 					</div>

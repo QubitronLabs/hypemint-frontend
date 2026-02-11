@@ -7,3 +7,4 @@ export * from "./watchlist";
 export * from "./alerts";
 export * from "./orders";
 export * from "./leaderboard";
+export * from "./seo";
