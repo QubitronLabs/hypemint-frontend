@@ -9,34 +9,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-
-      - name: Install Dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build Next.js
-        run: bun run build
-
-      - name: Compress Build
-        run: tar -czf build.tar.gz .next public package.json next.config.js 
-
-      - name: Upload Build
-        run: |
-          scp -P ${{ secrets.SSH_PORT }} build.tar.gz \
-          ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/hypemint-frontend/
-
-      - name: Deploy on VPS
-        run: |
-          ssh -p ${{ secrets.SSH_PORT }} \
-          ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
             set -e
             cd /var/www/hypemint-frontend
-            rm -rf .next
-            tar -xzf build.tar.gz
-            rm build.tar.gz
-            sudo systemctl restart hypemint-frontend
-          EOF
+            rm package-lock.json
+            git pull origin main
+            npm install
+            npm run build && systemctl restart hypemint-frontend
+
