@@ -55,7 +55,7 @@ export async function generateMetadata({
 		}
 
 		const pageJson = await pageRes.json();
-		console.log("Fetched page data for slug:", {slug}, {pageJson});
+		 
 		const pageData: DocData | null = pageJson?.data ?? null;
 
 		let seoData: SeoData | null = null;
