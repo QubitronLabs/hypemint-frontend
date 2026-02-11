@@ -126,31 +126,31 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 	}, [creatorProfile?.isFollowing]);
 
 	// Prevent background scrolling on lg+ screens only (not on mobile)
-	useEffect(() => {
-		const mediaQuery = window.matchMedia("(min-width: 1024px)");
+	// useEffect(() => {
+	// 	const mediaQuery = window.matchMedia("(min-width: 1024px)");
 
-		const applyOverflow = () => {
-			if (mediaQuery.matches) {
-				// Only apply overflow clip on lg+ screens
-				document.body.style.overflowY = "clip";
-			} else {
-				// Remove overflow clip on mobile/tablet
-				document.body.style.overflowY = "";
-			}
-		};
+	// 	const applyOverflow = () => {
+	// 		if (mediaQuery.matches) {
+	// 			// Only apply overflow clip on lg+ screens
+	// 			document.body.style.overflowY = "clip";
+	// 		} else {
+	// 			// Remove overflow clip on mobile/tablet
+	// 			document.body.style.overflowY = "";
+	// 		}
+	// 	};
 
-		// Apply initial state
-		applyOverflow();
+	// 	// Apply initial state
+	// 	applyOverflow();
 
-		// Listen for screen size changes
-		mediaQuery.addEventListener("change", applyOverflow);
+	// 	// Listen for screen size changes
+	// 	mediaQuery.addEventListener("change", applyOverflow);
 
-		return () => {
-			// Cleanup: remove overflow and listener
-			document.body.style.overflowY = "";
-			mediaQuery.removeEventListener("change", applyOverflow);
-		};
-	}, []);
+	// 	return () => {
+	// 		// Cleanup: remove overflow and listener
+	// 		document.body.style.overflowY = "";
+	// 		mediaQuery.removeEventListener("change", applyOverflow);
+	// 	};
+	// }, []);
 
 	// Follow/unfollow handler
 	const handleFollow = async () => {
@@ -373,7 +373,8 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 		<div className="w-full mx-auto p-3 sm:p-4 lg:p-6 relative overflow-x-clip">
 			<div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] relative gap-4 lg:gap-6">
 				{/* Main Content */}
-				<div className="min-w-0 space-y-4 sm:space-y-6 w-full lg:sticky lg:top-22 lg:self-start overflow-y-auto scroll-smooth lg:max-h-[calc(100vh-6.5rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+				{/* removed: lg:max-h-[calc(100vh-6.5rem)]  */}
+				<div className="min-w-0 space-y-4 sm:space-y-6 w-full lg:sticky lg:top-22 lg:self-start overflow-y-auto scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 					{/* Section 1: Token Header Card - Simplified as per screenshot 1 */}
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}

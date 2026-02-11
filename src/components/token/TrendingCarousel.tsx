@@ -151,7 +151,7 @@ export function TrendingCarousel() {
 				</h2>
 				<div className="flex items-center gap-1">
 					<Button
-						variant="ghost"
+						variant="secondary"
 						size="icon"
 						onClick={scrollPrev}
 						disabled={!canScrollPrev}
@@ -160,7 +160,7 @@ export function TrendingCarousel() {
 						<ChevronLeft className="h-4 w-4" />
 					</Button>
 					<Button
-						variant="ghost"
+						variant="secondary"
 						size="icon"
 						onClick={scrollNext}
 						disabled={!canScrollNext}
