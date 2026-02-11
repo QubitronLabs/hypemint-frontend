@@ -7,6 +7,11 @@ import { Zap, GraduationCap } from "lucide-react";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { cn, fromWei, formatNumber } from "@/lib/utils";
 import { TokenImage } from "@/components/ui/token-image";
+import {
+	Tooltip,
+	TooltipTrigger,
+	TooltipContent,
+} from "@/components/ui/tooltip";
 import { formatRelativeTime } from "@/lib/formatters";
 import type { Token } from "@/types";
 
@@ -127,6 +132,16 @@ export function TokenCard({ token, className }: TokenCardProps) {
 		const progress = token.athProgress ?? 0;
 		return Math.min(100, Math.max(0, progress));
 	}, [token.athProgress]);
+
+	// 5-minute price change
+	const priceChange5m = useMemo(() => {
+		const raw = token.priceChange5m;
+		if (raw === undefined || raw === null) return 0;
+		const val = typeof raw === "string" ? parseFloat(raw) : raw;
+		return isNaN(val) ? 0 : val;
+	}, [token.priceChange5m]);
+
+	const priceChange5mPositive = priceChange5m >= 0;
 
 	// ATH progress bar colors
 	const athColors = useMemo(
@@ -255,44 +270,75 @@ export function TokenCard({ token, className }: TokenCardProps) {
 						</span>
 					</div>
 
-					{/* Row 4: ATH Progress Bar + Percentage */}
+					{/* Row 4: ATH Progress Bar + 5m Change */}
 					<div className="flex items-center gap-1.5 sm:gap-2 mt-1 sm:mt-1.5">
-						<div className="relative flex-1 max-w-44 h-1.5 sm:h-2 bg-[#222] rounded-full  shrink-0">
-							<motion.div
-								initial={{ width: 0 }}
-								animate={{
-									width: `${Math.max(athProgress > 0 ? 4 : 0, athProgress)}%`,
-								}}
-								transition={{ duration: 0.8, ease: "easeOut" }}
-								className="h-full rounded-full"
-								style={{
-									background: `linear-gradient(to right, ${athColors.from}, ${athColors.to})`,
-									minWidth: athProgress > 0 ? "3px" : "0px",
-									boxShadow:
-										athProgress > 0
-											? `0 0 6px ${athColors.glow}`
-											: "none",
-								}}
-							/>
-							{/* Sparkle gif at end of bar when at ATH */}
-							{isAtAth && (
-								<motion.img
-									initial={{ opacity: 0 }}
-									animate={{ opacity: 1 }}
-									transition={{
-										delay: 0.8,
-										duration: 0.5,
-										ease: "easeOut",
-									}}
-									src="/spark.gif"
-									alt="ATH"
-									className="absolute -right-4 top-1/2 -translate-y-1/2 size-10 pointer-events-none"
-								/>
-							)}
-						</div>
-						<span className="text-[9px] sm:text-[10px] text-[#999] font-medium shrink-0">
-							{athProgress.toFixed(1)}%
-						</span>
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<div className="relative flex-1 max-w-44 h-1.5 sm:h-2 bg-[#222] rounded-full  shrink-0 cursor-help">
+									<motion.div
+										initial={{ width: 0 }}
+										animate={{
+											width: `${Math.max(athProgress > 0 ? 4 : 0, athProgress)}%`,
+										}}
+										transition={{ duration: 0.8, ease: "easeOut" }}
+										className="h-full rounded-full"
+										style={{
+											background: `linear-gradient(to right, ${athColors.from}, ${athColors.to})`,
+											minWidth: athProgress > 0 ? "3px" : "0px",
+											boxShadow:
+												athProgress > 0
+													? `0 0 6px ${athColors.glow}`
+													: "none",
+										}}
+									/>
+									{/* Sparkle gif at end of bar when at ATH */}
+									{isAtAth && (
+										<motion.img
+											initial={{ opacity: 0 }}
+											animate={{ opacity: 1 }}
+											transition={{
+												delay: 0.8,
+												duration: 0.5,
+												ease: "easeOut",
+											}}
+											src="/spark.gif"
+											alt="ATH"
+											className="absolute -right-4 top-1/2 -translate-y-1/2 size-10 pointer-events-none"
+										/>
+									)}
+								</div>
+							</TooltipTrigger>
+							<TooltipContent
+								side="top"
+								sideOffset={6}
+								className="bg-[#1a1a1a] text-white border border-[#333] px-3 py-2 rounded-lg text-[11px] max-w-[200px] shadow-xl"
+							>
+								<p className="font-medium text-white/90">ATH Progress ({athProgress.toFixed(1)}%)</p>
+								<p className="text-white/50 mt-0.5">Current price / all-time high price</p>
+							</TooltipContent>
+						</Tooltip>
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<span
+									className={cn(
+										"text-[9px] sm:text-[10px] font-semibold shrink-0 cursor-help",
+										priceChange5mPositive
+											? "text-[#00ff88]"
+											: "text-[#ff4444]",
+									)}
+								>
+									{priceChange5mPositive ? "+" : ""}
+									{priceChange5m.toFixed(1)}%
+								</span>
+							</TooltipTrigger>
+							<TooltipContent
+								side="top"
+								sideOffset={6}
+								className="bg-[#1a1a1a] text-white border border-[#333] px-3 py-2 rounded-lg text-[11px] shadow-xl"
+							>
+								<p className="font-medium text-white/90">5 min price change</p>
+							</TooltipContent>
+						</Tooltip>
 					</div>
 
 					{truncatedDescription && (

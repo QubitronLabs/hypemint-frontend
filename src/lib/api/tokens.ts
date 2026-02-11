@@ -221,15 +221,33 @@ export async function checkTokenSymbol(
   }
 }
 
-// Search tokens by name or symbol
+// Search user result type
+export interface SearchUser {
+  id: string;
+  username: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+  walletAddress: string;
+  isVerified: boolean;
+  followersCount: number;
+  tokensCreated: number;
+}
+
+// Search results containing both tokens and users
+export interface SearchResults {
+  tokens: Token[];
+  users: SearchUser[];
+}
+
+// Search tokens and users
 export async function searchTokens(
   query: string,
   options?: { chainId?: number; limit?: number },
-): Promise<Token[]> {
-  if (!query || query.length < 2) return [];
+): Promise<SearchResults> {
+  if (!query || query.length < 2) return { tokens: [], users: [] };
 
   try {
-    const { data } = await apiClient.get<ApiResponse<Token[]>>(
+    const { data } = await apiClient.get<ApiResponse<SearchResults>>(
       "/api/v1/tokens/search",
       {
         params: {
@@ -239,10 +257,10 @@ export async function searchTokens(
         },
       },
     );
-    return data.data ?? [];
+    return data.data ?? { tokens: [], users: [] };
   } catch (error) {
     console.error("Failed to search tokens:", error);
-    return [];
+    return { tokens: [], users: [] };
   }
 }
 
