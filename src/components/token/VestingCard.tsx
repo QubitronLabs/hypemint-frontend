@@ -20,6 +20,7 @@ export function VestingCard({ bondingCurveAddress, symbol }: VestingCardProps) {
 	const { claim, isClaiming, isConfirming, isConfirmed, error, reset } =
 		useClaimVested();
 	const [justClaimed, setJustClaimed] = useState(false);
+	const [hideCard, setHideCard] = useState(false);
 
 	// Vesting duration is fixed at 1 hour (3600 seconds) in current contract
 	const VESTING_DURATION = 3600;
@@ -64,6 +65,16 @@ export function VestingCard({ bondingCurveAddress, symbol }: VestingCardProps) {
 		return () => clearInterval(interval);
 	}, [startTime, VESTING_DURATION]);
 
+	useEffect(() => {
+		if (justClaimed && isConfirmed) {
+			const t = setTimeout(() => {
+				setHideCard(true);
+			}, 1500);
+
+			return () => clearTimeout(t);
+		}
+	}, [justClaimed, isConfirmed]);
+
 	// Early return AFTER all hooks
 	// Don't show card if no vesting info or totalAmount is 0
 	if (!vestingInfo || vestingInfo.totalAmount === 0n) {
@@ -94,6 +105,9 @@ export function VestingCard({ bondingCurveAddress, symbol }: VestingCardProps) {
 
 	const hasClaimable = claimableAmount && claimableAmount > 0n;
 	const isVestingComplete = elapsed >= VESTING_DURATION;
+
+	// Don't show card if user just claimed and it's confirmed (to show success message), but hide after short delay
+	if (hideCard) return null;
 
 	return (
 		<Card className="border-primary/20 bg-linear-to-br from-primary/5 to-background">
