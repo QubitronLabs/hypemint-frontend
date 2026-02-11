@@ -89,14 +89,13 @@ export function usePersistedTabs<T extends string>(
     return getStoredTab();
   });
 
-  // Hydration effect - sync with URL after mount
+  // Hydration effect - ONLY runs once on mount to initialize from URL
   useEffect(() => {
     const storedTab = getStoredTab();
-    // Only update if different to avoid unnecessary re-renders
-
     setActiveTabState((prev) => (prev !== storedTab ? storedTab : prev));
     setIsHydrated(true);
-  }, [getStoredTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - only run once on mount
 
   // Function to set active tab and persist it
   const setActiveTab = useCallback(
@@ -198,12 +197,13 @@ export function useSmartTabs<T extends string>(
     return getStoredTab();
   });
 
-  // Hydration effect
+  // Hydration effect - ONLY runs once on mount to initialize from URL
   useEffect(() => {
     const storedTab = getStoredTab();
     setActiveTabState((prev) => (prev !== storedTab ? storedTab : prev));
     setIsHydrated(true);
-  }, [getStoredTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - only run once on mount
 
   // Set active tab and persist to both URL and localStorage
   const setActiveTab = useCallback(
