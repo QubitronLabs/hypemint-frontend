@@ -5,6 +5,7 @@ import { cn, fromWei, formatNumber } from "@/lib/utils";
 import { useNativeCurrencySymbol } from "@/hooks";
 
 interface BondingCurveProgressProps {
+	nativeSymbol: string;
 	progress: number;
 	currentAmount: string;
 	targetAmount: string;
@@ -17,13 +18,14 @@ interface BondingCurveProgressProps {
  * Shows progress toward moving from bonding curve to DEX liquidity
  */
 export function BondingCurveProgress({
+	nativeSymbol,
 	progress,
 	currentAmount,
 	targetAmount,
 	className,
 }: BondingCurveProgressProps) {
 	const formattedProgress = Math.min(progress, 100);
-	const nativeSymbol = useNativeCurrencySymbol();
+	
 
 	const formatAmount = (amount: string) => {
 		// Convert from Wei if needed

@@ -85,42 +85,118 @@ export function getChain(chainId: number) {
 	}
 }
 
-// Block explorer URLs
-export const BLOCK_EXPLORER_URLS: Record<number, string> = {
+// Fallback block explorer URLs (used when deployment store is not loaded)
+const FALLBACK_EXPLORER_URLS: Record<number, string> = {
 	[polygon.id]: "https://polygonscan.com",
 	[polygonAmoy.id]: "https://amoy.polygonscan.com",
 	[ganache.id]: "", // No explorer for local
+	901: "https://explorer.solana.com", // Solana devnet
 };
 
-// Get transaction URL (returns empty for Ganache)
+/**
+ * Get explorer base URL for a chain.
+ * Checks the admin contract deployment store first, then falls back to hardcoded.
+ */
+export function getExplorerBaseUrl(chainId: number): string {
+	// Dynamic: check contract deployments store
+	try {
+		const { useContractConfigStore } = require("@/hooks/useContractConfig");
+		const store = useContractConfigStore.getState();
+		if (store.isLoaded && store.deployments.length > 0) {
+			const deployment = store.deployments.find(
+				(d: any) => d.chainId === chainId && d.isActive,
+			);
+			if (deployment?.explorerUrl) {
+				// Remove trailing slash if present
+				return deployment.explorerUrl.replace(/\/$/, "");
+			}
+		}
+	} catch {
+		// Store not available (SSR), use fallback
+	}
+	return FALLBACK_EXPLORER_URLS[chainId] || "";
+}
+
+/**
+ * Get chain display name for a chain ID.
+ * Checks the admin contract deployment store first, then falls back to known names.
+ */
+export function getChainDisplayName(chainId: number): string {
+	// Dynamic: check contract deployments store
+	try {
+		const { useContractConfigStore } = require("@/hooks/useContractConfig");
+		const store = useContractConfigStore.getState();
+		if (store.isLoaded && store.deployments.length > 0) {
+			const deployment = store.deployments.find(
+				(d: any) => d.chainId === chainId && d.isActive,
+			);
+			if (deployment?.chainName) return deployment.chainName;
+		}
+	} catch {
+		// Store not available (SSR), use fallback
+	}
+	const FALLBACK_NAMES: Record<number, string> = {
+		1: "Ethereum",
+		137: "Polygon",
+		80002: "Polygon Amoy",
+		8453: "Base",
+		1337: "Ganache Local",
+		901: "Solana Devnet",
+	};
+	return FALLBACK_NAMES[chainId] || `Chain ${chainId}`;
+}
+
+// Solana chain ID used in our system
+export const SOLANA_DEVNET_CHAIN_ID = 901;
+
+/**
+ * Check if a chain is Solana-based
+ */
+export function isSolanaChain(chainId: number): boolean {
+	return chainId === 901;
+}
+
+// Get transaction URL — supports both EVM and Solana chains
 export function getTxUrl(
 	txHash: string,
 	chainId: number = DEFAULT_CHAIN_ID,
 ): string {
-	const baseUrl = BLOCK_EXPLORER_URLS[chainId];
-	if (!baseUrl) return ""; // Ganache has no explorer
+	const baseUrl = getExplorerBaseUrl(chainId);
+	if (!baseUrl) return "";
+	if (isSolanaChain(chainId)) {
+		return `${baseUrl}/tx/${txHash}?cluster=devnet`;
+	}
 	return `${baseUrl}/tx/${txHash}`;
 }
 
-// Get address URL
+// Get address URL — supports both EVM and Solana chains
 export function getAddressUrl(
 	address: string,
 	chainId: number = DEFAULT_CHAIN_ID,
 ): string {
-	const baseUrl = BLOCK_EXPLORER_URLS[chainId];
+	const baseUrl = getExplorerBaseUrl(chainId);
 	if (!baseUrl) return "";
+	if (isSolanaChain(chainId)) {
+		return `${baseUrl}/address/${address}?cluster=devnet`;
+	}
 	return `${baseUrl}/address/${address}`;
 }
 
-// Get token URL
+// Get token URL — supports both EVM and Solana chains
 export function getTokenUrl(
 	address: string,
 	chainId: number = DEFAULT_CHAIN_ID,
 ): string {
-	const baseUrl = BLOCK_EXPLORER_URLS[chainId];
+	const baseUrl = getExplorerBaseUrl(chainId);
 	if (!baseUrl) return "";
+	if (isSolanaChain(chainId)) {
+		return `${baseUrl}/address/${address}?cluster=devnet`;
+	}
 	return `${baseUrl}/token/${address}`;
 }
+
+// Legacy export for backward compatibility
+export const BLOCK_EXPLORER_URLS: Record<number, string> = FALLBACK_EXPLORER_URLS;
 
 // Check if running in local mode
 export const IS_LOCAL_MODE = isLocalMode;

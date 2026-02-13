@@ -26,6 +26,7 @@ export {
 	useNativeBalance,
 	useCreationFee,
 	useCreateToken as useCreateTokenOnChain,
+	useActiveEvmChainId,
 	useBondingCurveState,
 	useBuyQuote,
 	useSellQuote,
@@ -43,3 +44,33 @@ export type {
 	BuyParams,
 	SellParams,
 } from "./useContracts";
+
+// === Multichain Hooks ===
+export { useUniversalTrade } from "./useUniversalTrade";
+export type {
+	ChainType,
+	UniversalTradeParams,
+	UniversalBuyParams,
+	UniversalSellParams,
+	UniversalTradeReturn,
+} from "./useUniversalTrade";
+
+// Chain-aware balance (automatically delegates to EVM or Solana)
+export { useChainNativeBalance } from "./useChainNativeBalance";
+export type { ChainBalance } from "./useChainNativeBalance";
+
+// EVM-specific re-exports live in ./useEvmContracts.ts
+// Import directly from "@/hooks/useEvmContracts" for explicit EVM chain usage.
+// Not re-exported here to avoid duplicate export conflicts with useContracts.
+
+// Solana hooks
+export {
+	useSolanaCreateToken,
+	useSolanaBuyTokens,
+	useSolanaSellTokens,
+	useSolanaTokenBalance,
+	useSolanaNativeBalance,
+} from "./useSolanaContracts";
+
+// Contract config (dynamic from backend)
+export { useContractConfig, useContractConfigStore } from "./useContractConfig";

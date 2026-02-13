@@ -1,8 +1,12 @@
 /**
  * HypeMint Contract Configuration
  *
- * Contract addresses and chain configuration
+ * Contract addresses and chain configuration.
+ * Prefers dynamic config from backend (stored in useContractConfigStore),
+ * falls back to hardcoded addresses when backend is unavailable.
  */
+
+import { useContractConfigStore } from "@/hooks/useContractConfig";
 
 // Polygon Mainnet Chain ID
 export const POLYGON_CHAIN_ID = 137;
@@ -10,10 +14,41 @@ export const POLYGON_CHAIN_ID = 137;
 // Polygon Amoy Testnet Chain ID
 export const POLYGON_AMOY_CHAIN_ID = 80002;
 
-// Active chain (change for production)
+// Active chain (change for production) - used as fallback only
 export const ACTIVE_CHAIN_ID = POLYGON_AMOY_CHAIN_ID;
 
-// Contract addresses - UPDATE THESE AFTER DEPLOYMENT
+/**
+ * Get the active EVM chain ID dynamically from the backend contract deployments store.
+ * Falls back to ACTIVE_CHAIN_ID if the store hasn't loaded or has no active EVM deployment.
+ * Use this instead of ACTIVE_CHAIN_ID for runtime chain detection.
+ */
+export function getActiveEvmChainId(): number {
+	const store = useContractConfigStore.getState();
+	if (store.isLoaded && store.deployments.length > 0) {
+		const evmDeployment = store.deployments.find(
+			(d) => d.chainType === "EVM" && d.isActive,
+		);
+		if (evmDeployment) return evmDeployment.chainId;
+	}
+	return ACTIVE_CHAIN_ID;
+}
+
+/**
+ * Get the active Solana chain ID from the backend contract deployments store.
+ * Returns undefined if no active Solana deployment found.
+ */
+export function getActiveSolanaChainId(): number | undefined {
+	const store = useContractConfigStore.getState();
+	if (store.isLoaded && store.deployments.length > 0) {
+		const solDeployment = store.deployments.find(
+			(d) => d.chainType === "SOLANA" && d.isActive,
+		);
+		if (solDeployment) return solDeployment.chainId;
+	}
+	return undefined;
+}
+
+// Hardcoded fallback addresses - used when backend is unavailable
 export const CONTRACT_ADDRESSES = {
 	// Polygon Mainnet
 	[POLYGON_CHAIN_ID]: {
@@ -33,11 +68,67 @@ export const CONTRACT_ADDRESSES = {
 	},
 } as const;
 
-// Get contract address for active chain
+/**
+ * Get contract address for a given chain.
+ * First checks the dynamic backend config store, then falls back to hardcoded.
+ */
 export function getContractAddress(
 	contract: "factory" | "tokenImplementation" | "bondingCurveImplementation",
+	chainId?: number,
 ): `0x${string}` {
+	const targetChainId = chainId ?? getActiveEvmChainId();
+
+	// Try dynamic config from backend first
+	const store = useContractConfigStore.getState();
+	if (store.isLoaded && store.deployments.length > 0) {
+		const deployment = store.deployments.find(
+			(d) => d.chainId === targetChainId && d.isActive,
+		);
+		if (deployment) {
+			const mapping: Record<string, string | null> = {
+				factory: deployment.factoryAddress,
+				tokenImplementation: deployment.tokenImplementationAddress,
+				bondingCurveImplementation:
+					deployment.bondingCurveImplementationAddress,
+			};
+			const addr = mapping[contract];
+			if (addr) return addr as `0x${string}`;
+		}
+	}
+
+	// Fallback to hardcoded
+	const addresses =
+		CONTRACT_ADDRESSES[targetChainId as keyof typeof CONTRACT_ADDRESSES];
+	if (addresses) {
+		return addresses[contract];
+	}
+
+	// Ultimate fallback
 	return CONTRACT_ADDRESSES[ACTIVE_CHAIN_ID][contract];
+}
+
+/**
+ * Get creation fee for a chain.
+ * Checks dynamic config first, falls back to DEFAULT_CREATION_FEE.
+ */
+export function getCreationFeeForChain(chainId?: number): bigint {
+	const targetChainId = chainId ?? getActiveEvmChainId();
+
+	const store = useContractConfigStore.getState();
+	if (store.isLoaded && store.deployments.length > 0) {
+		const deployment = store.deployments.find(
+			(d) => d.chainId === targetChainId && d.isActive,
+		);
+		if (deployment?.creationFee) {
+			try {
+				return BigInt(deployment.creationFee);
+			} catch {
+				// fall through
+			}
+		}
+	}
+
+	return DEFAULT_CREATION_FEE;
 }
 
 // Default creation fee in wei (0.01 MATIC)

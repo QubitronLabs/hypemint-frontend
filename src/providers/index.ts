@@ -12,3 +12,4 @@ export {
   useWebSocketEvent,
   useNewTokens,
 } from "./WebSocketProvider";
+export { ContractConfigInitializer } from "./ContractConfigInitializer";

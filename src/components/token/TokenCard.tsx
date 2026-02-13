@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Zap, GraduationCap } from "lucide-react";
+import { Zap, GraduationCap, Globe } from "lucide-react";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { cn, fromWei, formatNumber } from "@/lib/utils";
 import { TokenImage } from "@/components/ui/token-image";
@@ -195,7 +195,8 @@ export function TokenCard({ token, className }: TokenCardProps) {
 					"flex gap-2 sm:gap-3",
 					className,
 				)}
-			>
+			> 
+
 				{/* Graduated Badge - Top Right Corner */}
 				{isGraduated && (
 					<div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 z-10">
@@ -213,6 +214,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
 						alt={token.name}
 						symbol={token.symbol}
 						size={88}
+						chaintype={token?.chainType}
 						className="rounded-lg w-16 h-16 sm:w-22 sm:h-22 object-cover"
 					/>
 				</div>

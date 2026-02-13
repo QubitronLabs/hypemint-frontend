@@ -17,12 +17,14 @@ import {
 import { cn, fromWei, formatNumber } from "@/lib/utils";
 import { wsService } from "@/lib/websocket";
 import { useNativeCurrencySymbol } from "@/hooks";
+import { getTxUrl } from "@/lib/wagmi/config";
 import type { Trade, TradeEvent } from "@/types";
 
 interface TradeTapeProps {
 	tokenId: string;
 	tokenSymbol?: string;
 	initialTrades?: Trade[];
+	chainId?: number;
 	className?: string;
 }
 
@@ -40,6 +42,7 @@ export function TradeTape({
 	tokenId,
 	tokenSymbol = "TOKEN",
 	initialTrades = [],
+	chainId,
 	className,
 }: TradeTapeProps) {
 	const nativeSymbol = useNativeCurrencySymbol();
@@ -287,7 +290,7 @@ export function TradeTape({
 									<div>
 										{trade.txHash ? (
 											<a
-												href={`https://amoy.polygonscan.com/tx/${trade.txHash}`}
+												href={getTxUrl(trade.txHash, chainId)}
 												target="_blank"
 												rel="noopener noreferrer"
 												className="text-xs text-primary hover:underline flex items-center gap-1"

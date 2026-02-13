@@ -183,9 +183,12 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
     );
   }
 
+
+
   return (
     <DynamicContextProvider
       settings={{
+        
         environmentId: environmentId || "demo-environment-id",
         walletConnectors: [
           // Solana as primary chain (like pump.fun)
@@ -193,13 +196,8 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
           // EVM chains ready for multi-chain expansion
           EthereumWalletConnectors,
         ],
-        // Add Ganache network for local development
-        overrides: isLocalMode
-          ? {
-              evmNetworks: (networks) =>
-                mergeNetworks([ganacheNetwork], networks),
-            }
-          : undefined,
+        
+         
         // Dark theme to match our design
         cssOverrides: `
           .dynamic-widget-inline-controls {
@@ -214,6 +212,7 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
           }
         `,
       }}
+      
     >
       <AuthSync>{children}</AuthSync>
     </DynamicContextProvider>

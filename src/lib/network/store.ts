@@ -3,6 +3,10 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { NativeCurrency } from "@dynamic-labs/sdk-api-core";
+
+// Chain type for multichain support
+export type ChainType = "EVM" | "SOLANA";
+
 // --- TYPE DEFINITIONS ---
 export interface NetworkInfo {
 	name: string;
@@ -14,6 +18,7 @@ export interface NetworkState {
 	chainId: number | null;
 	chainLogo: string | null;
 	nativeCurrency: NativeCurrency | null;
+	activeChainType: ChainType;
 }
 
 interface NetworkStoreState extends NetworkState {
@@ -24,6 +29,7 @@ interface NetworkStoreState extends NetworkState {
 	setNetworkData: (data: NetworkState) => void;
 	clearNetworkData: () => void;
 	setChainLogo: (logo: string) => void;
+	setChainType: (chainType: ChainType) => void;
 	setHasHydrated: (state: boolean) => void;
 }
 
@@ -32,6 +38,7 @@ interface NetworkStoreState extends NetworkState {
  *
  * This store tracks the currently selected blockchain network across the app.
  * It syncs with Dynamic.xyz wallet network changes and persists to localStorage.
+ * Now includes activeChainType for multichain (EVM/Solana) support.
  */
 export const useNetworkStore = create<NetworkStoreState>()(
 	persist(
@@ -40,6 +47,7 @@ export const useNetworkStore = create<NetworkStoreState>()(
 			chainId: null,
 			chainLogo: null,
 			nativeCurrency: null,
+			activeChainType: "EVM" as ChainType,
 			_hasHydrated: false,
 
 			setNetworkData: (data) => {
@@ -49,6 +57,7 @@ export const useNetworkStore = create<NetworkStoreState>()(
 					chainId: data.chainId,
 					chainLogo: data.chainLogo,
 					nativeCurrency: data.nativeCurrency,
+					activeChainType: data.activeChainType ?? "EVM",
 				});
 			},
 
@@ -59,11 +68,17 @@ export const useNetworkStore = create<NetworkStoreState>()(
 					chainId: null,
 					chainLogo: null,
 					nativeCurrency: null,
+					activeChainType: "EVM",
 				});
 			},
 
 			setChainLogo: (logo) => {
 				set({ chainLogo: logo });
+			},
+
+			setChainType: (chainType) => {
+				console.log("[Network] Setting chain type:", chainType);
+				set({ activeChainType: chainType });
 			},
 
 			setHasHydrated: (state) => set({ _hasHydrated: state }),
@@ -76,11 +91,14 @@ export const useNetworkStore = create<NetworkStoreState>()(
 				chainId: state.chainId,
 				chainLogo: state.chainLogo,
 				nativeCurrency: state.nativeCurrency,
+				activeChainType: state.activeChainType,
 			}),
 			onRehydrateStorage: () => (state) => {
 				console.log(
 					"[Network] Hydration complete, chainId:",
 					state?.chainId || "none",
+					"chainType:",
+					state?.activeChainType || "EVM",
 				);
 				state?.setHasHydrated(true);
 			},
@@ -94,6 +112,8 @@ export const useChainId = () => useNetworkStore((state) => state.chainId);
 export const useChainLogo = () => useNetworkStore((state) => state.chainLogo);
 export const useNativeCurrency = () =>
 	useNetworkStore((state) => state.nativeCurrency);
+export const useActiveChainType = () =>
+	useNetworkStore((state) => state.activeChainType);
 export const useNetworkHasHydrated = () =>
 	useNetworkStore((state) => state._hasHydrated);
 
@@ -107,5 +127,6 @@ export function getNetworkState(): NetworkState {
 		chainId: state.chainId,
 		chainLogo: state.chainLogo,
 		nativeCurrency: state.nativeCurrency,
+		activeChainType: state.activeChainType,
 	};
 }

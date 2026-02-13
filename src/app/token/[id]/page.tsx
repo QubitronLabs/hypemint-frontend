@@ -51,7 +51,7 @@ import { useTokenTrades, tradeKeys } from "@/hooks/useTrades";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useManualSync } from "@/hooks/useBlockchainSync";
 import { usePersistedTabs } from "@/hooks/usePersistedTabs";
-import { useNativeCurrencySymbol, useAuth } from "@/hooks";
+import {  useAuth } from "@/hooks";
 import {
 	useFollowUser,
 	useUnfollowUser,
@@ -66,6 +66,7 @@ import {
 	formatPrice,
 	fromWei,
 } from "@/lib/utils";
+import { getChainDisplayName } from "@/lib/wagmi/config";
 import type { Address } from "viem";
 import type { Token } from "@/types";
 import dynamic from "next/dynamic";
@@ -81,11 +82,10 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 	const [localIsFollowing, setLocalIsFollowing] = useState(false);
 	const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 	const [showBubbleMap, setShowBubbleMap] = useState(false);
-	const [showImageModal, setShowImageModal] = useState(false);
-	const nativeSymbol = useNativeCurrencySymbol();
+	const [showImageModal, setShowImageModal] = useState(false); 
 
 	// Auth and follow hooks
-	const { isAuthenticated, walletAddress } = useAuth();
+	const { isAuthenticated, walletAddress, setShowAuthFlow } = useAuth();
 	const followMutation = useFollowUser();
 	const unfollowMutation = useUnfollowUser();
 
@@ -256,6 +256,9 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							...oldData,
 							currentPrice: message.data.price,
 							marketCap: message.data.marketCap,
+							holdersCount:
+								message.data.holdersCount ??
+								oldData.holdersCount,
 							priceChange24h:
 								message.data.priceChange24h ??
 								oldData.priceChange24h,
@@ -497,7 +500,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 																		4,
 																	)}{" "}
 																	{
-																		nativeSymbol
+																		token?.nativeCurrency?.symbol
 																	}{" "}
 																	in the
 																	bonding
@@ -756,32 +759,44 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 													arrowClassName="bg-zinc-900 fill-zinc-900"
 												>
 													<p>
-														This bar shows the
-														current market cap
+														Current market cap
 														relative to ATH
 													</p>
 												</TooltipContent>
 											</Tooltip>
 										</TooltipProvider>
-										<span
-											className="text-sm font-semibold tabular-nums"
-											style={{
-												color: (() => {
-													const p =
-														token.athProgress ?? 0;
-													if (p >= 85)
-														return "#ff6b00";
-													if (p >= 60)
-														return "#ffd200";
-													return "#00ff88";
-												})(),
-											}}
-										>
-											{(token.athProgress ?? 0).toFixed(
-												1,
-											)}
-											%
-										</span>
+										<TooltipProvider>
+											<Tooltip>
+												<TooltipTrigger asChild>
+													<span
+														className="text-sm font-semibold tabular-nums cursor-help"
+														style={{
+															color: (() => {
+																const change = parseFloat(token.priceChange5m || "0");
+																if (change > 0) return "#00ff88";
+																if (change < 0) return "#ef4444";
+																return "#a1a1aa";
+															})(),
+														}}
+													>
+														{parseFloat(token.priceChange5m || "0") >= 0
+															? "+"
+															: ""}
+														{parseFloat(token.priceChange5m || "0").toFixed(
+															2,
+														)}
+														%
+													</span>
+												</TooltipTrigger>
+												<TooltipContent
+													side="top"
+													className="bg-zinc-900 border-zinc-700 text-white text-xs"
+													arrowClassName="bg-zinc-900 fill-zinc-900"
+												>
+													<p>5 min price change</p>
+												</TooltipContent>
+											</Tooltip>
+										</TooltipProvider>
 									</div>
 								</div>
 							</div>
@@ -976,6 +991,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 									tokenId={id}
 									tokenSymbol={token.symbol}
 									initialTrades={trades}
+									chainId={token.chainId}
 									className="border-0 rounded-none"
 								/>
 							</TabsContent>
@@ -1000,32 +1016,55 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						</motion.div>
 					)}
 
-					{/* Trading Panel - On-Chain or Centralized */}
-					<motion.div
+					{/* login button to trade */}
+					{!isAuthenticated && (
+						<motion.div
 						initial={{ opacity: 0, x: 20 }}
 						animate={{ opacity: 1, x: 0 }}
+						transition={{ delay: 0.1 }}
+						>
+						<div className="bg-card border border-border rounded-xl p-4 flex flex-col items-center gap-4">
+							<p className="text-sm text-muted-foreground">
+								Please log in to access trading features.
+							</p>
+							<Button onClick={() => setShowAuthFlow(true)} className="w-full cursor-pointer">
+								Log In
+							</Button>
+						</div>
+						</motion.div>
+					)}
+					{/* Trading Panel - On-Chain or Centralized */}
+					{isAuthenticated
+					&&(
+					<motion.div
+					initial={{ opacity: 0, x: 20 }}
+					animate={{ opacity: 1, x: 0 }}
 					>
 						{token.bondingCurveAddress && token.contractAddress ? (
 							<OnChainTradingPanel
-								tokenAddress={token.contractAddress as Address}
-								bondingCurveAddress={
+							tokenAddress={token.contractAddress as Address}
+							bondingCurveAddress={
 									token.bondingCurveAddress as Address
 								}
+								nativeSymbol={token?.nativeCurrency?.symbol as string}
 								tokenSymbol={token.symbol || "TOKEN"}
 								tokenName={token.name || "Unknown Token"}
 								currentPrice={token.currentPrice || "0.00001"}
+								chainType={token.chainType === "SOLANA" ? "SOLANA" : "EVM"}
+								chainId={token.chainId}
 							/>
 						) : (
 							<TradingPanel
-								tokenId={id}
-								tokenSymbol={token.symbol || "TOKEN"}
-								tokenName={token.name || "Unknown Token"}
-								currentPrice={token.currentPrice || "0.00001"}
-								totalSupply={token.totalSupply || "1000000000"}
+							tokenId={id}
+							tokenSymbol={token.symbol || "TOKEN"}
+							tokenName={token.name || "Unknown Token"}
+							currentPrice={token.currentPrice || "0.00001"}
+							totalSupply={token.totalSupply || "1000000000"}
 							/>
 						)}
-					</motion.div>
-
+					</motion.div>)
+					}
+					
 					{/* Bonding Curve */}
 					<motion.div
 						initial={{ opacity: 0, x: 20 }}
@@ -1034,6 +1073,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						className="bg-card border border-border rounded-xl p-4"
 					>
 						<BondingCurveProgress
+						nativeSymbol={token?.nativeCurrency?.symbol as string}
 							progress={token.bondingCurveProgress ?? 0}
 							currentAmount={token.currentBondingAmount || "0"}
 							targetAmount={token.graduationTarget || "100"}
@@ -1079,10 +1119,11 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 									Reserve
 								</span>
 								<span className="text-sm font-mono tabular-nums">
-									{fromWei(
-										token.currentBondingAmount || "0",
-									).toFixed(4)}{" "}
-									{nativeSymbol}
+									{token.chainType === "SOLANA"
+										? (Number(token.currentBondingAmount || "0") / 1e9).toFixed(4)
+										: fromWei(token.currentBondingAmount || "0").toFixed(4)
+									}{" "}
+									{token?.nativeCurrency?.symbol}
 								</span>
 							</div>
 							<div className="flex items-center justify-between">
@@ -1090,7 +1131,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 									Network
 								</span>
 								<Badge variant="outline" className="text-xs">
-									Polygon Amoy
+									{getChainDisplayName(token.chainId)}
 								</Badge>
 							</div>
 							{token.hypeBoostEnabled && (

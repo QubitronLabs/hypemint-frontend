@@ -29,13 +29,7 @@ export function useUserProfile(address: string | undefined) {
 	return useQuery<UserProfileResponse>({
 		// Include auth status in query key so it refetches when user logs in/out
 		queryKey: ["user", address, "hasAuth", hasAuth],
-		queryFn: async () => {
-			console.log(
-				"[useUserProfile] Fetching profile for",
-				address,
-				"hasAuth:",
-				hasAuth,
-			);
+		queryFn: async () => { 
 			return getUserProfileByAddress(address!);
 		},
 		// CRITICAL: Only enable query after hydration is complete

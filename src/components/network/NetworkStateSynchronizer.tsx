@@ -7,13 +7,31 @@ import {
 	getNetwork,
 } from "@dynamic-labs/sdk-react-core";
 import type { EvmNetwork } from "@dynamic-labs/types";
-import { useNetworkStore } from "@/lib/network";
+import { useNetworkStore, type ChainType } from "@/lib/network";
 import { useQueryClient } from "@tanstack/react-query";
+import { SOLANA_DEVNET_CHAIN_ID } from "@/lib/wagmi/config";
 
 // Helper type to safely access evmNetworks from the generic connector
-interface EvmWalletConnector {
+export interface EvmWalletConnector {
 	evmNetworks?: EvmNetwork[];
 	[key: string]: unknown;
+}
+
+/**
+ * Detect chain type from the wallet's chain/connector
+ *
+ * Dynamic.xyz exposes wallet.chain for distinguishing EVM vs Solana wallets.
+ */
+function detectChainType(wallet: { chain?: string } | null): ChainType {
+	if (!wallet) return "EVM";
+
+	// Dynamic.xyz uses "SOL" or "solana" for Solana wallets
+	const chain = (wallet as { chain?: string }).chain?.toLowerCase();
+	if (chain === "sol" || chain === "solana") {
+		return "SOLANA";
+	}
+
+	return "EVM";
 }
 
 /**
@@ -23,15 +41,16 @@ interface EvmWalletConnector {
  * This component:
  * 1. Listens to Dynamic.xyz wallet network change events
  * 2. Extracts network info (chainId, name, logo) from the wallet connector
- * 3. Updates the global network store
- * 4. Invalidates React Query caches so data refetches for the new chain
+ * 3. Determines if the wallet is EVM or Solana-based (sets chainType)
+ * 4. Updates the global network store
+ * 5. Invalidates React Query caches so data refetches for the new chain
  *
  * Place this component inside DynamicContextProvider to ensure
  * all Dynamic hooks work correctly.
  */
 export function NetworkStateSynchronizer() {
 	const { primaryWallet, sdkHasLoaded } = useDynamicContext();
-	const { setNetworkData, clearNetworkData } = useNetworkStore();
+	const { setNetworkData, clearNetworkData, setChainType } = useNetworkStore();
 	const queryClient = useQueryClient();
 	const lastChainIdRef = useRef<number | null>(null);
 
@@ -50,6 +69,35 @@ export function NetworkStateSynchronizer() {
 			}
 
 			try {
+				// Detect chain type from the primary wallet
+				const walletChainType = detectChainType(primaryWallet as { chain?: string });
+				setChainType(walletChainType);
+
+				console.log(
+					`[NetworkSync] Wallet chain type detected: ${walletChainType}`,
+				);
+
+				// For Solana wallets, we handle network info differently
+				if (walletChainType === "SOLANA") {
+					setNetworkData({
+						network: { name: "Solana", vanityName: "Solana Devnet" },
+						chainId: SOLANA_DEVNET_CHAIN_ID,
+						chainLogo: "/chains/solana.svg",
+						nativeCurrency: {
+							name: "SOL",
+							symbol: "SOL",
+							decimals: 9,
+						},
+						activeChainType: "SOLANA",
+					});
+					lastChainIdRef.current = SOLANA_DEVNET_CHAIN_ID;
+
+					console.log("[NetworkSync] Invalidating all queries for Solana switch...");
+					queryClient.invalidateQueries();
+					return;
+				}
+
+				// EVM wallet logic (existing behavior)
 				const chainId = await getNetwork(primaryWallet.connector);
 
 				if (!chainId) {
@@ -90,6 +138,7 @@ export function NetworkStateSynchronizer() {
 						chainId: numericChainId,
 						chainLogo: null,
 						nativeCurrency: null,
+						activeChainType: "EVM",
 					});
 				} else {
 					// Use vanityName if available, otherwise fall back to name
@@ -121,6 +170,7 @@ export function NetworkStateSynchronizer() {
 						chainId: numericChainId,
 						chainLogo,
 						nativeCurrency,
+						activeChainType: "EVM",
 					});
 
 					console.log(
@@ -162,7 +212,7 @@ export function NetworkStateSynchronizer() {
 				handleNetworkChange,
 			);
 		};
-	}, [primaryWallet, sdkHasLoaded, setNetworkData, clearNetworkData, queryClient]);
+	}, [primaryWallet, sdkHasLoaded, setNetworkData, clearNetworkData, setChainType, queryClient]);
 
 	// This component renders nothing - it's just a state synchronizer
 	return null;

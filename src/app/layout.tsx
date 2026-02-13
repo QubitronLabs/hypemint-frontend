@@ -11,6 +11,7 @@ import {
 	UsernamePromptProvider,
 	WagmiProvider,
 	WebSocketProvider,
+	ContractConfigInitializer,
 } from "@/providers";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
@@ -63,8 +64,7 @@ const displayFont = Space_Grotesk({
  * @see src/lib/seo/defaults.ts to change default values
  * @see src/lib/api/seo.ts for API fetch functions
  */
-export async function generateMetadata(): Promise<Metadata> {
-	return resolveMetadata();
+export async function generateMetadata(): Promise<Metadata> { return resolveMetadata();
 }
 
 export default function RootLayout({
@@ -81,6 +81,7 @@ export default function RootLayout({
 				<QueryProvider>
 					<WagmiProvider>
 						<DynamicProviderWrapper>
+							<ContractConfigInitializer>
 							<WebSocketProvider>
 								<UsernamePromptProvider>
 									{/* Sidebar Navigation */}
@@ -100,6 +101,7 @@ export default function RootLayout({
 									<Toaster richColors position="top-right" />
 								</UsernamePromptProvider>
 							</WebSocketProvider>
+							</ContractConfigInitializer>
 						</DynamicProviderWrapper>
 					</WagmiProvider>
 				</QueryProvider>

@@ -12,6 +12,7 @@ import {
 	useBalance,
 	usePublicClient,
 	useSwitchChain,
+	useChainId as useWagmiChainId,
 } from "wagmi";
 import { parseEther, type Address, type Hash } from "viem";
 import {
@@ -22,9 +23,28 @@ import {
 	DEFAULT_CREATION_FEE,
 	DEFAULT_SLIPPAGE_BPS,
 } from "@/lib/contracts";
-import { ACTIVE_CHAIN_ID } from "@/lib/contracts/config";
+import { ACTIVE_CHAIN_ID, getActiveEvmChainId } from "@/lib/contracts/config";
+import { useContractConfigStore } from "./useContractConfig";
 import { useChainId as useNetworkChainId } from "@/lib/network";
 import { useAuth } from "./useAuth";
+
+/**
+ * Hook: Get the active EVM chain ID from the backend contract deployments.
+ * Subscribes to the Zustand store so components re-render when config loads.
+ * Falls back to ACTIVE_CHAIN_ID if store hasn't loaded.
+ */
+export function useActiveEvmChainId(): number {
+	const chainId = useContractConfigStore((s) => {
+		if (s.isLoaded && s.deployments.length > 0) {
+			const evmDeploy = s.deployments.find(
+				(d) => d.chainType === "EVM" && d.isActive,
+			);
+			if (evmDeploy) return evmDeploy.chainId;
+		}
+		return null;
+	});
+	return chainId ?? ACTIVE_CHAIN_ID;
+}
 
 // Types
 export interface CreateTokenParams {
@@ -62,14 +82,15 @@ export interface SellParams {
 export function useNativeBalance() {
 	const { walletAddress } = useAuth();
 	const networkChainId = useNetworkChainId();
+	const evmChainId = useActiveEvmChainId();
 
 	// for debugging
 	useEffect(
 		() => console.log("[useNativeBalance] networkChainId:", networkChainId),
 		[networkChainId],
 	);
-	// Use the network store's chain ID, falling back to ACTIVE_CHAIN_ID
-	const chainId = networkChainId ?? ACTIVE_CHAIN_ID;
+	// Use the network store's chain ID, falling back to backend-configured EVM chain
+	const chainId = networkChainId ?? evmChainId;
 
 	return useBalance({
 		address: walletAddress,
@@ -81,13 +102,14 @@ export function useNativeBalance() {
  * Hook: Get factory creation fee
  */
 export function useCreationFee() {
-	const factoryAddress = getContractAddress("factory");
+	const evmChainId = useActiveEvmChainId();
+	const factoryAddress = getContractAddress("factory", evmChainId);
 
 	return useReadContract({
 		address: factoryAddress,
 		abi: HYPE_FACTORY_ABI,
 		functionName: "creationFee",
-		chainId: ACTIVE_CHAIN_ID,
+		chainId: evmChainId,
 	});
 }
 
@@ -98,7 +120,8 @@ const TOKEN_CREATED_TOPIC =
 // Hook: Create a new token
 export function useCreateToken() {
 	const { walletAddress: address } = useAuth();
-	const chainId = useNetworkChainId();
+	const walletChainId = useWagmiChainId(); // Actual wallet chain from Wagmi
+	const evmChainId = useActiveEvmChainId(); // Dynamic from backend config
 	const publicClient = usePublicClient();
 	const [txHash, setTxHash] = useState<Hash | undefined>();
 	const [isCreating, setIsCreating] = useState(false);
@@ -127,35 +150,35 @@ export function useCreateToken() {
 			setError(null);
 
 			try {
-				// Ensure we're on the correct chain
-				if (chainId !== ACTIVE_CHAIN_ID) {
+				// Ensure we're on the correct chain (use dynamic chain ID from backend)
+				if (walletChainId !== evmChainId) {
 					console.log(
-						`Switching from chain ${chainId} to ${ACTIVE_CHAIN_ID}`,
+						`Switching from chain ${walletChainId} to ${evmChainId}`,
 					);
 					try {
-						await switchChainAsync({ chainId: ACTIVE_CHAIN_ID });
+						await switchChainAsync({ chainId: evmChainId });
 					} catch (switchError) {
 						console.error("Failed to switch chain:", switchError);
 						setError(
 							new Error(
-								`Please switch to Polygon Amoy network (Chain ID: ${ACTIVE_CHAIN_ID})`,
+								`Please switch to the correct EVM network (Chain ID: ${evmChainId})`,
 							),
 						);
 						return null;
 					}
 				}
 
-				const factoryAddress = getContractAddress("factory");
+				const factoryAddress = getContractAddress("factory", evmChainId);
 				const fee = creationFee || DEFAULT_CREATION_FEE;
 
 				console.log("Creating token with params:", {
 					factoryAddress,
 					fee: fee.toString(),
 					params,
-					chainId: ACTIVE_CHAIN_ID,
+					chainId: evmChainId,
 				});
 
-				// Write the transaction with proper gas settings for Polygon Amoy
+				// Write the transaction
 				const hash = await writeContractAsync({
 					address: factoryAddress,
 					abi: HYPE_FACTORY_ABI,
@@ -170,10 +193,7 @@ export function useCreateToken() {
 						params.basePrice || BigInt(0),
 					],
 					value: fee,
-					chainId: ACTIVE_CHAIN_ID,
-					// Set higher gas price for Polygon Amoy testnet (minimum 25 gwei)
-					maxFeePerGas: BigInt(50000000000), // 50 gwei
-					maxPriorityFeePerGas: BigInt(30000000000), // 30 gwei
+					chainId: evmChainId,
 				});
 
 				console.log("Transaction submitted:", hash);
@@ -283,7 +303,8 @@ export function useCreateToken() {
 		},
 		[
 			address,
-			chainId,
+			walletChainId,
+			evmChainId,
 			writeContractAsync,
 			creationFee,
 			publicClient,
@@ -307,11 +328,13 @@ export function useCreateToken() {
 
 // Hook: Get bonding curve state
 export function useBondingCurveState(bondingCurveAddress: Address | undefined) {
+	const evmChainId = useActiveEvmChainId();
+
 	const { data: currentPrice } = useReadContract({
 		address: bondingCurveAddress,
 		abi: HYPE_BONDING_CURVE_ABI,
 		functionName: "getCurrentPrice",
-		chainId: ACTIVE_CHAIN_ID,
+		chainId: evmChainId,
 		query: {
 			enabled: !!bondingCurveAddress,
 		},
@@ -321,7 +344,7 @@ export function useBondingCurveState(bondingCurveAddress: Address | undefined) {
 		address: bondingCurveAddress,
 		abi: HYPE_BONDING_CURVE_ABI,
 		functionName: "getMarketCap",
-		chainId: ACTIVE_CHAIN_ID,
+		chainId: evmChainId,
 		query: {
 			enabled: !!bondingCurveAddress,
 		},
@@ -331,7 +354,7 @@ export function useBondingCurveState(bondingCurveAddress: Address | undefined) {
 		address: bondingCurveAddress,
 		abi: HYPE_BONDING_CURVE_ABI,
 		functionName: "totalSupply",
-		chainId: ACTIVE_CHAIN_ID,
+		chainId: evmChainId,
 		query: {
 			enabled: !!bondingCurveAddress,
 		},
@@ -341,7 +364,7 @@ export function useBondingCurveState(bondingCurveAddress: Address | undefined) {
 		address: bondingCurveAddress,
 		abi: HYPE_BONDING_CURVE_ABI,
 		functionName: "reserveBalance",
-		chainId: ACTIVE_CHAIN_ID,
+		chainId: evmChainId,
 		query: {
 			enabled: !!bondingCurveAddress,
 		},
@@ -351,7 +374,7 @@ export function useBondingCurveState(bondingCurveAddress: Address | undefined) {
 		address: bondingCurveAddress,
 		abi: HYPE_BONDING_CURVE_ABI,
 		functionName: "isGraduated",
-		chainId: ACTIVE_CHAIN_ID,
+		chainId: evmChainId,
 		query: {
 			enabled: !!bondingCurveAddress,
 		},
@@ -371,6 +394,7 @@ export function useBuyQuote(
 	bondingCurveAddress: Address | undefined,
 	maticAmount: string,
 ) {
+	const evmChainId = useActiveEvmChainId();
 	const amountWei = maticAmount ? parseEther(maticAmount) : BigInt(0);
 
 	return useReadContract({
@@ -378,7 +402,7 @@ export function useBuyQuote(
 		abi: HYPE_BONDING_CURVE_ABI,
 		functionName: "calculateBuy",
 		args: [amountWei],
-		chainId: ACTIVE_CHAIN_ID,
+		chainId: evmChainId,
 		query: {
 			enabled: !!bondingCurveAddress && amountWei > BigInt(0),
 		},
@@ -390,6 +414,7 @@ export function useSellQuote(
 	bondingCurveAddress: Address | undefined,
 	tokenAmount: string,
 ) {
+	const evmChainId = useActiveEvmChainId();
 	const amountWei = tokenAmount ? parseEther(tokenAmount) : BigInt(0);
 
 	return useReadContract({
@@ -397,7 +422,7 @@ export function useSellQuote(
 		abi: HYPE_BONDING_CURVE_ABI,
 		functionName: "calculateSell",
 		args: [amountWei],
-		chainId: ACTIVE_CHAIN_ID,
+		chainId: evmChainId,
 		query: {
 			enabled: !!bondingCurveAddress && amountWei > BigInt(0),
 		},
@@ -407,6 +432,7 @@ export function useSellQuote(
 // Hook: Buy tokens
 export function useBuyTokens() {
 	const { walletAddress: address } = useAuth();
+	const evmChainId = useActiveEvmChainId();
 	const [txHash, setTxHash] = useState<Hash | undefined>();
 	const [isBuying, setIsBuying] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
@@ -449,7 +475,7 @@ export function useBuyTokens() {
 					maticWei: maticWei.toString(),
 					minTokens: minTokens.toString(),
 					slippageBps: slippage,
-					chainId: ACTIVE_CHAIN_ID,
+					chainId: evmChainId,
 				});
 
 				const hash = await writeContractAsync({
@@ -458,10 +484,7 @@ export function useBuyTokens() {
 					functionName: "buy",
 					args: [minTokens],
 					value: maticWei,
-					chainId: ACTIVE_CHAIN_ID,
-					// Set higher gas price for Polygon Amoy testnet (minimum 25 gwei)
-					maxFeePerGas: BigInt(50000000000), // 50 gwei
-					maxPriorityFeePerGas: BigInt(30000000000), // 30 gwei
+					chainId: evmChainId,
 				});
 
 				console.log("[useBuyTokens] Transaction hash:", hash);
@@ -479,7 +502,7 @@ export function useBuyTokens() {
 				setIsBuying(false);
 			}
 		},
-		[address, writeContractAsync],
+		[address, evmChainId, writeContractAsync],
 	);
 
 	return {
@@ -500,6 +523,7 @@ export function useBuyTokens() {
 // Hook: Sell tokens
 export function useSellTokens() {
 	const { walletAddress: address } = useAuth();
+	const evmChainId = useActiveEvmChainId();
 	const [txHash, setTxHash] = useState<Hash | undefined>();
 	const [isSelling, setIsSelling] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
@@ -540,7 +564,7 @@ export function useSellTokens() {
 					tokenAmount: params.tokenAmount,
 					tokenWei: tokenWei.toString(),
 					minMatic: minMatic.toString(),
-					chainId: ACTIVE_CHAIN_ID,
+					chainId: evmChainId,
 				});
 
 				const hash = await writeContractAsync({
@@ -548,10 +572,7 @@ export function useSellTokens() {
 					abi: HYPE_BONDING_CURVE_ABI,
 					functionName: "sell",
 					args: [tokenWei, minMatic],
-					chainId: ACTIVE_CHAIN_ID,
-					// Set higher gas price for Polygon Amoy testnet (minimum 25 gwei)
-					maxFeePerGas: BigInt(50000000000), // 50 gwei
-					maxPriorityFeePerGas: BigInt(30000000000), // 30 gwei
+					chainId: evmChainId,
 				});
 
 				setTxHash(hash);
@@ -568,7 +589,7 @@ export function useSellTokens() {
 				setIsSelling(false);
 			}
 		},
-		[address, writeContractAsync],
+		[address, evmChainId, writeContractAsync],
 	);
 
 	return {
@@ -591,6 +612,7 @@ export function useTokenBalance(
 	tokenAddress: Address | undefined,
 	userAddress?: Address,
 ) {
+	const evmChainId = useActiveEvmChainId();
 	const { walletAddress: connectedAddress } = useAuth();
 	const targetAddress = userAddress || connectedAddress;
 
@@ -599,7 +621,7 @@ export function useTokenBalance(
 		abi: HYPE_TOKEN_ABI,
 		functionName: "balanceOf",
 		args: targetAddress ? [targetAddress] : undefined,
-		chainId: ACTIVE_CHAIN_ID,
+		chainId: evmChainId,
 		query: {
 			enabled: !!tokenAddress && !!targetAddress,
 		},
@@ -608,6 +630,7 @@ export function useTokenBalance(
 
 // Hook: Approve token spending
 export function useApproveToken() {
+	const evmChainId = useActiveEvmChainId();
 	const [txHash, setTxHash] = useState<Hash | undefined>();
 	const [isApproving, setIsApproving] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
@@ -634,10 +657,7 @@ export function useApproveToken() {
 					abi: HYPE_TOKEN_ABI,
 					functionName: "approve",
 					args: [spenderAddress, amount],
-					chainId: ACTIVE_CHAIN_ID,
-					// Set higher gas price for Polygon Amoy testnet (minimum 25 gwei)
-					maxFeePerGas: BigInt(50000000000), // 50 gwei
-					maxPriorityFeePerGas: BigInt(30000000000), // 30 gwei
+					chainId: evmChainId,
 				});
 
 				setTxHash(hash);
@@ -652,7 +672,7 @@ export function useApproveToken() {
 				setIsApproving(false);
 			}
 		},
-		[writeContractAsync],
+		[evmChainId, writeContractAsync],
 	);
 
 	return {
@@ -674,6 +694,7 @@ export function useTokenAllowance(
 	tokenAddress: Address | undefined,
 	spenderAddress: Address | undefined,
 ) {
+	const evmChainId = useActiveEvmChainId();
 	const { walletAddress: ownerAddress } = useAuth();
 
 	return useReadContract({
@@ -684,7 +705,7 @@ export function useTokenAllowance(
 			ownerAddress && spenderAddress
 				? [ownerAddress, spenderAddress]
 				: undefined,
-		chainId: ACTIVE_CHAIN_ID,
+		chainId: evmChainId,
 		query: {
 			enabled: !!tokenAddress && !!ownerAddress && !!spenderAddress,
 		},
@@ -693,6 +714,7 @@ export function useTokenAllowance(
 
 // Hook: Get vesting info
 export function useVestingInfo(bondingCurveAddress: Address | undefined) {
+	const evmChainId = useActiveEvmChainId();
 	const { walletAddress } = useAuth();
 
 	const { data: vestingInfo, refetch: refetchVestingInfo } = useReadContract({
@@ -700,7 +722,7 @@ export function useVestingInfo(bondingCurveAddress: Address | undefined) {
 		abi: HYPE_BONDING_CURVE_ABI,
 		functionName: "getVestingInfo",
 		args: walletAddress ? [walletAddress] : undefined,
-		chainId: ACTIVE_CHAIN_ID,
+		chainId: evmChainId,
 		query: {
 			enabled: !!bondingCurveAddress && !!walletAddress,
 		},
@@ -711,7 +733,7 @@ export function useVestingInfo(bondingCurveAddress: Address | undefined) {
 		abi: HYPE_BONDING_CURVE_ABI,
 		functionName: "getClaimableVested",
 		args: walletAddress ? [walletAddress] : undefined,
-		chainId: ACTIVE_CHAIN_ID,
+		chainId: evmChainId,
 		query: {
 			enabled: !!bondingCurveAddress && !!walletAddress,
 		},
@@ -735,6 +757,7 @@ export function useVestingInfo(bondingCurveAddress: Address | undefined) {
 // Hook: Claim vested tokens
 export function useClaimVested() {
 	const { walletAddress: address } = useAuth();
+	const evmChainId = useActiveEvmChainId();
 	const [txHash, setTxHash] = useState<Hash | undefined>();
 	const [isClaiming, setIsClaiming] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
@@ -761,10 +784,7 @@ export function useClaimVested() {
 					address: bondingCurveAddress,
 					abi: HYPE_BONDING_CURVE_ABI,
 					functionName: "claimVested",
-					chainId: ACTIVE_CHAIN_ID,
-                    // Set higher gas price for Polygon Amoy testnet
-					maxFeePerGas: BigInt(50000000000), // 50 gwei
-					maxPriorityFeePerGas: BigInt(30000000000), // 30 gwei
+					chainId: evmChainId,
 				});
 
 				setTxHash(hash);
@@ -781,7 +801,7 @@ export function useClaimVested() {
 				setIsClaiming(false);
 			}
 		},
-		[address, writeContractAsync],
+		[address, evmChainId, writeContractAsync],
 	);
 
 	return {

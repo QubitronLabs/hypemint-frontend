@@ -53,6 +53,7 @@ import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Token } from "@/types";
 import { useAuth } from "@/hooks";
+import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 
 // Filter tabs configuration
 const FILTER_TABS = [
@@ -450,7 +451,16 @@ function HomePage() {
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
-	const { isAuthenticated } = useAuth();
+	const { isAuthenticated } = useAuth(); 
+
+	// useEffect(() => {
+	// 	(async () => {
+	// 		if (primaryWallet) {
+	// 			const network = await primaryWallet.getNetwork();
+	// 			console.log("Current network:", network);
+	// 		}
+	// 	})();
+	// }, [primaryWallet]);
 
 	// ─── URL-synced state ─────────────────────────────────────
 	const activeFilter = (() => {

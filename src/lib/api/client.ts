@@ -68,7 +68,7 @@ apiClient.interceptors.request.use(
 
     if (jwt) {
       config.headers.Authorization = `Bearer ${jwt}`;
-      console.log("[API] Request with JWT:", config.url);
+      // console.log("[API] Request with JWT:", config.url);
     } else {
       console.log("[API] Request WITHOUT JWT:", config.url);
     }

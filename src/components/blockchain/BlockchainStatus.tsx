@@ -4,31 +4,52 @@
  * BlockchainStatus Component
  *
  * Displays real-time blockchain connection status and sync information.
+ * Supports both EVM and Solana chain types.
  */
 
 import { motion } from "framer-motion";
 import { useBlockNumber, useChainId } from "wagmi";
-import { Activity, Wifi, WifiOff, Database, Zap } from "lucide-react";
+import { Activity, Wifi, WifiOff, Database, Zap, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { useActiveChainType } from "@/lib/network";
+import { getChainDisplayName, SOLANA_DEVNET_CHAIN_ID } from "@/lib/wagmi/config";
 
 interface BlockchainStatusProps {
   className?: string;
   compact?: boolean;
 }
 
-const CHAIN_NAMES: Record<number, string> = {
-  1: "Ethereum",
-  137: "Polygon",
-  80002: "Polygon Amoy",
-  8453: "Base",
-};
+/**
+ * Small badge showing whether the user is on EVM or Solana
+ */
+function ChainTypeBadge({ chainType }: { chainType: "EVM" | "SOLANA" }) {
+  const isSolana = chainType === "SOLANA";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
+        isSolana
+          ? "bg-purple-500/15 text-purple-400"
+          : "bg-blue-500/15 text-blue-400",
+      )}
+    >
+      {isSolana ? (
+        <Globe className="h-2.5 w-2.5" />
+      ) : (
+        <Zap className="h-2.5 w-2.5" />
+      )}
+      {isSolana ? "SOL" : "EVM"}
+    </span>
+  );
+}
 
 export function BlockchainStatus({
   className,
   compact = false,
 }: BlockchainStatusProps) {
   const chainId = useChainId();
+  const activeChainType = useActiveChainType();
   const { data: blockNumber, isLoading: blockLoading } = useBlockNumber({
     watch: true,
     query: {
@@ -37,21 +58,29 @@ export function BlockchainStatus({
   });
   const { isConnected: wsConnected } = useWebSocket({});
 
-  const chainName = CHAIN_NAMES[chainId] || `Chain ${chainId}`;
+  const isSolana = activeChainType === "SOLANA";
+  const chainName = isSolana
+    ? getChainDisplayName(SOLANA_DEVNET_CHAIN_ID)
+    : getChainDisplayName(chainId);
 
   if (compact) {
     return (
       <div className={cn("flex items-center gap-2", className)}>
+        <ChainTypeBadge chainType={activeChainType} />
         <motion.div
           className={cn(
             "w-2 h-2 rounded-full",
-            blockNumber ? "bg-green-500" : "bg-yellow-500",
+            blockNumber || isSolana ? "bg-green-500" : "bg-yellow-500",
           )}
           animate={{ scale: [1, 1.2, 1] }}
           transition={{ duration: 2, repeat: Infinity }}
         />
         <span className="text-xs text-muted-foreground">
-          {blockNumber ? `#${blockNumber.toLocaleString()}` : "Connecting..."}
+          {isSolana
+            ? "Solana"
+            : blockNumber
+              ? `#${blockNumber.toLocaleString()}`
+              : "Connecting..."}
         </span>
       </div>
     );
@@ -81,7 +110,7 @@ export function BlockchainStatus({
       <div className="grid grid-cols-2 gap-2">
         {/* Chain */}
         <div className="flex items-center gap-2">
-          <Zap className="h-3 w-3 text-primary" />
+          <ChainTypeBadge chainType={activeChainType} />
           <span className="text-xs">{chainName}</span>
         </div>
 

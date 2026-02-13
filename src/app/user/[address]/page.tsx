@@ -31,6 +31,7 @@ import {
 	useUserCreatedTokens,
 } from "@/hooks/useUsers";
 import { cn } from "@/lib/utils";
+import { getAddressUrl, isSolanaChain, SOLANA_DEVNET_CHAIN_ID } from "@/lib/wagmi/config";
 
 interface UserProfilePageProps {
 	params: Promise<{ address: string }>;
@@ -213,13 +214,13 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
 								{shortAddress}
 							</button>
 							<a
-								href={`https://amoy.polygonscan.com/address/${address}`}
+								href={getAddressUrl(address, address.startsWith("0x") ? undefined : SOLANA_DEVNET_CHAIN_ID)}
 								target="_blank"
 								rel="noopener noreferrer"
 								className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
 							>
 								<ExternalLink className="h-3 w-3" />
-								Polygonscan
+								{address.startsWith("0x") ? "Explorer" : "Solana Explorer"}
 							</a>
 						</div>
 

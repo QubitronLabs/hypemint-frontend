@@ -86,6 +86,7 @@ export interface Token {
 	priceChange6h?: string;
 	priceHistory?: Array<{ timestamp: number; price: number }>; // Mini chart data BC
 	chainId: number;
+	chainType?: "EVM" | "SOLANA";
 	status: TokenStatus;
 	creatorId: string;
 	creator?: User;
@@ -102,6 +103,11 @@ export interface Token {
 	hypeBoostEnabled?: boolean;
 	createdAt: string;
 	updatedAt: string;
+	nativeCurrency?: {
+		symbol: string;
+		decimals: number;
+		chainName: string;
+	};
 }
 
 export interface BondingCurve {
@@ -280,5 +286,37 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
 		icon: "/chains/arbitrum.svg",
 		nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
 		explorerUrl: "https://arbiscan.io",
+	},
+];
+
+// Solana chain type (not EVM, uses string identifiers)
+export type SolanaCluster = "mainnet-beta" | "devnet" | "testnet";
+
+export interface SolanaChainConfig {
+	cluster: SolanaCluster;
+	name: string;
+	icon: string;
+	nativeCurrency: {
+		name: string;
+		symbol: string;
+		decimals: number;
+	};
+	explorerUrl: string;
+}
+
+export const SUPPORTED_SOLANA_CHAINS: SolanaChainConfig[] = [
+	{
+		cluster: "devnet",
+		name: "Solana Devnet",
+		icon: "/chains/solana.svg",
+		nativeCurrency: { name: "SOL", symbol: "SOL", decimals: 9 },
+		explorerUrl: "https://explorer.solana.com/?cluster=devnet",
+	},
+	{
+		cluster: "mainnet-beta",
+		name: "Solana",
+		icon: "/chains/solana.svg",
+		nativeCurrency: { name: "SOL", symbol: "SOL", decimals: 9 },
+		explorerUrl: "https://explorer.solana.com",
 	},
 ];

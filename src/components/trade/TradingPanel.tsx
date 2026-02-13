@@ -3,6 +3,7 @@
 /**
  * Trading Panel Component
  * Real centralized-ledger trading interface
+ * Supports both EVM and Solana tokens with chain mismatch detection.
  */
 
 import { useState, useMemo } from "react";
@@ -16,6 +17,8 @@ import {
   TrendingDown,
   Loader2,
   CheckCircle2,
+  Globe,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +26,7 @@ import { useAuthStore } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { createTrade, confirmTrade } from "@/lib/api/trades";
 import { toast } from "sonner";
+import { useActiveChainType } from "@/lib/network";
 
 interface TradingPanelProps {
   tokenId: string;
@@ -30,6 +34,7 @@ interface TradingPanelProps {
   tokenName: string;
   currentPrice: string;
   totalSupply: string;
+  tokenChainType?: "EVM" | "SOLANA";
   className?: string;
 }
 
@@ -70,6 +75,7 @@ export function TradingPanel({
   tokenName,
   currentPrice,
   totalSupply,
+  tokenChainType = "EVM",
   className,
 }: TradingPanelProps) {
   const [tradeType, setTradeType] = useState<TradeType>("buy");
@@ -79,6 +85,12 @@ export function TradingPanel({
   const [result, setResult] = useState<TradeResult | null>(null);
 
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const activeChainType = useActiveChainType();
+
+  // Detect chain mismatch: user wallet is on EVM but token is on Solana (or vice versa)
+  const isChainMismatch = activeChainType !== tokenChainType;
+  const isSolanaToken = tokenChainType === "SOLANA";
+  const nativeSymbol = isSolanaToken ? "SOL" : "ETH";
 
   // Calculate trade metrics
   const tradeMetrics = useMemo(() => {
@@ -195,6 +207,30 @@ export function TradingPanel({
     >
       {/* Trade Type Tabs */}
       <div className="p-5">
+        {/* Chain Mismatch Warning */}
+        {isChainMismatch && isAuthenticated && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-3"
+          >
+            {isSolanaToken ? (
+              <Globe className="h-5 w-5 text-purple-400 shrink-0" />
+            ) : (
+              <Zap className="h-5 w-5 text-blue-400 shrink-0" />
+            )}
+            <div className="text-sm">
+              <p className="font-semibold text-amber-400">
+                Switch to {isSolanaToken ? "Solana" : "EVM"} to Trade
+              </p>
+              <p className="text-muted-foreground text-xs mt-0.5">
+                This token is on {isSolanaToken ? "Solana" : "an EVM chain"}.
+                Please connect a {isSolanaToken ? "Solana" : "EVM"} wallet to trade.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
         <div className="flex bg-background/40 rounded-xl p-1.5 gap-1">
           <motion.button
             onClick={() => setTradeType("buy")}
@@ -279,13 +315,13 @@ export function TradingPanel({
                     {formatNumber(
                       tradeMetrics.estimatedOutput * tradeMetrics.finalPrice,
                     )}{" "}
-                    ETH
+                    {nativeSymbol}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Price per Token</span>
                   <span className="font-semibold">
-                    {tradeMetrics.finalPrice.toFixed(8)} ETH
+                    {tradeMetrics.finalPrice.toFixed(8)} {nativeSymbol}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -311,7 +347,7 @@ export function TradingPanel({
           <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
             <Button
               onClick={handleTrade}
-              disabled={!amount || parseFloat(amount) <= 0 || isExecuting}
+              disabled={!amount || parseFloat(amount) <= 0 || isExecuting || isChainMismatch}
               className={cn(
                 "w-full h-14 text-base font-bold rounded-xl shadow-lg transition-all duration-200",
                 tradeType === "buy"

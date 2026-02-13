@@ -11,6 +11,7 @@ interface TokenImageProps {
   symbol?: string;
   size?: number;
   className?: string;
+  chaintype?: string;
 }
 
 /**
@@ -26,6 +27,7 @@ export function TokenImage({
   symbol,
   size = 40,
   className,
+  chaintype,
 }: TokenImageProps) {
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -105,6 +107,12 @@ export function TokenImage({
         }}
         unoptimized
       />
+      {/* Chain Type Badge - Top Left Corner */}
+				{chaintype === "SOLANA"? (
+							<img src="/solana.png" title="Solana" alt="solana" className="h-3 w-3 sm:h-6 sm:w-6 absolute bottom-0 right-0 sm:bottom-0 sm:right-0 z-10   rounded-full" /> 
+				):
+        <img src="/evm.png" title="EVM" alt="evm"  className="h-3 w-3 sm:h-6 sm:w-6 absolute bottom-0 right-0 sm:bottom-0 sm:right-0 z-10    rounded-full"  />
+        }
     </div>
   );
 }

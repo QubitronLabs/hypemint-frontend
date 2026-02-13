@@ -102,12 +102,12 @@ export async function getNewTokens(
 export async function getToken(id: string): Promise<Token | null> {
   try {
     const { data } = await apiClient.get<
-      ApiResponse<{ token: Token; bondingCurve: any }>
+      ApiResponse<{ token: Token; bondingCurve: any; nativeCurrency?: { symbol: string; decimals: number; chainName: string } }>
     >(`/api/v1/tokens/${id}`);
 
     if (!data.data) return null;
 
-    const { token, bondingCurve } = data.data;
+    const { token, bondingCurve, nativeCurrency } = data.data;
     const curve = bondingCurve || {};
 
     const currentSupply = BigInt(
