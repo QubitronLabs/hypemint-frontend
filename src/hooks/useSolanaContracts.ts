@@ -92,7 +92,6 @@ function getConnectionFromWalletOrConfig(
 			const connector =
 				w.connector as unknown as SolanaWalletConnector;
 			const connection = connector.getWalletClient();
-			// @ts-expect-error - getWalletClient may return null if not connected, handle that case
 			if (connection) return connection;
 		} catch {
 			// Fall through to manual connection
