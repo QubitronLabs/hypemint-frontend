@@ -70,6 +70,10 @@ export {
 	useSolanaSellTokens,
 	useSolanaTokenBalance,
 	useSolanaNativeBalance,
+	useSolanaBondingCurveState,
+	calculateTokensForSol,
+	calculateSolForTokens,
+	calculateCurrentPrice,
 } from "./useSolanaContracts";
 
 // Contract config (dynamic from backend)

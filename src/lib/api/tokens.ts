@@ -110,12 +110,19 @@ export async function getToken(id: string): Promise<Token | null> {
     const { token, bondingCurve, nativeCurrency } = data.data;
     const curve = bondingCurve || {};
 
+    // Determine chain-specific divisors
+    const isSolana = token.chainType === "SOLANA";
+    // Token decimals: Solana SPL = 6, EVM ERC20 = 18
+    const tokenDecimalsDivisor = isSolana ? 1e6 : 1e18;
+    // Native currency divisor: SOL = 1e9 (lamports), ETH/MATIC = 1e18 (wei)
+    const nativeDivisor = isSolana ? 1e9 : 1e18;
+
     const currentSupply = BigInt(
       curve.currentSupply || token.totalSupply || "0",
     );
     const graduationSupply = BigInt(
-      curve.graduationSupply || "1000000000000000000000000000",
-    ); // ~1B tokens default
+      curve.graduationSupply || (isSolana ? "1000000000000" : "1000000000000000000000000000"),
+    );
 
     const graduationThreshold = BigInt(
       curve.graduationMcap || curve.graduationMarketCap || curve.graduationThreshold || "69000000000000000000000" // 69k * 1e18
@@ -126,8 +133,8 @@ export async function getToken(id: string): Promise<Token | null> {
       progress = 100;
     } else {
       // Calculate based on Market Cap (preferred) or Supply as backup
-      // Backend provides token.marketCap as DECIMAL string
-      // graduationThreshold is WEI string
+      // Backend provides token.marketCap as DECIMAL string (already converted)
+      // graduationThreshold is stored in WEI format for both chains
       
       const marketCapDecimal = parseFloat(token.marketCap || "0");
       const graduationThresholdDecimal = Number(graduationThreshold) / 1e18;
@@ -153,9 +160,15 @@ export async function getToken(id: string): Promise<Token | null> {
     // Volume24h is already converted to decimal by backend
     const volume24h = token.volume24h || "0";
 
-    // Convert circulatingSupply from Wei to decimal
+    // Convert circulatingSupply from raw token units to human-readable
+    // Solana: 6 decimals, EVM: 18 decimals
     const circulatingSupplyDecimal = curve.currentSupply 
-      ? (Number(BigInt(curve.currentSupply)) / 1e18).toString()
+      ? (Number(BigInt(curve.currentSupply)) / tokenDecimalsDivisor).toString()
+      : "0";
+
+    // Convert bonding curve reserve from raw native units to human-readable
+    const currentBondingAmountDecimal = curve.currentReserve
+      ? (Number(BigInt(curve.currentReserve)) / nativeDivisor).toString()
       : "0";
 
     return {
@@ -167,7 +180,7 @@ export async function getToken(id: string): Promise<Token | null> {
       bondingCurveAddress: curve.contractAddress || undefined,
       bondingCurveProgress: progress,
       graduationTarget: curve.graduationMcap || curve.graduationMarketCap || "69000", // Default target
-      currentBondingAmount: curve.currentReserve || "0",
+      currentBondingAmount: currentBondingAmountDecimal,
       holdersCount: token.holdersCount || 0,
       tradesCount: token.tradesCount || 0,
       description: token.description || "",

@@ -25,6 +25,9 @@ import {
 	getSolanaConnection,
 	fetchBondingCurveState,
 	findATA,
+	findFactoryStatePDA,
+	findBondingCurvePDA,
+	type BondingCurveData,
 	type CreateTokenParams as ProgramCreateTokenParams,
 } from "@/lib/solana/program";
 import { useContractConfigStore } from "./useContractConfig";
@@ -327,6 +330,12 @@ export function useSolanaBuyTokens() {
 					Math.round(solFloat * 1_000_000_000),
 				);
 
+				if (lamports <= 0n) {
+					throw new Error(
+						"Amount too small. Minimum is 0.000000001 SOL (1 lamport).",
+					);
+				}
+
 				// Set minTokensOut to 0 for now (no slippage protection)
 				// In production, use a quote endpoint to calculate expected tokens
 				const minTokensOut = BigInt(0);
@@ -505,6 +514,12 @@ export function useSolanaSellTokens() {
 					Math.round(tokenFloat * 1_000_000),
 				);
 
+				if (tokenSmallest <= 0n) {
+					throw new Error(
+						"Amount too small. Minimum is 0.000001 tokens.",
+					);
+				}
+
 				// Calculate min SOL out with slippage
 				const minSolOut = params.minSol
 					? BigInt(
@@ -517,6 +532,23 @@ export function useSolanaSellTokens() {
 				console.log(
 					`[useSolanaSellTokens] Selling ${params.tokenAmount} tokens`,
 				);
+
+				// Fetch bonding curve state BEFORE the sell to calculate actual SOL received
+				const [factoryStatePDA] = findFactoryStatePDA();
+				const [bondingCurvePDA] = findBondingCurvePDA(
+					factoryStatePDA,
+					tokenMint,
+				);
+				let reserveBefore = BigInt(0);
+				try {
+					const curveStateBefore = await fetchBondingCurveState(
+						connection,
+						bondingCurvePDA,
+					);
+					reserveBefore = curveStateBefore.reserveBalance;
+				} catch (e) {
+					console.warn("[useSolanaSellTokens] Could not fetch pre-sell curve state");
+				}
 
 				const transaction = await buildSellTransaction(
 					connection,
@@ -571,13 +603,30 @@ export function useSolanaSellTokens() {
 					signature,
 				);
 
+				// Fetch updated bonding curve state to calculate actual SOL received
+				let actualSolReceived = minSolOut.toString(); // fallback to minSolOut
+				try {
+					const updatedCurveState = await fetchBondingCurveState(
+						connection,
+						bondingCurvePDA,
+					);
+					const reserveAfter = updatedCurveState.reserveBalance;
+					const solDelta = reserveBefore - reserveAfter;
+					if (solDelta > BigInt(0)) {
+						actualSolReceived = solDelta.toString();
+					}
+					console.log("[useSolanaSellTokens] SOL received:", actualSolReceived);
+				} catch (e) {
+					console.warn("[useSolanaSellTokens] Could not fetch updated curve state, using fallback");
+				}
+
 				// Report trade to backend for stats, chart, and WebSocket updates
 				try {
 					await recordOnChainTrade({
 						tokenId: params.tokenAddress,
 						bondingCurveAddress: params.bondingCurveAddress,
 						type: "sell",
-						maticAmount: minSolOut.toString(),
+						maticAmount: actualSolReceived,
 						tokenAmount: tokenSmallest.toString(),
 						txHash: signature,
 					});
@@ -820,4 +869,132 @@ export function useSolanaNativeBalance() {
 	}, [fetchBalance]);
 
 	return { data, isLoading, error, refetch: fetchBalance };
+}
+
+// ============================================
+// Hook: Get Solana bonding curve state
+// ============================================
+
+export function useSolanaBondingCurveState(tokenAddress?: string) {
+	const { primaryWallet } = useDynamicContext();
+	const rpcUrl = useSolanaRpcUrl();
+	const [data, setData] = useState<BondingCurveData | undefined>(undefined);
+	const [isLoading, setIsLoading] = useState(false);
+	const [error, setError] = useState<Error | null>(null);
+	const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+	const fetchState = useCallback(async () => {
+		if (!tokenAddress) {
+			setData(undefined);
+			return;
+		}
+
+		try {
+			setIsLoading(true);
+			const connection = getConnectionFromWalletOrConfig(
+				primaryWallet ?? null,
+				rpcUrl,
+			);
+
+			const tokenMint = new PublicKey(tokenAddress);
+			const [factoryStatePDA] = findFactoryStatePDA();
+			const [bondingCurvePDA] = findBondingCurvePDA(factoryStatePDA, tokenMint);
+
+			const curveState = await fetchBondingCurveState(connection, bondingCurvePDA);
+			setData(curveState);
+			setError(null);
+		} catch (err) {
+			console.error("[useSolanaBondingCurveState] Failed to fetch:", err);
+			setError(
+				err instanceof Error
+					? err
+					: new Error("Failed to fetch bonding curve state"),
+			);
+			setData(undefined);
+		} finally {
+			setIsLoading(false);
+		}
+	}, [tokenAddress, primaryWallet, rpcUrl]);
+
+	useEffect(() => {
+		fetchState();
+		intervalRef.current = setInterval(fetchState, 15_000);
+		return () => {
+			if (intervalRef.current) clearInterval(intervalRef.current);
+		};
+	}, [fetchState]);
+
+	return { data, isLoading, error, refetch: fetchState };
+}
+
+// ============================================
+// Solana bonding curve math (client-side)
+// ============================================
+
+/**
+ * Integer square root using Newton's method (matching on-chain implementation)
+ */
+function integerSqrt(n: bigint): bigint {
+	if (n <= 0n) return 0n;
+	let x = n;
+	let y = (x + 1n) / 2n;
+	while (y < x) {
+		x = y;
+		y = (x + n / x) / 2n;
+	}
+	return x;
+}
+
+/**
+ * Calculate tokens received for a given SOL amount (lamports)
+ * Matches on-chain: calculate_tokens_for_sol
+ */
+export function calculateTokensForSol(
+	solAmount: bigint,
+	currentSupply: bigint,
+	slope: bigint,
+	basePrice: bigint,
+): bigint {
+	if (solAmount <= 0n) return 0n;
+
+	const bCoeff = slope * currentSupply + basePrice;
+	const bSq = bCoeff * bCoeff;
+	const twoMC = 2n * slope * solAmount;
+	const discriminant = bSq + twoMC;
+
+	const sqrtDisc = integerSqrt(discriminant);
+	if (sqrtDisc <= bCoeff) return 0n;
+
+	return (sqrtDisc - bCoeff) / slope;
+}
+
+/**
+ * Calculate SOL returned for selling tokens
+ * Matches on-chain: calculate_sol_for_tokens
+ */
+export function calculateSolForTokens(
+	tokenAmount: bigint,
+	currentSupply: bigint,
+	slope: bigint,
+	basePrice: bigint,
+): bigint {
+	if (tokenAmount <= 0n) return 0n;
+
+	const halfN = tokenAmount / 2n;
+	const sMinus = currentSupply - halfN;
+	const slopeComponent = slope * tokenAmount * sMinus;
+	const baseComponent = basePrice * tokenAmount;
+
+	return slopeComponent + baseComponent;
+}
+
+/**
+ * Calculate current price: P = slope * supply + base_price (in lamports)
+ */
+export function calculateCurrentPrice(
+	supply: bigint,
+	slope: bigint,
+	basePrice: bigint,
+): bigint {
+	return slope * supply + basePrice;
 }
