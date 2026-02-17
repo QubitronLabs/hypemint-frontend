@@ -17,7 +17,7 @@ import {
 import { cn, fromWei, formatNumber } from "@/lib/utils";
 import { wsService } from "@/lib/websocket";
 import { useNativeCurrencySymbol } from "@/hooks";
-import { getTxUrl } from "@/lib/wagmi/config";
+import { getTxUrl, isSolanaChain } from "@/lib/wagmi/config";
 import type { Trade, TradeEvent } from "@/types";
 
 interface TradeTapeProps {
@@ -122,9 +122,18 @@ export function TradeTape({
 		return unsubscribe;
 	}, [tokenId]);
 
-	// Format amount
-	const formatAmount = (amount: string | undefined | null) => {
+	const isSolana = chainId ? isSolanaChain(chainId) : false;
+
+	// Format amount — chain-aware for Solana vs EVM
+	const formatAmount = (amount: string | undefined | null, isTokenAmount = false) => {
 		if (!amount) return "0";
+		if (isSolana) {
+			// Solana: raw units need proper conversion
+			// Token: 6 decimals (SPL), Native: 9 decimals (lamports)
+			const divisor = isTokenAmount ? 1e6 : 1e9;
+			const val = parseFloat(amount) / divisor;
+			return formatNumber(val);
+		}
 		const val = fromWei(amount);
 		return formatNumber(val);
 	};
@@ -138,7 +147,10 @@ export function TradeTape({
 	// Filter trades by size
 	const filteredTrades = trades.filter((trade) => {
 		if (filter === "all") return true;
-		const amount = fromWei(trade.totalValue || trade.amount || "0");
+		const rawValue = trade.totalValue || trade.amount || "0";
+		const amount = isSolana
+			? parseFloat(rawValue) / 1e9
+			: fromWei(rawValue);
 		return amount >= parseFloat(filter);
 	});
 
@@ -250,6 +262,7 @@ export function TradeTape({
 									<span className="text-sm tabular-nums">
 										{formatAmount(
 											trade.totalValue || trade.price,
+											false, // native amount
 										)}
 									</span>
 
@@ -263,9 +276,10 @@ export function TradeTape({
 										)}
 									>
 										{formatAmount(
-											// @ts-expect-error - tokenAmount field added dynamically
-											trade.tokenAmount || trade.amount,
-										)}
+										// @ts-expect-error - tokenAmount field added dynamically
+										trade.tokenAmount || trade.amount,
+										true, // token amount
+									)}
 									</span>
 
 									{/* Time */}

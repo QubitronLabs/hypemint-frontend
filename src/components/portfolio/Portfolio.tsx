@@ -203,12 +203,26 @@ export function Portfolio({ className }: PortfolioProps) {
 			const amount = fromWei(trade.amount);
 			const value = fromWei(trade.totalValue);
 
+			// Chain-aware conversion: Solana uses smaller decimals than EVM
+			const tokenChainType = (trade.token as any)?.chainType;
+			const isSolanaToken = tokenChainType === "SOLANA";
+			// Token decimals: Solana SPL = 6, EVM = 18
+			const tokenDivisor = isSolanaToken ? 1e6 : 1;
+			// Native decimals: SOL = 9 (lamports), ETH/MATIC = 18 (wei)
+			const nativeDivisor = isSolanaToken ? 1e9 : 1;
+
+			// fromWei handles large Wei strings (>15 chars) by dividing by 1e18
+			// For Solana, values are shorter so fromWei returns them as-is
+			// We need to apply proper chain-specific divisors
+			const adjustedAmount = isSolanaToken ? parseFloat(String(trade.amount || "0")) / tokenDivisor : amount;
+			const adjustedValue = isSolanaToken ? parseFloat(String(trade.totalValue || "0")) / nativeDivisor : value;
+
 			if (trade.type === "buy") {
-				existing.buys += amount;
-				existing.buyValue += value;
+				existing.buys += adjustedAmount;
+				existing.buyValue += adjustedValue;
 			} else {
-				existing.sells += amount;
-				existing.sellValue += value;
+				existing.sells += adjustedAmount;
+				existing.sellValue += adjustedValue;
 			}
 
 			if (new Date(trade.createdAt) > existing.lastTrade) {
@@ -224,9 +238,15 @@ export function Portfolio({ className }: PortfolioProps) {
 				const balance = data.buys - data.sells;
 				if (balance <= 0) return null;
 
-				const currentPrice = parseFloat(
-					data.token?.currentPrice || "0",
-				);
+				// Chain-aware price conversion
+				const tokenChainType = (data.token as any)?.chainType;
+				const isSolanaToken = tokenChainType === "SOLANA";
+				const rawPrice = parseFloat(data.token?.currentPrice || "0");
+				// Backend stores price as raw BigInt; check if it's > 1e6 (likely raw)
+				// For Solana: divide by 1e9 (precision multiplier)
+				// For EVM: divide by 1e18 if still in wei
+				const priceDivisor = isSolanaToken ? 1e9 : (rawPrice > 1e12 ? 1e18 : 1);
+				const currentPrice = rawPrice / priceDivisor;
 				const currentValue = balance * currentPrice;
 				const costBasis = data.buyValue - data.sellValue;
 				const pnl = currentValue - costBasis;

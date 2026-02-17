@@ -97,14 +97,15 @@ const FALLBACK_EXPLORER_URLS: Record<number, string> = {
  * Get explorer base URL for a chain.
  * Checks the admin contract deployment store first, then falls back to hardcoded.
  */
-export function getExplorerBaseUrl(chainId: number): string {
+export function getExplorerBaseUrl(chainId: number | string): string {
+	const numericId = Number(chainId);
 	// Dynamic: check contract deployments store
 	try {
 		const { useContractConfigStore } = require("@/hooks/useContractConfig");
 		const store = useContractConfigStore.getState();
 		if (store.isLoaded && store.deployments.length > 0) {
 			const deployment = store.deployments.find(
-				(d: any) => d.chainId === chainId && d.isActive,
+				(d: any) => Number(d.chainId) === numericId && d.isActive,
 			);
 			if (deployment?.explorerUrl) {
 				// Remove trailing slash if present
@@ -114,7 +115,7 @@ export function getExplorerBaseUrl(chainId: number): string {
 	} catch {
 		// Store not available (SSR), use fallback
 	}
-	return FALLBACK_EXPLORER_URLS[chainId] || "";
+	return FALLBACK_EXPLORER_URLS[numericId] || "";
 }
 
 /**
@@ -150,20 +151,22 @@ export function getChainDisplayName(chainId: number): string {
 export const SOLANA_DEVNET_CHAIN_ID = 901;
 
 /**
- * Check if a chain is Solana-based
+ * Check if a chain is Solana-based.
+ * Handles both string and number chainId (DB stores as varchar).
  */
-export function isSolanaChain(chainId: number): boolean {
-	return chainId === 901;
+export function isSolanaChain(chainId: number | string): boolean {
+	return Number(chainId) === 901;
 }
 
 // Get transaction URL — supports both EVM and Solana chains
 export function getTxUrl(
 	txHash: string,
-	chainId: number = DEFAULT_CHAIN_ID,
+	chainId: number | string = DEFAULT_CHAIN_ID,
 ): string {
-	const baseUrl = getExplorerBaseUrl(chainId);
+	const numericChainId = Number(chainId);
+	const baseUrl = getExplorerBaseUrl(numericChainId);
 	if (!baseUrl) return "";
-	if (isSolanaChain(chainId)) {
+	if (isSolanaChain(numericChainId)) {
 		return `${baseUrl}/tx/${txHash}?cluster=devnet`;
 	}
 	return `${baseUrl}/tx/${txHash}`;
@@ -172,11 +175,12 @@ export function getTxUrl(
 // Get address URL — supports both EVM and Solana chains
 export function getAddressUrl(
 	address: string,
-	chainId: number = DEFAULT_CHAIN_ID,
+	chainId: number | string = DEFAULT_CHAIN_ID,
 ): string {
-	const baseUrl = getExplorerBaseUrl(chainId);
+	const numericChainId = Number(chainId);
+	const baseUrl = getExplorerBaseUrl(numericChainId);
 	if (!baseUrl) return "";
-	if (isSolanaChain(chainId)) {
+	if (isSolanaChain(numericChainId)) {
 		return `${baseUrl}/address/${address}?cluster=devnet`;
 	}
 	return `${baseUrl}/address/${address}`;
@@ -185,11 +189,12 @@ export function getAddressUrl(
 // Get token URL — supports both EVM and Solana chains
 export function getTokenUrl(
 	address: string,
-	chainId: number = DEFAULT_CHAIN_ID,
+	chainId: number | string = DEFAULT_CHAIN_ID,
 ): string {
-	const baseUrl = getExplorerBaseUrl(chainId);
+	const numericChainId = Number(chainId);
+	const baseUrl = getExplorerBaseUrl(numericChainId);
 	if (!baseUrl) return "";
-	if (isSolanaChain(chainId)) {
+	if (isSolanaChain(numericChainId)) {
 		return `${baseUrl}/address/${address}?cluster=devnet`;
 	}
 	return `${baseUrl}/token/${address}`;
