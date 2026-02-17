@@ -5,7 +5,7 @@ import { Trophy, Medal, TrendingUp, Users, Zap } from "lucide-react";
 import { cn, fromWei, formatNumber } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -199,12 +199,12 @@ export function LeaderboardTable({ className }: LeaderboardTableProps) {
 
                   {/* User */}
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={entry.avatarUrl || undefined} />
-                      <AvatarFallback>
-                        {entry.username?.[0]?.toUpperCase() || "?"}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      userId={entry.userId}
+                      avatarUrl={entry.avatarUrl}
+                      username={entry.username || undefined}
+                      sizeClassName="size-10"
+                    />
                     <div className="min-w-0">
                       <p className="font-medium truncate">
                         {entry.username || shortenAddress(entry.walletAddress)}

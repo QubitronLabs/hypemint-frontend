@@ -6,12 +6,12 @@ import { cn } from "@/lib/utils";
 import { Coins } from "lucide-react";
 
 interface TokenImageProps {
-  src?: string | null;
-  alt: string;
-  symbol?: string;
-  size?: number;
-  className?: string;
-  chaintype?: string;
+	src?: string | null;
+	alt: string;
+	symbol?: string;
+	size?: number;
+	className?: string;
+	chaintype?: string;
 }
 
 /**
@@ -22,97 +22,130 @@ interface TokenImageProps {
  * - Properly handles different image URL formats
  */
 export function TokenImage({
-  src,
-  alt,
-  symbol,
-  size = 40,
-  className,
-  chaintype,
+	src,
+	alt,
+	symbol,
+	size = 40,
+	className,
+	chaintype,
 }: TokenImageProps) {
-  const [hasError, setHasError] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+	const [hasError, setHasError] = useState(false);
+	const [isLoading, setIsLoading] = useState(true);
 
-  // Normalize the image URL
-  const getImageUrl = (url?: string | null): string | null => {
-    if (!url) return null;
+	// Normalize the image URL
+	const getImageUrl = (url?: string | null): string | null => {
+		if (!url) return null;
 
-    // Already a full URL
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-      return url;
-    }
+		// Already a full URL
+		if (url.startsWith("http://") || url.startsWith("https://")) {
+			return url;
+		}
 
-    // Relative path starting with /uploads
-    if (url.startsWith("/uploads")) {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      return `${apiUrl}${url}`;
-    }
+		// Relative path starting with /uploads
+		if (url.startsWith("/uploads")) {
+			const apiUrl =
+				process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+			return `${apiUrl}${url}`;
+		}
 
-    // Other relative paths
-    if (url.startsWith("/")) {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-      return `${apiUrl}${url}`;
-    }
+		// Other relative paths
+		if (url.startsWith("/")) {
+			const apiUrl =
+				process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+			return `${apiUrl}${url}`;
+		}
 
-    return url;
-  };
+		return url;
+	};
 
-  const imageUrl = getImageUrl(src);
-  const showFallback = !imageUrl || hasError;
+	const imageUrl = getImageUrl(src);
+	const showFallback = !imageUrl || hasError;
 
-  if (showFallback) {
-    return (
-      <div
-        className={cn(
-          "flex items-center justify-center bg-linear-to-br from-primary/20 to-purple-500/20 rounded-lg",
-          className,
-        )}
-        style={{ width: size, height: size }}
-      >
-        {symbol ? (
-          <span
-            className="font-bold text-muted-foreground"
-            style={{ fontSize: size * 0.35 }}
-          >
-            {symbol.slice(0, 2)}
-          </span>
-        ) : (
-          <Coins
-            className="text-muted-foreground"
-            style={{ width: size * 0.5, height: size * 0.5 }}
-          />
-        )}
-      </div>
-    );
-  }
+	if (showFallback) {
+		return (
+			<div
+				className={cn(
+					"flex items-center justify-center relative bg-linear-to-br from-primary/20 to-purple-500/20 rounded-lg",
+					className,
+				)}
+				style={{ width: size, height: size }}
+			>
+				{symbol ? (
+					<span
+						className="font-bold text-muted-foreground"
+						style={{ fontSize: size * 0.35 }}
+					>
+						{symbol.slice(0, 2)}
+					</span>
+				) : (
+					<Coins
+						className="text-muted-foreground"
+						style={{ width: size * 0.5, height: size * 0.5 }}
+					/>
+				)}
+				{/* Chain Type Badge - Top Left Corner */}
+				{chaintype === "SOLANA" ? (
+					<img
+						src="/solana.png"
+						title="Solana"
+						alt="solana"
+						className="h-3 w-3 sm:h-6 sm:w-6 absolute bottom-0 right-0 sm:bottom-0 sm:right-0 z-10   rounded-full"
+					/>
+				) : (
+					<img
+						src="/evm.png"
+						title="EVM"
+						alt="evm"
+						className="h-3 w-3 sm:h-6 sm:w-6 absolute bottom-0 right-0 sm:bottom-0 sm:right-0 z-10    rounded-full"
+					/>
+				)}
+			</div>
+		);
+	}
 
-  return (
-    <div
-      className={cn("relative overflow-hidden rounded-lg bg-muted", className)}
-      style={{ width: size, height: size }}
-    >
-      {isLoading && <div className="absolute inset-0 bg-muted animate-pulse" />}
-      <Image
-        src={imageUrl}
-        alt={alt}
-        width={size}
-        height={size}
-        className={cn(
-          "object-cover w-full h-full transition-opacity",
-          isLoading ? "opacity-0" : "opacity-100",
-        )}
-        onLoad={() => setIsLoading(false)}
-        onError={() => {
-          setHasError(true);
-          setIsLoading(false);
-        }}
-        unoptimized
-      />
-      {/* Chain Type Badge - Top Left Corner */}
-				{chaintype === "SOLANA"? (
-							<img src="/solana.png" title="Solana" alt="solana" className="h-3 w-3 sm:h-6 sm:w-6 absolute bottom-0 right-0 sm:bottom-0 sm:right-0 z-10   rounded-full" /> 
-				):
-        <img src="/evm.png" title="EVM" alt="evm"  className="h-3 w-3 sm:h-6 sm:w-6 absolute bottom-0 right-0 sm:bottom-0 sm:right-0 z-10    rounded-full"  />
-        }
-    </div>
-  );
+	return (
+		<div
+			className={cn(
+				"relative overflow-hidden rounded-lg bg-muted",
+				className,
+			)}
+			style={{ width: size, height: size }}
+		>
+			{isLoading && (
+				<div className="absolute inset-0 bg-muted animate-pulse" />
+			)}
+			<Image
+				src={imageUrl}
+				alt={alt}
+				width={size}
+				height={size}
+				className={cn(
+					"object-cover w-full h-full transition-opacity",
+					isLoading ? "opacity-0" : "opacity-100",
+				)}
+				onLoad={() => setIsLoading(false)}
+				onError={() => {
+					setHasError(true);
+					setIsLoading(false);
+				}}
+				unoptimized
+			/>
+			{/* Chain Type Badge - Top Left Corner */}
+			{chaintype === "SOLANA" ? (
+				<img
+					src="/solana.png"
+					title="Solana"
+					alt="solana"
+					className="h-3 w-3 sm:h-6 sm:w-6 absolute bottom-0 right-0 sm:bottom-0 sm:right-0 z-10   rounded-full"
+				/>
+			) : (
+				<img
+					src="/evm.png"
+					title="EVM"
+					alt="evm"
+					className="h-3 w-3 sm:h-6 sm:w-6 absolute bottom-0 right-0 sm:bottom-0 sm:right-0 z-10    rounded-full"
+				/>
+			)}
+		</div>
+	);
 }

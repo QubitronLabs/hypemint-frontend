@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -357,14 +357,13 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			exit={{ opacity: 0, scale: 0.95 }}
 			className={cn("flex gap-3", isReply && "ml-10")}
 		>
-			<Avatar className={cn("shrink-0", isReply ? "w-7 h-7" : "w-8 h-8")}>
-				<AvatarImage src={comment.user.avatarUrl || undefined} />
-				<AvatarFallback className="bg-muted text-xs">
-					{(comment.user.displayName || comment.user.username || "A")
-						.slice(0, 2)
-						.toUpperCase()}
-				</AvatarFallback>
-			</Avatar>
+			<UserAvatar
+				userId={comment.user.id}
+				avatarUrl={comment.user.avatarUrl}
+				username={comment.user.username || comment.user.displayName || undefined}
+				sizeClassName={isReply ? "size-7" : "size-8"}
+				className="shrink-0"
+			/>
 
 			<div className="flex-1 min-w-0">
 				<div className="flex items-baseline gap-2 mb-0.5">
@@ -434,14 +433,13 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 
 			{/* Top Input Row: Avatar + Input + Newest Dropdown */}
 			<div className="flex items-center gap-3 p-4 border-b border-border">
-				<Avatar className="w-8 h-8 shrink-0">
-					<AvatarImage src={user?.avatarUrl || undefined} />
-					<AvatarFallback className="bg-muted text-xs">
-						{(user?.displayName || user?.username || "?")
-							.slice(0, 2)
-							.toUpperCase()}
-					</AvatarFallback>
-				</Avatar>
+				<UserAvatar
+					userId={user?.id || ''}
+					avatarUrl={user?.avatarUrl}
+					username={user?.username || user?.displayName || undefined}
+					sizeClassName="size-8"
+					className="shrink-0"
+				/>
 
 				<Input
 					ref={inlineInputRef}

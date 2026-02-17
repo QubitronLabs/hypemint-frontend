@@ -5,7 +5,7 @@ import {
   useDynamicContext,
   useIsLoggedIn,
   getAuthToken,
-  mergeNetworks,
+  // mergeNetworks,
 } from "@dynamic-labs/sdk-react-core";
 import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
 import { SolanaWalletConnectors } from "@dynamic-labs/solana";
@@ -14,27 +14,28 @@ import { useAuthStore, shouldFetchUser } from "@/lib/auth";
 import { getCurrentUser } from "@/lib/api/auth";
 import { forceLogout } from "@/lib/api/client";
 import { NetworkStateSynchronizer } from "@/components/network";
+import { useAutoGenerateAvatar } from "@/hooks/useAutoGenerateAvatar";
 
 // Ganache Local Development Network for Dynamic.xyz
-const ganacheNetwork = {
-  blockExplorerUrls: [],
-  chainId: 1337,
-  chainName: "Ganache Local",
-  iconUrls: ["https://app.dynamic.xyz/assets/networks/eth.svg"],
-  name: "Ganache",
-  nativeCurrency: {
-    decimals: 18,
-    name: "Ether",
-    symbol: "ETH",
-    iconUrl: "https://app.dynamic.xyz/assets/networks/eth.svg",
-  },
-  networkId: 1337,
-  rpcUrls: [process.env.NEXT_PUBLIC_GANACHE_RPC_URL || "http://127.0.0.1:7545"],
-  vanityName: "Ganache Local",
-};
+// const ganacheNetwork = {
+//   blockExplorerUrls: [],
+//   chainId: 1337,
+//   chainName: "Ganache Local",
+//   iconUrls: ["https://app.dynamic.xyz/assets/networks/eth.svg"],
+//   name: "Ganache",
+//   nativeCurrency: {
+//     decimals: 18,
+//     name: "Ether",
+//     symbol: "ETH",
+//     iconUrl: "https://app.dynamic.xyz/assets/networks/eth.svg",
+//   },
+//   networkId: 1337,
+//   rpcUrls: [process.env.NEXT_PUBLIC_GANACHE_RPC_URL || "http://127.0.0.1:7545"],
+//   vanityName: "Ganache Local",
+// };
 
 // Check if running in local mode
-const isLocalMode = process.env.NEXT_PUBLIC_CHAIN_MODE === "local";
+// const isLocalMode = process.env.NEXT_PUBLIC_CHAIN_MODE === "local";
 
 interface DynamicProviderProps {
   children: ReactNode;
@@ -154,6 +155,9 @@ function AuthSync({ children }: { children: ReactNode }) {
   useEffect(() => {
     syncAuth();
   }, [syncAuth]);
+
+  // Auto-generate avatar for users who don't have one
+  useAutoGenerateAvatar();
 
   return (
     <>

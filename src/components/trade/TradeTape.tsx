@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { ExternalLink, Filter } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -217,19 +217,13 @@ export function TradeTape({
 								>
 									{/* Account - Avatar + Username */}
 									<div className="flex items-center gap-2 min-w-0">
-										<Avatar className="w-6 h-6 shrink-0">
-											<AvatarImage
-												src={
-													trade.user?.avatarUrl ||
-													undefined
-												}
-											/>
-											<AvatarFallback className="bg-muted text-[10px]">
-												{(trade.username || "U")
-													.slice(0, 3)
-													.toUpperCase()}
-											</AvatarFallback>
-										</Avatar>
+										<UserAvatar
+											userId={trade.user?.id || trade.userId || trade.id}
+											avatarUrl={trade.user?.avatarUrl}
+											username={trade.username}
+											sizeClassName="size-6"
+											className="shrink-0"
+										/>
 										<span className="text-sm truncate">
 											{trade.username || "Unknown"}
 										</span>

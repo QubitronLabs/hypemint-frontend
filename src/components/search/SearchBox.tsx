@@ -28,6 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TokenImage } from "@/components/ui/token-image";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
 import {
 	formatRelativeTime,
@@ -603,17 +604,13 @@ export function SearchBox({ config, className }: SearchBoxProps) {
 												}}
 												className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-[#1a1a1a] data-[selected=true]:bg-[#1a1a1a]"
 											>
-												{user.avatarUrl ? (
-													<img
-														src={user.avatarUrl}
-														alt={user.displayName || user.username || "User"}
-														className="rounded-full w-9 h-9 shrink-0 object-cover"
-													/>
-												) : (
-													<div className="w-9 h-9 rounded-full bg-[#1a1a1a] border border-[#333] flex items-center justify-center shrink-0">
-														<User className="h-4 w-4 text-white/40" />
-													</div>
-												)}
+											<UserAvatar
+												userId={user.id}
+												avatarUrl={user.avatarUrl}
+												username={user.username || user.displayName || undefined}
+												sizeClassName="size-9"
+												className="shrink-0"
+											/>
 												<div className="flex-1 min-w-0">
 													<div className="flex items-center gap-1.5">
 														<span className="font-semibold text-sm text-white truncate">
@@ -763,17 +760,13 @@ export function SearchBox({ config, className }: SearchBoxProps) {
 													}}
 													className="flex items-center gap-3 py-2.5 cursor-pointer hover:bg-[#1a1a1a] data-[selected=true]:bg-[#1a1a1a]"
 												>
-													{user.avatarUrl ? (
-														<img
-															src={user.avatarUrl}
-															alt={user.displayName || user.username || "User"}
-															className="rounded-full w-9 h-9 shrink-0 object-cover"
-														/>
-													) : (
-														<div className="w-9 h-9 rounded-full bg-[#1a1a1a] border border-[#333] flex items-center justify-center shrink-0">
-															<User className="h-4 w-4 text-white/40" />
-														</div>
-													)}
+													<UserAvatar
+														userId={user.id}
+														avatarUrl={user.avatarUrl}
+														username={user.username || user.displayName || undefined}
+														sizeClassName="size-9"
+														className="shrink-0"
+													/>
 													<div className="flex-1 min-w-0">
 														<div className="flex items-center gap-1.5">
 															<span className="font-semibold text-sm text-white truncate">

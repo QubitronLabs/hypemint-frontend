@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TokenCard } from "@/components/token";
 import { useAuth } from "@/hooks";
@@ -181,15 +181,13 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
 				className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 sm:mb-8"
 			>
 				<div className="flex items-center gap-3 sm:gap-4">
-					<Avatar className="w-14 h-14 sm:w-20 sm:h-20 border-2 border-border">
-						<AvatarImage
-							src={user.avatarUrl || undefined}
-							alt={displayName || shortAddress}
-						/>
-						<AvatarFallback className="bg-primary/20 text-2xl">
-							{displayName?.slice(0, 2) || "🐸"}
-						</AvatarFallback>
-					</Avatar>
+					<UserAvatar
+						userId={user.id}
+						avatarUrl={user.avatarUrl}
+						username={displayName || shortAddress}
+						sizeClassName="size-14 sm:size-20"
+						className="border-2 border-border"
+					/>
 
 					<div className="min-w-0">
 						<div className="flex items-center gap-2">
@@ -412,21 +410,12 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
 										className="flex items-center justify-between p-4 bg-card border border-border rounded-xl hover:border-primary/30 transition-colors"
 									>
 										<div className="flex items-center gap-3">
-											<Avatar className="w-10 h-10">
-												<AvatarImage
-													src={
-														follower.avatarUrl ||
-														undefined
-													}
+												<UserAvatar
+													userId={follower.id}
+													avatarUrl={follower.avatarUrl}
+													username={follower.username || follower.displayName || undefined}
+													sizeClassName="size-10"
 												/>
-												<AvatarFallback className="bg-primary/20">
-													{(
-														follower.displayName ||
-														follower.username ||
-														"?"
-													).slice(0, 2)}
-												</AvatarFallback>
-											</Avatar>
 											<div>
 												<p className="font-medium">
 													{follower.displayName ||
@@ -464,21 +453,12 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
 										className="flex items-center justify-between p-4 bg-card border border-border rounded-xl hover:border-primary/30 transition-colors"
 									>
 										<div className="flex items-center gap-3">
-											<Avatar className="w-10 h-10">
-												<AvatarImage
-													src={
-														following.avatarUrl ||
-														undefined
-													}
+												<UserAvatar
+													userId={following.id}
+													avatarUrl={following.avatarUrl}
+													username={following.username || following.displayName || undefined}
+													sizeClassName="size-10"
 												/>
-												<AvatarFallback className="bg-primary/20">
-													{(
-														following.displayName ||
-														following.username ||
-														"?"
-													).slice(0, 2)}
-												</AvatarFallback>
-											</Avatar>
 											<div>
 												<p className="font-medium">
 													{following.displayName ||

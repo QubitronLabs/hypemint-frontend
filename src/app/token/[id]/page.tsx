@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
 	Tooltip,
@@ -534,20 +535,12 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 											href={`/user/${token.creator?.walletAddress || ""}`}
 											className="hover:text-primary flex items-center gap-1"
 										>
-											<div className="w-4 h-4 rounded-full bg-muted overflow-hidden">
-												{token.creator?.avatarUrl ? (
-													<Image
-														src={
-															token.creator
-																.avatarUrl
-														}
-														alt=""
-														width={16}
-														height={16}
-														className="object-cover"
-													/>
-												) : null}
-											</div>
+											<UserAvatar
+												userId={token.creator?.id || token.creatorId || ''}
+												avatarUrl={token.creator?.avatarUrl}
+												username={token.creator?.username || token.creator?.displayName || undefined}
+												sizeClassName="size-4"
+											/>
 											{token.creator?.displayName ||
 												token.creator?.username ||
 												(token.creator?.walletAddress

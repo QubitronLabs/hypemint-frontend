@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreatorDashboard } from "@/components/dashboard";
 import { Portfolio } from "@/components/portfolio";
@@ -106,15 +106,13 @@ export default function ProfilePage() {
 						whileHover={{ scale: 1.05 }}
 						transition={{ type: "spring", stiffness: 400 }}
 					>
-						<Avatar className="w-20 h-20 md:w-24 md:h-24 border-4 border-border/50 shadow-xl ring-4 ring-primary/10">
-							<AvatarImage
-								src={user?.avatarUrl}
-								alt={displayName || shortAddress}
-							/>
-							<AvatarFallback className="bg-linear-to-br from-primary/20 to-purple-500/20 text-2xl md:text-3xl">
-								{displayName?.slice(0, 2) || "🐸"}
-							</AvatarFallback>
-						</Avatar>
+						<UserAvatar
+							userId={user?.id || walletAddress || ''}
+							avatarUrl={user?.avatarUrl}
+							username={displayName || shortAddress}
+							sizeClassName="size-20 md:size-24"
+							className="border-4 border-border/50 shadow-xl ring-4 ring-primary/10"
+						/>
 					</motion.div>
 
 					<div>
