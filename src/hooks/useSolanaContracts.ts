@@ -361,7 +361,6 @@ export function useSolanaBuyTokens() {
 				if (!signer) {
 					throw new Error("Failed to get Solana signer.");
 				}
-// @ts-expect-error - result.transaction is a Transaction but TypeScript may not recognize it as such
 				const signedTx = await signer.signTransaction(transaction);
 
 				setIsBuying(false);
@@ -567,7 +566,6 @@ export function useSolanaSellTokens() {
 				if (!signer) {
 					throw new Error("Failed to get Solana signer.");
 				}
-// @ts-expect-error - result.transaction is a Transaction but TypeScript may not recognize it as such
 				const signedTx = await signer.signTransaction(transaction);
 
 				setIsSelling(false);
