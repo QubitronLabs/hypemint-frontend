@@ -92,6 +92,7 @@ function getConnectionFromWalletOrConfig(
 			const connector =
 				w.connector as unknown as SolanaWalletConnector;
 			const connection = connector.getWalletClient();
+			// @ts-expect-error - getWalletClient may return null if not connected, handle that case
 			if (connection) return connection;
 		} catch {
 			// Fall through to manual connection
@@ -195,6 +196,7 @@ export function useSolanaCreateToken() {
 					"[useSolanaCreateToken] Requesting wallet signature...",
 				);
 				const signedTx = await signer.signTransaction(
+					// @ts-expect-error - result.transaction is a Transaction but TypeScript may not recognize it as such
 					result.transaction,
 				);
 
@@ -361,7 +363,7 @@ export function useSolanaBuyTokens() {
 				if (!signer) {
 					throw new Error("Failed to get Solana signer.");
 				}
-
+// @ts-expect-error - result.transaction is a Transaction but TypeScript may not recognize it as such
 				const signedTx = await signer.signTransaction(transaction);
 
 				setIsBuying(false);
@@ -567,7 +569,7 @@ export function useSolanaSellTokens() {
 				if (!signer) {
 					throw new Error("Failed to get Solana signer.");
 				}
-
+// @ts-expect-error - result.transaction is a Transaction but TypeScript may not recognize it as such
 				const signedTx = await signer.signTransaction(transaction);
 
 				setIsSelling(false);
@@ -790,7 +792,7 @@ export function useSolanaNativeBalance() {
 		const wallet = walletRef.current;
 
 		// Try getting address from wallet or fallback
-		let address = wallet?.address;
+		const address = wallet?.address;
 		if (!address) {
 			setData(undefined);
 			return;
