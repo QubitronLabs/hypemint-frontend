@@ -195,7 +195,6 @@ export function useSolanaCreateToken() {
 					"[useSolanaCreateToken] Requesting wallet signature...",
 				);
 				const signedTx = await signer.signTransaction(
-					// @ts-expect-error - result.transaction is a Transaction but TypeScript may not recognize it as such
 					result.transaction,
 				);
 
