@@ -259,12 +259,34 @@ export interface ChainConfig {
 }
 
 export const SUPPORTED_CHAINS: ChainConfig[] = [
+	// ═══ MAINNETS ═══
 	{
 		id: 1,
 		name: "Ethereum",
 		icon: "/chains/ethereum.svg",
 		nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
 		explorerUrl: "https://etherscan.io",
+	},
+	{
+		id: 137,
+		name: "Polygon",
+		icon: "/chains/polygon.svg",
+		nativeCurrency: { name: "POL", symbol: "POL", decimals: 18 },
+		explorerUrl: "https://polygonscan.com",
+	},
+	{
+		id: 42161,
+		name: "Arbitrum",
+		icon: "/chains/arbitrum.svg",
+		nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+		explorerUrl: "https://arbiscan.io",
+	},
+	{
+		id: 10,
+		name: "Optimism",
+		icon: "/chains/optimism.svg",
+		nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+		explorerUrl: "https://optimistic.etherscan.io",
 	},
 	{
 		id: 56,
@@ -274,18 +296,82 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
 		explorerUrl: "https://bscscan.com",
 	},
 	{
+		id: 43114,
+		name: "Avalanche",
+		icon: "/chains/avalanche.svg",
+		nativeCurrency: { name: "AVAX", symbol: "AVAX", decimals: 18 },
+		explorerUrl: "https://snowtrace.io",
+	},
+	{
+		id: 59144,
+		name: "Linea",
+		icon: "/chains/linea.svg",
+		nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+		explorerUrl: "https://lineascan.build",
+	},
+	{
 		id: 8453,
 		name: "Base",
 		icon: "/chains/base.svg",
 		nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
 		explorerUrl: "https://basescan.org",
 	},
+	// ═══ TESTNETS ═══
 	{
-		id: 42161,
-		name: "Arbitrum",
+		id: 80002,
+		name: "Polygon Amoy",
+		icon: "/chains/polygon.svg",
+		nativeCurrency: { name: "POL", symbol: "POL", decimals: 18 },
+		explorerUrl: "https://amoy.polygonscan.com",
+	},
+	{
+		id: 97,
+		name: "BNB Testnet",
+		icon: "/chains/bnb.svg",
+		nativeCurrency: { name: "tBNB", symbol: "tBNB", decimals: 18 },
+		explorerUrl: "https://testnet.bscscan.com",
+	},
+	{
+		id: 11155111,
+		name: "Sepolia",
+		icon: "/chains/ethereum.svg",
+		nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+		explorerUrl: "https://sepolia.etherscan.io",
+	},
+	{
+		id: 421614,
+		name: "Arbitrum Sepolia",
 		icon: "/chains/arbitrum.svg",
 		nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-		explorerUrl: "https://arbiscan.io",
+		explorerUrl: "https://sepolia.arbiscan.io",
+	},
+	{
+		id: 11155420,
+		name: "Optimism Sepolia",
+		icon: "/chains/optimism.svg",
+		nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+		explorerUrl: "https://sepolia-optimism.etherscan.io",
+	},
+	{
+		id: 43113,
+		name: "Avalanche Fuji",
+		icon: "/chains/avalanche.svg",
+		nativeCurrency: { name: "AVAX", symbol: "AVAX", decimals: 18 },
+		explorerUrl: "https://testnet.snowtrace.io",
+	},
+	{
+		id: 59141,
+		name: "Linea Sepolia",
+		icon: "/chains/linea.svg",
+		nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+		explorerUrl: "https://sepolia.lineascan.build",
+	},
+	{
+		id: 84532,
+		name: "Base Sepolia",
+		icon: "/chains/base.svg",
+		nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+		explorerUrl: "https://sepolia.basescan.org",
 	},
 ];
 

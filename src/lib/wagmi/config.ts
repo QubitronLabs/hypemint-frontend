@@ -5,7 +5,25 @@
  */
 
 import { http, createConfig } from "wagmi";
-import { Chain, polygon, polygonAmoy, opBNB } from "wagmi/chains";
+import {
+	Chain,
+	mainnet,
+	polygon,
+	polygonAmoy,
+	arbitrum,
+	optimism,
+	bsc,
+	avalanche,
+	linea,
+	opBNB,
+	bscTestnet,
+	sepolia,
+	arbitrumSepolia,
+	optimismSepolia,
+	avalancheFuji,
+	lineaSepolia,
+	baseSepolia,
+} from "wagmi/chains";
 
 // Ganache Local Development Chain
 export const ganache: Chain = {
@@ -34,11 +52,37 @@ export const ganache: Chain = {
 };
 
 // RPC URLs from environment
+const ETHEREUM_RPC_URL =
+	process.env.NEXT_PUBLIC_ETHEREUM_RPC_URL || "https://eth.merkle.io";
 const POLYGON_RPC_URL =
 	process.env.NEXT_PUBLIC_POLYGON_RPC_URL || "https://polygon-rpc.com";
 const POLYGON_AMOY_RPC_URL =
 	process.env.NEXT_PUBLIC_POLYGON_AMOY_RPC_URL ||
 	"https://rpc-amoy.polygon.technology";
+const ARBITRUM_RPC_URL =
+	process.env.NEXT_PUBLIC_ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc";
+const OPTIMISM_RPC_URL =
+	process.env.NEXT_PUBLIC_OPTIMISM_RPC_URL || "https://mainnet.optimism.io";
+const BNB_RPC_URL =
+	process.env.NEXT_PUBLIC_BNB_RPC_URL || "https://bsc-dataseed.binance.org";
+const AVALANCHE_RPC_URL =
+	process.env.NEXT_PUBLIC_AVALANCHE_RPC_URL || "https://api.avax.network/ext/bc/C/rpc";
+const LINEA_RPC_URL =
+	process.env.NEXT_PUBLIC_LINEA_RPC_URL || "https://rpc.linea.build";
+const BNB_TESTNET_RPC_URL =
+	process.env.NEXT_PUBLIC_BNB_TESTNET_RPC_URL || "https://data-seed-prebsc-1-s1.binance.org:8545";
+const SEPOLIA_RPC_URL =
+	process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || "https://rpc.sepolia.org";
+const ARBITRUM_SEPOLIA_RPC_URL =
+	process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc";
+const OPTIMISM_SEPOLIA_RPC_URL =
+	process.env.NEXT_PUBLIC_OPTIMISM_SEPOLIA_RPC_URL || "https://sepolia.optimism.io";
+const AVALANCHE_FUJI_RPC_URL =
+	process.env.NEXT_PUBLIC_AVALANCHE_FUJI_RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc";
+const LINEA_SEPOLIA_RPC_URL =
+	process.env.NEXT_PUBLIC_LINEA_SEPOLIA_RPC_URL || "https://rpc.sepolia.linea.build";
+const BASE_SEPOLIA_RPC_URL =
+	process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org";
 const GANACHE_RPC_URL =
 	process.env.NEXT_PUBLIC_GANACHE_RPC_URL || "http://127.0.0.1:7545";
 
@@ -48,21 +92,47 @@ const isLocalMode = process.env.NEXT_PUBLIC_CHAIN_MODE === "local";
 // Create Wagmi config
 export const wagmiConfig = createConfig({
 	chains: isLocalMode
-		? [ganache, polygonAmoy, polygon]
-		: [polygon, polygonAmoy, ganache],
+		? [ganache, polygonAmoy, polygon, mainnet, arbitrum, optimism, bsc, avalanche, linea, bscTestnet, sepolia, arbitrumSepolia, optimismSepolia, avalancheFuji, lineaSepolia, baseSepolia]
+		: [polygon, mainnet, arbitrum, optimism, bsc, avalanche, linea, polygonAmoy, bscTestnet, sepolia, arbitrumSepolia, optimismSepolia, avalancheFuji, lineaSepolia, baseSepolia, ganache],
 	transports: {
+		[mainnet.id]: http(ETHEREUM_RPC_URL),
 		[polygon.id]: http(POLYGON_RPC_URL),
 		[polygonAmoy.id]: http(POLYGON_AMOY_RPC_URL),
+		[arbitrum.id]: http(ARBITRUM_RPC_URL),
+		[optimism.id]: http(OPTIMISM_RPC_URL),
+		[bsc.id]: http(BNB_RPC_URL),
+		[avalanche.id]: http(AVALANCHE_RPC_URL),
+		[linea.id]: http(LINEA_RPC_URL),
+		[bscTestnet.id]: http(BNB_TESTNET_RPC_URL),
+		[sepolia.id]: http(SEPOLIA_RPC_URL),
+		[arbitrumSepolia.id]: http(ARBITRUM_SEPOLIA_RPC_URL),
+		[optimismSepolia.id]: http(OPTIMISM_SEPOLIA_RPC_URL),
+		[avalancheFuji.id]: http(AVALANCHE_FUJI_RPC_URL),
+		[lineaSepolia.id]: http(LINEA_SEPOLIA_RPC_URL),
+		[baseSepolia.id]: http(BASE_SEPOLIA_RPC_URL),
 		[ganache.id]: http(GANACHE_RPC_URL),
 	},
 	ssr: true, // Enable SSR for Next.js
 });
 
 // Export chain IDs for convenience
+export const ETHEREUM_CHAIN_ID = mainnet.id;
 export const POLYGON_CHAIN_ID = polygon.id;
 export const POLYGON_AMOY_CHAIN_ID = polygonAmoy.id;
+export const ARBITRUM_CHAIN_ID = arbitrum.id;
+export const OPTIMISM_CHAIN_ID = optimism.id;
+export const BNB_CHAIN_ID = bsc.id;
+export const AVALANCHE_CHAIN_ID = avalanche.id;
+export const LINEA_CHAIN_ID = linea.id;
 export const GANACHE_CHAIN_ID = ganache.id;
 export const OPBNB_CHAIN_ID = opBNB.id;
+export const BNB_TESTNET_CHAIN_ID = bscTestnet.id;
+export const SEPOLIA_CHAIN_ID = sepolia.id;
+export const ARBITRUM_SEPOLIA_CHAIN_ID = arbitrumSepolia.id;
+export const OPTIMISM_SEPOLIA_CHAIN_ID = optimismSepolia.id;
+export const AVALANCHE_FUJI_CHAIN_ID = avalancheFuji.id;
+export const LINEA_SEPOLIA_CHAIN_ID = lineaSepolia.id;
+export const BASE_SEPOLIA_CHAIN_ID = baseSepolia.id;
 
 // Default chain based on mode
 export const DEFAULT_CHAIN_ID = isLocalMode
@@ -74,10 +144,36 @@ export const DEFAULT_CHAIN_ID = isLocalMode
 // Get chain by ID
 export function getChain(chainId: number) {
 	switch (chainId) {
+		case mainnet.id:
+			return mainnet;
 		case polygon.id:
 			return polygon;
 		case polygonAmoy.id:
 			return polygonAmoy;
+		case arbitrum.id:
+			return arbitrum;
+		case optimism.id:
+			return optimism;
+		case bsc.id:
+			return bsc;
+		case avalanche.id:
+			return avalanche;
+		case linea.id:
+			return linea;
+		case bscTestnet.id:
+			return bscTestnet;
+		case sepolia.id:
+			return sepolia;
+		case arbitrumSepolia.id:
+			return arbitrumSepolia;
+		case optimismSepolia.id:
+			return optimismSepolia;
+		case avalancheFuji.id:
+			return avalancheFuji;
+		case lineaSepolia.id:
+			return lineaSepolia;
+		case baseSepolia.id:
+			return baseSepolia;
 		case ganache.id:
 			return ganache;
 		default:
@@ -87,8 +183,21 @@ export function getChain(chainId: number) {
 
 // Fallback block explorer URLs (used when deployment store is not loaded)
 const FALLBACK_EXPLORER_URLS: Record<number, string> = {
+	[mainnet.id]: "https://etherscan.io",
 	[polygon.id]: "https://polygonscan.com",
 	[polygonAmoy.id]: "https://amoy.polygonscan.com",
+	[arbitrum.id]: "https://arbiscan.io",
+	[optimism.id]: "https://optimistic.etherscan.io",
+	[bsc.id]: "https://bscscan.com",
+	[avalanche.id]: "https://snowtrace.io",
+	[linea.id]: "https://lineascan.build",
+	[bscTestnet.id]: "https://testnet.bscscan.com",
+	[sepolia.id]: "https://sepolia.etherscan.io",
+	[arbitrumSepolia.id]: "https://sepolia.arbiscan.io",
+	[optimismSepolia.id]: "https://sepolia-optimism.etherscan.io",
+	[avalancheFuji.id]: "https://testnet.snowtrace.io",
+	[lineaSepolia.id]: "https://sepolia.lineascan.build",
+	[baseSepolia.id]: "https://sepolia.basescan.org",
 	[ganache.id]: "", // No explorer for local
 	901: "https://explorer.solana.com", // Solana devnet
 };
@@ -138,9 +247,21 @@ export function getChainDisplayName(chainId: number): string {
 	}
 	const FALLBACK_NAMES: Record<number, string> = {
 		1: "Ethereum",
+		10: "Optimism",
+		56: "BNB Chain",
+		97: "BNB Testnet",
 		137: "Polygon",
-		80002: "Polygon Amoy",
 		8453: "Base",
+		42161: "Arbitrum",
+		43113: "Avalanche Fuji",
+		43114: "Avalanche",
+		59141: "Linea Sepolia",
+		59144: "Linea",
+		80002: "Polygon Amoy",
+		84532: "Base Sepolia",
+		421614: "Arbitrum Sepolia",
+		11155111: "Sepolia",
+		11155420: "Optimism Sepolia",
 		1337: "Ganache Local",
 		901: "Solana Devnet",
 	};

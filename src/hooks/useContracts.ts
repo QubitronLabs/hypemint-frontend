@@ -29,13 +29,28 @@ import { useChainId as useNetworkChainId } from "@/lib/network";
 import { useAuth } from "./useAuth";
 
 /**
- * Hook: Get the active EVM chain ID from the backend contract deployments.
- * Subscribes to the Zustand store so components re-render when config loads.
- * Falls back to ACTIVE_CHAIN_ID if store hasn't loaded.
+ * Hook: Get the active EVM chain ID.
+ *
+ * Priority:
+ *   1. The wallet's current chain, IF there is an active deployment for it.
+ *   2. The first active EVM deployment in the store.
+ *   3. ACTIVE_CHAIN_ID (hard-coded fallback).
+ *
+ * This ensures that when a user switches their wallet to Avalanche (43114),
+ * we use the Avalanche deployment — not the first alphabetical EVM entry.
  */
 export function useActiveEvmChainId(): number {
+	const walletChainId = useWagmiChainId();
 	const chainId = useContractConfigStore((s) => {
 		if (s.isLoaded && s.deployments.length > 0) {
+			// First: if the wallet's current chain has an active deployment, use it
+			if (walletChainId) {
+				const walletDeploy = s.deployments.find(
+					(d) => d.chainId === walletChainId && d.chainType === "EVM" && d.isActive,
+				);
+				if (walletDeploy) return walletDeploy.chainId;
+			}
+			// Fallback: first active EVM deployment
 			const evmDeploy = s.deployments.find(
 				(d) => d.chainType === "EVM" && d.isActive,
 			);

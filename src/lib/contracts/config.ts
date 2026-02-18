@@ -7,6 +7,7 @@
  */
 
 import { useContractConfigStore } from "@/hooks/useContractConfig";
+import { useNetworkStore } from "@/lib/network/store";
 
 // Polygon Mainnet Chain ID
 export const POLYGON_CHAIN_ID = 137;
@@ -19,12 +20,23 @@ export const ACTIVE_CHAIN_ID = POLYGON_AMOY_CHAIN_ID;
 
 /**
  * Get the active EVM chain ID dynamically from the backend contract deployments store.
+ * If a walletChainId is provided (or detected from network store), prefer a
+ * deployment for that chain so we use the same chain the user is on.
  * Falls back to ACTIVE_CHAIN_ID if the store hasn't loaded or has no active EVM deployment.
- * Use this instead of ACTIVE_CHAIN_ID for runtime chain detection.
  */
-export function getActiveEvmChainId(): number {
+export function getActiveEvmChainId(walletChainId?: number): number {
+	// Auto-detect wallet chain from network store when not provided
+	const effectiveWalletChain = walletChainId ?? useNetworkStore.getState().chainId ?? undefined;
+
 	const store = useContractConfigStore.getState();
 	if (store.isLoaded && store.deployments.length > 0) {
+		// Prefer deployment that matches the wallet's current chain
+		if (effectiveWalletChain) {
+			const walletDeploy = store.deployments.find(
+				(d) => d.chainId === effectiveWalletChain && d.chainType === "EVM" && d.isActive,
+			);
+			if (walletDeploy) return walletDeploy.chainId;
+		}
 		const evmDeployment = store.deployments.find(
 			(d) => d.chainType === "EVM" && d.isActive,
 		);

@@ -774,9 +774,10 @@ export function TokenCreationForm() {
 				});
 
 				// Step 3: Store metadata in backend
-				// Use the correct chainId for current chain type
-				const deployment = getDeploymentByChainType(isSolana ? "SOLANA" : "EVM");
-				const targetChainId = deployment?.chainId ?? (isSolana ? 901 : getActiveEvmChainId());
+				// Use the wallet's actual chain ID (not generic "first EVM deployment")
+				const targetChainId = isSolana
+					? (getDeploymentByChainType("SOLANA")?.chainId ?? 901)
+					: getActiveEvmChainId();
 
 				let backendTokenId: string = tokenAddress;
 				try {
