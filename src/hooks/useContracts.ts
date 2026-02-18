@@ -168,7 +168,10 @@ export function useCreateToken() {
 					}
 				}
 
-				const factoryAddress = getContractAddress("factory", evmChainId);
+				const factoryAddress = getContractAddress(
+					"factory",
+					evmChainId,
+				);
 				const fee = creationFee || DEFAULT_CREATION_FEE;
 
 				console.log("Creating token with params:", {
@@ -193,7 +196,10 @@ export function useCreateToken() {
 						params.basePrice || BigInt(0),
 					],
 					value: fee,
+					account: address,
 					chainId: evmChainId,
+					maxPriorityFeePerGas: BigInt(30000000000),
+					maxFeePerGas: BigInt(50000000000),
 				});
 
 				console.log("Transaction submitted:", hash);
@@ -484,7 +490,10 @@ export function useBuyTokens() {
 					functionName: "buy",
 					args: [minTokens],
 					value: maticWei,
+					account: address,
 					chainId: evmChainId,
+					maxPriorityFeePerGas: BigInt(30000000000),
+					maxFeePerGas: BigInt(50000000000),
 				});
 
 				console.log("[useBuyTokens] Transaction hash:", hash);
@@ -572,7 +581,10 @@ export function useSellTokens() {
 					abi: HYPE_BONDING_CURVE_ABI,
 					functionName: "sell",
 					args: [tokenWei, minMatic],
+					account: address,
 					chainId: evmChainId,
+					maxPriorityFeePerGas: BigInt(30000000000),
+					maxFeePerGas: BigInt(50000000000),
 				});
 
 				setTxHash(hash);
@@ -631,6 +643,7 @@ export function useTokenBalance(
 // Hook: Approve token spending
 export function useApproveToken() {
 	const evmChainId = useActiveEvmChainId();
+	const { walletAddress: address } = useAuth();
 	const [txHash, setTxHash] = useState<Hash | undefined>();
 	const [isApproving, setIsApproving] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
@@ -657,7 +670,10 @@ export function useApproveToken() {
 					abi: HYPE_TOKEN_ABI,
 					functionName: "approve",
 					args: [spenderAddress, amount],
+					account: address,
 					chainId: evmChainId,
+					maxPriorityFeePerGas: BigInt(30000000000),
+					maxFeePerGas: BigInt(50000000000),
 				});
 
 				setTxHash(hash);
@@ -672,7 +688,7 @@ export function useApproveToken() {
 				setIsApproving(false);
 			}
 		},
-		[evmChainId, writeContractAsync],
+		[address, evmChainId, writeContractAsync],
 	);
 
 	return {
@@ -728,30 +744,33 @@ export function useVestingInfo(bondingCurveAddress: Address | undefined) {
 		},
 	});
 
-    const { data: claimableAmount, refetch: refetchClaimable } = useReadContract({
-		address: bondingCurveAddress,
-		abi: HYPE_BONDING_CURVE_ABI,
-		functionName: "getClaimableVested",
-		args: walletAddress ? [walletAddress] : undefined,
-		chainId: evmChainId,
-		query: {
-			enabled: !!bondingCurveAddress && !!walletAddress,
-		},
-	});
+	const { data: claimableAmount, refetch: refetchClaimable } =
+		useReadContract({
+			address: bondingCurveAddress,
+			abi: HYPE_BONDING_CURVE_ABI,
+			functionName: "getClaimableVested",
+			args: walletAddress ? [walletAddress] : undefined,
+			chainId: evmChainId,
+			query: {
+				enabled: !!bondingCurveAddress && !!walletAddress,
+			},
+		});
 
 	const refetch = useCallback(async () => {
 		await Promise.all([refetchVestingInfo(), refetchClaimable()]);
 	}, [refetchVestingInfo, refetchClaimable]);
 
-    return {
-        vestingInfo: vestingInfo as {
-            totalAmount: bigint;
-            claimedAmount: bigint;
-            startTime: bigint;
-        } | undefined,
-        claimableAmount: claimableAmount as bigint | undefined,
+	return {
+		vestingInfo: vestingInfo as
+			| {
+					totalAmount: bigint;
+					claimedAmount: bigint;
+					startTime: bigint;
+			  }
+			| undefined,
+		claimableAmount: claimableAmount as bigint | undefined,
 		refetch,
-    };
+	};
 }
 
 // Hook: Claim vested tokens
@@ -784,7 +803,10 @@ export function useClaimVested() {
 					address: bondingCurveAddress,
 					abi: HYPE_BONDING_CURVE_ABI,
 					functionName: "claimVested",
+					account: address,
 					chainId: evmChainId,
+					maxPriorityFeePerGas: BigInt(30000000000),
+					maxFeePerGas: BigInt(50000000000),
 				});
 
 				setTxHash(hash);
