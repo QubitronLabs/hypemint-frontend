@@ -50,6 +50,7 @@ import { toast } from "sonner";
 import { useChainId, useNetworkStore } from "@/lib/network/store";
 import { EvmWalletConnector } from "../network/NetworkStateSynchronizer";
 import { WalletConnector } from "@dynamic-labs/sdk-react-core";
+import { SUPPORTED_CHAINS } from "@/types";
 
 // Note: Trade recording is now handled by backend blockchain event listener
 // Frontend only needs to display confirmation UI
@@ -192,7 +193,13 @@ export function OnChainTradingPanel({
 			(!isSolana && connectedWalletIsSolana));
 
 	// Ensure nativeSymbol always has a value
-	const effectiveNativeSymbol = nativeSymbol || (isSolana ? "SOL" : "POL");
+	// Lookup from SUPPORTED_CHAINS as a chain-aware fallback instead of hardcoding "POL"
+	const chainFallbackSymbol = useMemo(() => {
+		if (isSolana) return "SOL";
+		const chain = SUPPORTED_CHAINS.find((c) => c.id === normalizedChainId);
+		return chain?.nativeCurrency?.symbol || "ETH";
+	}, [isSolana, normalizedChainId]);
+	const effectiveNativeSymbol = nativeSymbol || chainFallbackSymbol;
 
 	// Get dynamic native currency symbol
 
@@ -684,6 +691,7 @@ export function OnChainTradingPanel({
 					maticAmount: "0", // Will be extracted from blockchain
 					tokenAmount: "0", // Will be extracted from blockchain
 					txHash: hash,
+					chainId: normalizedChainId,
 				});
 				// console.log("[OnChainTrading] Trade synced to backend:", hash);
 			} catch (err) {
@@ -694,7 +702,7 @@ export function OnChainTradingPanel({
 				// Don't show error to user - on-chain trade succeeded, backend sync is secondary
 			}
 		},
-		[tokenAddress, bondingCurveAddress],
+		[tokenAddress, bondingCurveAddress, normalizedChainId],
 	);
 
 	// Refetch balances and sync when trades are confirmed
@@ -707,14 +715,14 @@ export function OnChainTradingPanel({
 		) {
 			handledBuyConfirmedRef.current = buyTxHash;
 			console.log("[OnChainTrading] Buy trade confirmed:", buyTxHash);
-			toast.success("Buy transaction confirmed!", {
+			toast.success("Buy transaction confirmed!", {	
 				id: "trade-result",
 				description: `Transaction successful`,
 				action: {
 					label: "View",
 					onClick: () =>
 						window.open(
-							getTxUrl(buyTxHash, isSolana ? 901 : undefined),
+							getTxUrl(buyTxHash, normalizedChainId),
 							"_blank",
 						),
 				},
@@ -757,7 +765,7 @@ export function OnChainTradingPanel({
 					label: "View",
 					onClick: () =>
 						window.open(
-							getTxUrl(buyTxHash, isSolana ? 901 : undefined),
+							getTxUrl(buyTxHash, normalizedChainId),
 							"_blank",
 						),
 				},
@@ -788,7 +796,7 @@ export function OnChainTradingPanel({
 					label: "View",
 					onClick: () =>
 						window.open(
-							getTxUrl(sellTxHash, isSolana ? 901 : undefined),
+							getTxUrl(sellTxHash, normalizedChainId),
 							"_blank",
 						),
 				},
@@ -831,7 +839,7 @@ export function OnChainTradingPanel({
 					label: "View",
 					onClick: () =>
 						window.open(
-							getTxUrl(sellTxHash, isSolana ? 901 : undefined),
+							getTxUrl(sellTxHash, normalizedChainId),
 							"_blank",
 						),
 				},
@@ -911,7 +919,7 @@ export function OnChainTradingPanel({
 							action: {
 								label: "View",
 								onClick: () =>
-									window.open(getTxUrl(sig, 901), "_blank"),
+									window.open(getTxUrl(sig, normalizedChainId), "_blank"),
 							},
 						});
 					}
@@ -929,7 +937,7 @@ export function OnChainTradingPanel({
 							action: {
 								label: "View",
 								onClick: () =>
-									window.open(getTxUrl(hash), "_blank"),
+									window.open(getTxUrl(hash, normalizedChainId), "_blank"),
 							},
 						});
 					}
@@ -957,7 +965,7 @@ export function OnChainTradingPanel({
 							action: {
 								label: "View",
 								onClick: () =>
-									window.open(getTxUrl(sig, 901), "_blank"),
+									window.open(getTxUrl(sig, normalizedChainId), "_blank"),
 							},
 						});
 					}
@@ -999,7 +1007,7 @@ export function OnChainTradingPanel({
 							action: {
 								label: "View",
 								onClick: () =>
-									window.open(getTxUrl(hash), "_blank"),
+									window.open(getTxUrl(hash, normalizedChainId), "_blank"),
 							},
 						});
 					}
@@ -1093,13 +1101,13 @@ export function OnChainTradingPanel({
 						<label className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
 							{tradeType === "buy"
 								? `You Pay (${effectiveNativeSymbol})`
-								: `You Sell (${tokenSymbol})`}
+								: `You Sell (${tokenName})`}
 						</label>
 						<span className="text-[10px] sm:text-xs text-muted-foreground truncate">
 							Balance:{" "}
 							{tradeType === "buy"
 								? `${nativeBalance?.value ? formatNumber(formatNativeDisplay(nativeBalance.value)) : "0"} ${effectiveNativeSymbol}`
-								: `${tokenBalance ? formatNumber(formatTokenDisplay(tokenBalance as bigint)) : "0"} ${tokenSymbol}`}
+								: `${tokenBalance ? formatNumber(formatTokenDisplay(tokenBalance as bigint)) : "0"} ${tokenName}`}
 						</span>
 					</div>
 					<div className="relative">
@@ -1118,7 +1126,7 @@ export function OnChainTradingPanel({
 						<div className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-muted-foreground">
 							{tradeType === "buy"
 								? effectiveNativeSymbol
-								: tokenSymbol}
+								: tokenName}
 						</div>
 					</div>
 				</div>
@@ -1180,7 +1188,7 @@ export function OnChainTradingPanel({
 													tradeMetrics.outputAmount,
 												)}{" "}
 												{tradeType === "buy"
-													? tokenSymbol
+													? tokenName
 													: effectiveNativeSymbol}
 											</>
 										)}
@@ -1188,7 +1196,7 @@ export function OnChainTradingPanel({
 								</div>
 								<div className="flex justify-between text-sm">
 									<span className="text-muted-foreground">
-										Price per Token
+										Avg. Price per Token
 									</span>
 									<span className="font-medium">
 										{tradeMetrics.isUnreasonable
@@ -1322,7 +1330,7 @@ export function OnChainTradingPanel({
 									Approving...
 								</>
 							) : (
-								<>Approve {tokenSymbol}</>
+								<>Approve {tokenName}</>
 							)
 						) : isLoading ? (
 							<>
@@ -1347,7 +1355,7 @@ export function OnChainTradingPanel({
 						) : exceedsBalance ? (
 							<>
 								<AlertTriangle className="h-5 w-5 mr-2" />
-								Insufficient {tokenSymbol} Balance
+								Insufficient {tokenName} Balance
 							</>
 						) : belowMinimum ? (
 							<>
@@ -1362,7 +1370,7 @@ export function OnChainTradingPanel({
 									<TrendingDown className="h-5 w-5 mr-2" />
 								)}
 								{tradeType === "buy" ? "Buy" : "Sell"}{" "}
-								{tokenSymbol}
+								{tokenName}
 							</>
 						)}
 					</Button>
@@ -1446,7 +1454,7 @@ export function OnChainTradingPanel({
 								<a
 									href={getTxUrl(
 										txHash,
-										isSolana ? 901 : undefined,
+										normalizedChainId,
 									)}
 									target="_blank"
 									rel="noopener noreferrer"

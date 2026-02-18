@@ -217,6 +217,7 @@ export function getExplorerBaseUrl(chainId: number | string): string {
 				(d: any) => Number(d.chainId) === numericId && d.isActive,
 			);
 			if (deployment?.explorerUrl) {
+				
 				// Remove trailing slash if present
 				return deployment.explorerUrl.replace(/\/$/, "");
 			}
@@ -286,6 +287,7 @@ export function getTxUrl(
 ): string {
 	const numericChainId = Number(chainId);
 	const baseUrl = getExplorerBaseUrl(numericChainId);
+	console.log({baseUrl});
 	if (!baseUrl) return "";
 	if (isSolanaChain(numericChainId)) {
 		return `${baseUrl}/tx/${txHash}?cluster=devnet`;

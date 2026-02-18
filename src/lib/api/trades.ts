@@ -15,6 +15,7 @@ export interface RecordOnChainTradeInput {
   tokenAmount: string;
   txHash: string;
   blockNumber?: number;
+  chainId?: number;
 }
 
 // Get trade quote

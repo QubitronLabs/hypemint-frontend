@@ -189,6 +189,7 @@ export async function getToken(id: string): Promise<Token | null> {
       twitterUrl: token.twitterUrl || "",
       telegramUrl: token.telegramUrl || "",
       discordUrl: token.discordUrl || "",
+      nativeCurrency: nativeCurrency || undefined,
     };
   } catch (err) {
     console.error("Failed to get token detail:", err);
