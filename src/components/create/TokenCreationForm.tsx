@@ -770,7 +770,7 @@ export function TokenCreationForm() {
 					action: isSolana ? undefined : {
 						label: "View",
 						onClick: () =>
-							window.open(getTxUrl(resultTxHash!), "_blank"),
+							window.open(getTxUrl(resultTxHash!, walletChainId), "_blank"),
 					},
 				});
 
@@ -1534,7 +1534,7 @@ export function TokenCreationForm() {
 								</div>
 								{!isSolana && txHash && (
 								<a
-									href={getTxUrl(txHash)}
+									href={getTxUrl(txHash, walletChainId)}
 									target="_blank"
 									rel="noopener noreferrer"
 									className="text-primary hover:underline flex items-center gap-1 text-sm"

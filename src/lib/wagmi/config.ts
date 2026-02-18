@@ -55,7 +55,7 @@ export const ganache: Chain = {
 const ETHEREUM_RPC_URL =
 	process.env.NEXT_PUBLIC_ETHEREUM_RPC_URL || "https://eth.merkle.io";
 const POLYGON_RPC_URL =
-	process.env.NEXT_PUBLIC_POLYGON_RPC_URL || "https://polygon-rpc.com";
+	process.env.NEXT_PUBLIC_POLYGON_RPC_URL || "https://polygon.drpc.org";
 const POLYGON_AMOY_RPC_URL =
 	process.env.NEXT_PUBLIC_POLYGON_AMOY_RPC_URL ||
 	"https://rpc-amoy.polygon.technology";

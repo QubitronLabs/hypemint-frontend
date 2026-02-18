@@ -131,6 +131,75 @@ export function useCreationFee() {
 const TOKEN_CREATED_TOPIC =
 	"0x4836be210e0cef1e63931ae5137b536c1191d9dc411069cf651c05c584c6fcae";
 
+// ============================================================================
+// PENDING TRANSACTION UTILITIES
+// ============================================================================
+
+/**
+ * Check how many transactions are pending (in-flight) for the given address.
+ * Compares the "pending" nonce (next available nonce including mempool)
+ * against the "latest" nonce (last mined nonce).
+ *
+ * Polygon RPCs enforce a per-account in-flight limit (often 16 or 64).
+ * If we detect pending txs, we can warn the user or wait before sending more.
+ */
+async function getPendingTransactionCount(
+	publicClient: ReturnType<typeof usePublicClient>,
+	address: Address,
+): Promise<number> {
+	if (!publicClient) return 0;
+	try {
+		const [pendingCount, latestCount] = await Promise.all([
+			publicClient.getTransactionCount({ address, blockTag: "pending" }),
+			publicClient.getTransactionCount({ address, blockTag: "latest" }),
+		]);
+		return pendingCount - latestCount;
+	} catch {
+		// If the RPC doesn't support pending blockTag, assume 0
+		return 0;
+	}
+}
+
+/**
+ * Wait for all pending transactions to clear before submitting a new one.
+ * Polls every `intervalMs` until pending count reaches 0 or `timeoutMs` elapses.
+ *
+ * @returns true if pending transactions cleared, false if timed out
+ */
+async function waitForPendingTransactions(
+	publicClient: ReturnType<typeof usePublicClient>,
+	address: Address,
+	timeoutMs = 30_000,
+	intervalMs = 2_000,
+): Promise<boolean> {
+	const start = Date.now();
+	while (Date.now() - start < timeoutMs) {
+		const pending = await getPendingTransactionCount(publicClient, address);
+		if (pending <= 0) return true;
+		console.log(`[tx-queue] Waiting for ${pending} pending tx(s) to clear...`);
+		await new Promise((r) => setTimeout(r, intervalMs));
+	}
+	return false;
+}
+
+/**
+ * Detect if an error is the Polygon "in-flight transaction limit" error
+ */
+function isInFlightLimitError(err: unknown): boolean {
+	const msg =
+		(err as any)?.message?.toLowerCase() ??
+		(err as any)?.shortMessage?.toLowerCase() ??
+		"";
+	return (
+		msg.includes("in-flight transaction limit") ||
+		msg.includes("inflight transaction limit") ||
+		msg.includes("delegated accounts") ||
+		msg.includes("max_inflight_txs") ||
+		msg.includes("replacement transaction underpriced") ||
+		msg.includes("already known")
+	);
+}
+
 // Hook: Create a new token
 export function useCreateToken() {
 	const { walletAddress: address } = useAuth();
@@ -193,6 +262,34 @@ export function useCreateToken() {
 				);
 				const fee = creationFee || DEFAULT_CREATION_FEE;
 
+				// ── Check for pending transactions before submitting ──
+				// Polygon RPCs enforce an in-flight limit per account.
+				// If there are stuck pending txs we wait for them to clear first.
+				if (publicClient && address) {
+					const pendingCount = await getPendingTransactionCount(publicClient, address);
+					if (pendingCount > 0) {
+						console.warn(
+							`[createToken] ${pendingCount} pending transaction(s) detected — waiting for them to clear...`,
+						);
+						const cleared = await waitForPendingTransactions(
+							publicClient,
+							address,
+							30_000,
+							2_000,
+						);
+						if (!cleared) {
+							setError(
+								new Error(
+									`You have ${pendingCount} pending transaction(s). Please wait for them to confirm or cancel them in your wallet before creating a new token.`,
+								),
+							);
+							setIsCreating(false);
+							return null;
+						}
+						console.log("[createToken] Pending transactions cleared, proceeding...");
+					}
+				}
+
 				console.log("Creating token with params:", {
 					factoryAddress,
 					fee: fee.toString(),
@@ -200,26 +297,61 @@ export function useCreateToken() {
 					chainId: targetChainId,
 				});
 
-				// Write the transaction
-				const hash = await writeContractAsync({
-					address: factoryAddress,
-					abi: HYPE_FACTORY_ABI,
-					functionName: "createToken",
-					args: [
-						params.name,
-						params.symbol,
-						params.imageURI,
-						params.description,
-						params.hypeBoostEnabled,
-						params.slope || BigInt(0),
-						params.basePrice || BigInt(0),
-					],
-					value: fee,
-					account: address,
-					chainId: targetChainId,
-					maxPriorityFeePerGas: BigInt(30000000000),
-					maxFeePerGas: BigInt(50000000000),
-				});
+				// ── Submit transaction with retry logic for in-flight errors ──
+				let hash: Hash | undefined;
+				const maxRetries = 3;
+				for (let attempt = 1; attempt <= maxRetries; attempt++) {
+					try {
+						// Get the explicit nonce from the RPC to avoid stale nonce issues
+						let nonce: number | undefined;
+						if (publicClient && address) {
+							nonce = await publicClient.getTransactionCount({
+								address,
+								blockTag: "pending",
+							});
+						}
+
+						hash = await writeContractAsync({
+							address: factoryAddress,
+							abi: HYPE_FACTORY_ABI,
+							functionName: "createToken",
+							args: [
+								params.name,
+								params.symbol,
+								params.imageURI,
+								params.description,
+								params.hypeBoostEnabled,
+								params.slope || BigInt(0),
+								params.basePrice || BigInt(0),
+							],
+							value: fee,
+							account: address,
+							chainId: targetChainId,
+							nonce,
+							maxPriorityFeePerGas: BigInt(30000000000),
+							maxFeePerGas: BigInt(50000000000),
+						});
+						break; // success – exit retry loop
+					} catch (retryErr: any) {
+						if (isInFlightLimitError(retryErr) && attempt < maxRetries) {
+							console.warn(
+								`[createToken] In-flight limit hit (attempt ${attempt}/${maxRetries}). Waiting before retry...`,
+							);
+							// Wait progressively longer between retries
+							await new Promise((r) => setTimeout(r, attempt * 5_000));
+							// Also wait for pending txs to clear
+							if (publicClient && address) {
+								await waitForPendingTransactions(publicClient, address, 15_000, 2_000);
+							}
+							continue;
+						}
+						throw retryErr; // Not an in-flight error, or out of retries
+					}
+				}
+
+				if (!hash) {
+					throw new Error("Transaction could not be submitted after retries");
+				}
 
 				console.log("Transaction submitted:", hash);
 				setTxHash(hash);
@@ -314,6 +446,9 @@ export function useCreateToken() {
 				} else if (err?.message?.includes("InsufficientCreationFee")) {
 					errorMessage =
 						"Insufficient creation fee. Please send at least 0.01 POL";
+				} else if (isInFlightLimitError(err)) {
+					errorMessage =
+						"Too many pending transactions. Please wait for your previous transactions to confirm, or speed them up / cancel them in your wallet settings, then try again.";
 				} else if (err?.shortMessage) {
 					errorMessage = err.shortMessage;
 				} else if (err?.message) {
@@ -457,6 +592,7 @@ export function useSellQuote(
 export function useBuyTokens() {
 	const { walletAddress: address } = useAuth();
 	const evmChainId = useActiveEvmChainId();
+	const publicClient = usePublicClient();
 	const [txHash, setTxHash] = useState<Hash | undefined>();
 	const [isBuying, setIsBuying] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
@@ -492,6 +628,26 @@ export function useBuyTokens() {
 				// For simplicity, set minTokens to 0 (could calculate properly with quote)
 				const minTokens = BigInt(0);
 
+				// Check for pending transactions before submitting
+				if (publicClient && address) {
+					const pendingCount = await getPendingTransactionCount(publicClient, address);
+					if (pendingCount > 0) {
+						console.warn(`[useBuyTokens] ${pendingCount} pending tx(s) detected — waiting...`);
+						const cleared = await waitForPendingTransactions(publicClient, address, 20_000, 2_000);
+						if (!cleared) {
+							setError(new Error(`You have ${pendingCount} pending transaction(s). Please wait for them to confirm or cancel them in your wallet.`));
+							setIsBuying(false);
+							return null;
+						}
+					}
+				}
+
+				// Get explicit nonce
+				let nonce: number | undefined;
+				if (publicClient && address) {
+					nonce = await publicClient.getTransactionCount({ address, blockTag: "pending" });
+				}
+
 				// Debug logging
 				console.log("[useBuyTokens] Buy params:", {
 					bondingCurveAddress: params.bondingCurveAddress,
@@ -500,6 +656,7 @@ export function useBuyTokens() {
 					minTokens: minTokens.toString(),
 					slippageBps: slippage,
 					chainId: evmChainId,
+					nonce,
 				});
 
 				const hash = await writeContractAsync({
@@ -510,6 +667,7 @@ export function useBuyTokens() {
 					value: maticWei,
 					account: address,
 					chainId: evmChainId,
+					nonce,
 					maxPriorityFeePerGas: BigInt(30000000000),
 					maxFeePerGas: BigInt(50000000000),
 				});
@@ -519,17 +677,21 @@ export function useBuyTokens() {
 				return hash;
 			} catch (err) {
 				console.error("Failed to buy tokens:", err);
-				setError(
-					err instanceof Error
-						? err
-						: new Error("Failed to buy tokens"),
-				);
+				if (isInFlightLimitError(err)) {
+					setError(new Error("Too many pending transactions. Please wait for your previous transactions to confirm, or cancel them in your wallet."));
+				} else {
+					setError(
+						err instanceof Error
+							? err
+							: new Error("Failed to buy tokens"),
+					);
+				}
 				return null;
 			} finally {
 				setIsBuying(false);
 			}
 		},
-		[address, evmChainId, writeContractAsync],
+		[address, evmChainId, publicClient, writeContractAsync],
 	);
 
 	return {
@@ -551,6 +713,7 @@ export function useBuyTokens() {
 export function useSellTokens() {
 	const { walletAddress: address } = useAuth();
 	const evmChainId = useActiveEvmChainId();
+	const publicClient = usePublicClient();
 	const [txHash, setTxHash] = useState<Hash | undefined>();
 	const [isSelling, setIsSelling] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
@@ -586,12 +749,33 @@ export function useSellTokens() {
 					? parseEther(params.minMatic)
 					: BigInt(0);
 
+				// Check for pending transactions before submitting
+				if (publicClient && address) {
+					const pendingCount = await getPendingTransactionCount(publicClient, address);
+					if (pendingCount > 0) {
+						console.warn(`[useSellTokens] ${pendingCount} pending tx(s) detected — waiting...`);
+						const cleared = await waitForPendingTransactions(publicClient, address, 20_000, 2_000);
+						if (!cleared) {
+							setError(new Error(`You have ${pendingCount} pending transaction(s). Please wait for them to confirm or cancel them in your wallet.`));
+							setIsSelling(false);
+							return null;
+						}
+					}
+				}
+
+				// Get explicit nonce
+				let nonce: number | undefined;
+				if (publicClient && address) {
+					nonce = await publicClient.getTransactionCount({ address, blockTag: "pending" });
+				}
+
 				console.log("[useSellTokens] Sell params:", {
 					bondingCurveAddress: params.bondingCurveAddress,
 					tokenAmount: params.tokenAmount,
 					tokenWei: tokenWei.toString(),
 					minMatic: minMatic.toString(),
 					chainId: evmChainId,
+					nonce,
 				});
 
 				const hash = await writeContractAsync({
@@ -601,6 +785,7 @@ export function useSellTokens() {
 					args: [tokenWei, minMatic],
 					account: address,
 					chainId: evmChainId,
+					nonce,
 					maxPriorityFeePerGas: BigInt(30000000000),
 					maxFeePerGas: BigInt(50000000000),
 				});
@@ -609,17 +794,21 @@ export function useSellTokens() {
 				return hash;
 			} catch (err) {
 				console.error("Failed to sell tokens:", err);
-				setError(
-					err instanceof Error
-						? err
-						: new Error("Failed to sell tokens"),
-				);
+				if (isInFlightLimitError(err)) {
+					setError(new Error("Too many pending transactions. Please wait for your previous transactions to confirm, or cancel them in your wallet."));
+				} else {
+					setError(
+						err instanceof Error
+							? err
+							: new Error("Failed to sell tokens"),
+					);
+				}
 				return null;
 			} finally {
 				setIsSelling(false);
 			}
 		},
-		[address, evmChainId, writeContractAsync],
+		[address, evmChainId, publicClient, writeContractAsync],
 	);
 
 	return {
