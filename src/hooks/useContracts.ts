@@ -11,7 +11,6 @@ import {
 	useWaitForTransactionReceipt,
 	useBalance,
 	usePublicClient,
-	useSwitchChain,
 	useChainId as useWagmiChainId,
 } from "wagmi";
 import { parseEther, type Address, type Hash } from "viem";
@@ -141,7 +140,6 @@ export function useCreateToken() {
 	const [txHash, setTxHash] = useState<Hash | undefined>();
 	const [isCreating, setIsCreating] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
-	const { switchChainAsync } = useSwitchChain();
 
 	const { writeContractAsync } = useWriteContract();
 
@@ -165,27 +163,33 @@ export function useCreateToken() {
 			setError(null);
 
 			try {
-				// Ensure we're on the correct chain (use dynamic chain ID from backend)
-				if (walletChainId !== evmChainId) {
-					console.log(
-						`Switching from chain ${walletChainId} to ${evmChainId}`,
+				// Verify the wallet's current chain has an active deployment
+				// Do NOT auto-switch to a random chain — that causes the BNB chain bug
+				const store = useContractConfigStore.getState();
+				const walletDeployment = store.deployments.find(
+					(d) => d.chainId === walletChainId && d.chainType === "EVM" && d.isActive,
+				);
+
+				if (!walletDeployment) {
+					// The wallet is on a chain we don't have a deployment for
+					const supportedChains = store.deployments
+						.filter((d) => d.chainType === "EVM" && d.isActive)
+						.map((d) => `${d.chainName} (${d.chainId})`);
+					setError(
+						new Error(
+							`No HypeMint deployment on this network. Please switch your wallet to a supported chain: ${supportedChains.join(", ")}`,
+						),
 					);
-					try {
-						await switchChainAsync({ chainId: evmChainId });
-					} catch (switchError) {
-						console.error("Failed to switch chain:", switchError);
-						setError(
-							new Error(
-								`Please switch to the correct EVM network (Chain ID: ${evmChainId})`,
-							),
-						);
-						return null;
-					}
+					setIsCreating(false);
+					return null;
 				}
+
+				// Use the wallet's current chain for the transaction
+				const targetChainId = walletChainId;
 
 				const factoryAddress = getContractAddress(
 					"factory",
-					evmChainId,
+					targetChainId,
 				);
 				const fee = creationFee || DEFAULT_CREATION_FEE;
 
@@ -193,7 +197,7 @@ export function useCreateToken() {
 					factoryAddress,
 					fee: fee.toString(),
 					params,
-					chainId: evmChainId,
+					chainId: targetChainId,
 				});
 
 				// Write the transaction
@@ -212,7 +216,7 @@ export function useCreateToken() {
 					],
 					value: fee,
 					account: address,
-					chainId: evmChainId,
+					chainId: targetChainId,
 					maxPriorityFeePerGas: BigInt(30000000000),
 					maxFeePerGas: BigInt(50000000000),
 				});
@@ -329,7 +333,6 @@ export function useCreateToken() {
 			writeContractAsync,
 			creationFee,
 			publicClient,
-			switchChainAsync,
 		],
 	);
 

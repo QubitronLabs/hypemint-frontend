@@ -192,7 +192,6 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
   return (
     <DynamicContextProvider
       settings={{
-        
         environmentId: environmentId || "demo-environment-id",
         walletConnectors: [
           // Solana as primary chain (like pump.fun)

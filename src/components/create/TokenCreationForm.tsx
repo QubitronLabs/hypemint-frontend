@@ -91,6 +91,7 @@ import {
 	useContractConfig,
 } from "@/hooks";
 import { getTxUrl } from "@/lib/wagmi";
+import { useChainId as useWagmiChainId } from "wagmi";
 import { toast } from "sonner";
 import {
 	getInitialSupplyPreview,
@@ -99,7 +100,6 @@ import {
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { useActiveChainType } from "@/lib/network";
 import type { ChainType } from "@/lib/network";
-import { getActiveEvmChainId } from "@/lib/contracts/config";
 
 // ============================================================================
 // COMPONENTS
@@ -336,6 +336,7 @@ export function TokenCreationForm() {
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
 	const { setShowAuthFlow } = useDynamicContext();
 	const activeChainType = useActiveChainType();
+	const walletChainId = useWagmiChainId();
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	// ========================================================================
@@ -777,7 +778,7 @@ export function TokenCreationForm() {
 				// Use the wallet's actual chain ID (not generic "first EVM deployment")
 				const targetChainId = isSolana
 					? (getDeploymentByChainType("SOLANA")?.chainId ?? 901)
-					: getActiveEvmChainId();
+					: walletChainId;
 
 				let backendTokenId: string = tokenAddress;
 				try {
