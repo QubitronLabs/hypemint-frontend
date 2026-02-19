@@ -71,6 +71,7 @@ import { getChainDisplayName } from "@/lib/wagmi/config";
 import type { Address } from "viem";
 import type { Token } from "@/types";
 import dynamic from "next/dynamic";
+import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 
 interface TokenDetailPageProps {
 	params: Promise<{ id: string }>;
@@ -83,7 +84,8 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 	const [localIsFollowing, setLocalIsFollowing] = useState(false);
 	const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 	const [showBubbleMap, setShowBubbleMap] = useState(false);
-	const [showImageModal, setShowImageModal] = useState(false); 
+	const [showImageModal, setShowImageModal] = useState(false);
+	const { primaryWallet } = useDynamicContext();
 
 	// Auth and follow hooks
 	const { isAuthenticated, walletAddress, setShowAuthFlow } = useAuth();
@@ -1010,7 +1012,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 					)}
 
 					{/* login button to trade */}
-					{!isAuthenticated && (
+					{!primaryWallet && (
 						<motion.div
 						initial={{ opacity: 0, x: 20 }}
 						animate={{ opacity: 1, x: 0 }}
@@ -1027,7 +1029,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						</motion.div>
 					)}
 					{/* Trading Panel - On-Chain or Centralized */}
-					{isAuthenticated
+					{primaryWallet
 					&&(
 					<motion.div
 					initial={{ opacity: 0, x: 20 }}
