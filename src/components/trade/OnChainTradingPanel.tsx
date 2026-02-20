@@ -187,9 +187,12 @@ export function OnChainTradingPanel({
 	);
 
 	// Check if connected wallet type matches token's blockchain platform
+	// Only show mismatch when a wallet is actually connected (primaryWallet != null)
+	// isAuthenticated alone isn't sufficient since JWT persists in localStorage
 	const connectedWalletIsSolana = primaryWallet?.chain === "SOL";
 	const walletPlatformMismatch =
 		isAuthenticated &&
+		!!primaryWallet &&
 		((isSolana && !connectedWalletIsSolana) ||
 			(!isSolana && connectedWalletIsSolana));
 
@@ -739,27 +742,38 @@ export function OnChainTradingPanel({
 	const syncTradeToBackend = useCallback(
 		async (hash: string, type: "buy" | "sell") => {
 			if (isSolana) return; // Solana hooks already report trades
-			try {
-				// Backend verifies the transaction on-chain before recording
-				await recordOnChainTrade({
-					tokenId: tokenAddress,
-					bondingCurveAddress,
-					type,
-					maticAmount: "0", // Will be extracted from blockchain
-					tokenAmount: "0", // Will be extracted from blockchain
-					txHash: hash,
-					chainId: normalizedChainId,
-				});
-				// console.log("[OnChainTrading] Trade synced to backend:", hash);
-			} catch (err) {
-				console.error(
-					"[OnChainTrading] Failed to sync trade to backend:",
-					err,
-				);
-				// Don't show error to user - on-chain trade succeeded, backend sync is secondary
+
+			// Small delay to allow backend RPC to propagate the receipt
+			await new Promise((r) => setTimeout(r, 3000));
+
+			// Retry up to 3 times with increasing delay
+			for (let attempt = 1; attempt <= 3; attempt++) {
+				try {
+					// Backend verifies the transaction on-chain before recording
+					await recordOnChainTrade({
+						tokenId: tokenAddress,
+						bondingCurveAddress,
+						type,
+						maticAmount: "0", // Will be extracted from blockchain
+						tokenAmount: "0", // Will be extracted from blockchain
+						txHash: hash,
+						chainId: normalizedChainId,
+					});
+					return; // Success - exit retry loop
+				} catch (err) {
+					console.warn(
+						`[OnChainTrading] Failed to sync trade to backend (attempt ${attempt}/3):`,
+						err,
+					);
+					if (attempt < 3) {
+						// Wait longer before next retry
+						await new Promise((r) => setTimeout(r, attempt * 5000));
+					}
+				}
 			}
+			console.error("[OnChainTrading] All backend sync attempts failed for:", hash);
 		},
-		[tokenAddress, bondingCurveAddress, normalizedChainId],
+		[tokenAddress, bondingCurveAddress, normalizedChainId, isSolana],
 	);
 
 	// Refetch balances and sync when trades are confirmed
@@ -1126,6 +1140,7 @@ export function OnChainTradingPanel({
 		setJustApproved(false);
 	}, [tradeType]);
 
+	
 	return (
 		<div
 			className={cn(
@@ -1170,13 +1185,13 @@ export function OnChainTradingPanel({
 						<label className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
 							{tradeType === "buy"
 								? `You Pay (${effectiveNativeSymbol})`
-								: `You Sell (${tokenName})`}
+								: `You Sell (${tokenSymbol})`}
 						</label>
 						<span className="text-[10px] sm:text-xs text-muted-foreground truncate">
 							Balance:{" "}
 							{tradeType === "buy"
 								? `${nativeBalance?.value ? formatNumber(formatNativeDisplay(nativeBalance.value)) : "0"} ${effectiveNativeSymbol}`
-								: `${tokenBalance ? formatNumber(formatTokenDisplay(tokenBalance as bigint)) : "0"} ${tokenName}`}
+								: `${tokenBalance ? formatNumber(formatTokenDisplay(tokenBalance as bigint)) : "0"} ${tokenSymbol}`}
 						</span>
 					</div>
 					<div className="relative">
@@ -1195,7 +1210,7 @@ export function OnChainTradingPanel({
 						<div className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-muted-foreground">
 							{tradeType === "buy"
 								? effectiveNativeSymbol
-								: tokenName}
+								: tokenSymbol}
 						</div>
 					</div>
 				</div>
@@ -1257,7 +1272,7 @@ export function OnChainTradingPanel({
 													tradeMetrics.outputAmount,
 												)}{" "}
 												{tradeType === "buy"
-													? tokenName
+													? tokenSymbol
 													: effectiveNativeSymbol}
 											</>
 										)}
@@ -1400,7 +1415,7 @@ export function OnChainTradingPanel({
 									Approving...
 								</>
 							) : (
-								<>Approve {tokenName}</>
+								<>Approve {tokenSymbol}</>
 							)
 						) : isLoading ? (
 							<>
@@ -1425,7 +1440,7 @@ export function OnChainTradingPanel({
 						) : exceedsBalance ? (
 							<>
 								<AlertTriangle className="h-5 w-5 mr-2" />
-								Insufficient {tokenName} Balance
+								Insufficient {tokenSymbol} Balance
 							</>
 						) : belowMinimum ? (
 							<>
@@ -1440,7 +1455,7 @@ export function OnChainTradingPanel({
 									<TrendingDown className="h-5 w-5 mr-2" />
 								)}
 								{tradeType === "buy" ? "Buy" : "Sell"}{" "}
-								{tokenName}
+								{tokenSymbol}
 							</>
 						)}
 					</Button>

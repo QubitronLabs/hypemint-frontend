@@ -328,8 +328,6 @@ export function useCreateToken() {
 							account: address,
 							chainId: targetChainId,
 							nonce,
-							maxPriorityFeePerGas: BigInt(30000000000),
-							maxFeePerGas: BigInt(50000000000),
 						});
 						break; // success – exit retry loop
 					} catch (retryErr: any) {
@@ -668,8 +666,6 @@ export function useBuyTokens() {
 					account: address,
 					chainId: evmChainId,
 					nonce,
-					maxPriorityFeePerGas: BigInt(30000000000),
-					maxFeePerGas: BigInt(50000000000),
 				});
 
 				console.log("[useBuyTokens] Transaction hash:", hash);
@@ -786,8 +782,6 @@ export function useSellTokens() {
 					account: address,
 					chainId: evmChainId,
 					nonce,
-					maxPriorityFeePerGas: BigInt(30000000000),
-					maxFeePerGas: BigInt(50000000000),
 				});
 
 				setTxHash(hash);
@@ -879,8 +873,6 @@ export function useApproveToken() {
 					args: [spenderAddress, amount],
 					account: address,
 					chainId: evmChainId,
-					maxPriorityFeePerGas: BigInt(30000000000),
-					maxFeePerGas: BigInt(50000000000),
 				});
 
 				setTxHash(hash);
@@ -1012,8 +1004,6 @@ export function useClaimVested() {
 					functionName: "claimVested",
 					account: address,
 					chainId: evmChainId,
-					maxPriorityFeePerGas: BigInt(30000000000),
-					maxFeePerGas: BigInt(50000000000),
 				});
 
 				setTxHash(hash);
