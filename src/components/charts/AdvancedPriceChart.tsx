@@ -498,8 +498,11 @@ export function AdvancedPriceChart({
 		fetchCandles();
 		return () => {
 			cancelled = true;
-		};
-	}, [tokenId, timeRange, dims.w]);
+		}
+		;
+	}, 
+	// eslint-disable-next-line react-hooks/exhaustive-deps	
+	[tokenId, timeRange]);
 
 	// ============================================================================
 	// Resize Observer
