@@ -5,7 +5,7 @@ import {
   useDynamicContext,
   useIsLoggedIn,
   getAuthToken,
-  // mergeNetworks,
+  overrideNetworkRpcUrl,
 } from "@dynamic-labs/sdk-react-core";
 import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
 import { SolanaWalletConnectors } from "@dynamic-labs/solana";
@@ -36,6 +36,20 @@ import { useAutoGenerateAvatar } from "@/hooks/useAutoGenerateAvatar";
 
 // Check if running in local mode
 // const isLocalMode = process.env.NEXT_PUBLIC_CHAIN_MODE === "local";
+
+// Override Dynamic.xyz default RPCs with reliable public RPCs (no API keys needed)
+const evmRpcUrlOverrides: Record<string, string[]> = {
+  "1": ["https://eth.merkle.io"],
+  "137": ["https://polygon.drpc.org"],
+  "80002": ["https://rpc-amoy.polygon.technology"],
+  "42161": ["https://arb1.arbitrum.io/rpc"],
+  "10": ["https://mainnet.optimism.io"],
+  "56": ["https://bsc-dataseed.binance.org"],
+  "43114": ["https://api.avax.network/ext/bc/C/rpc"],
+  "59144": ["https://rpc.linea.build"],
+  "97": ["https://data-seed-prebsc-1-s1.binance.org:8545"],
+  "11155111": ["https://rpc.sepolia.org"],
+};
 
 interface DynamicProviderProps {
   children: ReactNode;
@@ -199,8 +213,12 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
           // EVM chains ready for multi-chain expansion
           EthereumWalletConnectors,
         ],
-        
-         
+
+        // Override default RPCs (Dynamic.xyz defaults use Alchemy keys that may be disabled)
+        overrides: {
+          evmNetworks: (networks) =>
+            overrideNetworkRpcUrl(networks, evmRpcUrlOverrides),
+        },
         // Dark theme to match our design
         cssOverrides: `
           .dynamic-widget-inline-controls {

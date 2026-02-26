@@ -18,6 +18,26 @@ export interface RecordOnChainTradeInput {
   chainId?: number;
 }
 
+/**
+ * Instantly sync a confirmed trade to the backend.
+ * Called right after a buy/sell transaction is confirmed on-chain.
+ * The backend verifies the tx hash, records the trade, updates stats,
+ * and broadcasts via WebSocket so the UI updates immediately.
+ */
+export async function syncTrade(params: {
+  txHash: string;
+  tokenId: string;
+  chainId?: number;
+}): Promise<{ synced: boolean; tradeId?: string; reason?: string }> {
+  try {
+    const { data } = await apiClient.post("/api/v1/trades/sync", params);
+    return data.data ?? data;
+  } catch (error) {
+    console.warn("[syncTrade] Failed (non-critical):", error);
+    return { synced: false, reason: "api_error" };
+  }
+}
+
 // Get trade quote
 export async function getTradeQuote(
   tokenId: string,
@@ -33,6 +53,10 @@ export async function getTradeQuote(
   return data.data ?? data;
 }
 
+/**
+ * @deprecated Backend now handles trade creation via blockchain event listeners.
+ * This endpoint will be removed. Trades are auto-captured from on-chain events.
+ */
 // Create pending trade
 export async function createTrade(input: CreateTradeInput): Promise<Trade> {
   const { data } = await apiClient.post("/api/v1/trades/", input);
@@ -40,6 +64,10 @@ export async function createTrade(input: CreateTradeInput): Promise<Trade> {
   return data.data ?? data;
 }
 
+/**
+ * @deprecated Backend now handles trade recording via blockchain event listeners.
+ * This endpoint will be removed. Frontend should NOT call this after buy/sell.
+ */
 // Record on-chain trade after blockchain confirmation
 export async function recordOnChainTrade(
   input: RecordOnChainTradeInput,
@@ -49,6 +77,10 @@ export async function recordOnChainTrade(
   return data.data ?? data;
 }
 
+/**
+ * @deprecated Backend now handles trade confirmation via blockchain event listeners.
+ * This endpoint will be removed. Use on-chain events for trade confirmation.
+ */
 // Confirm trade after blockchain confirmation
 export async function confirmTrade(
   tradeId: string,

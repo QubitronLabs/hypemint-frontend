@@ -36,8 +36,16 @@ export const DEFAULT_SLOPE = BigInt(10_000);
 export const DEFAULT_BASE_PRICE = BigInt(1_000_000);
 /** Token decimals */
 export const TOKEN_DECIMALS = 6;
-/** Default RPC URL for Solana devnet */    
-export const SOLANA_DEVNET_RPC = "https://api.devnet.solana.com";
+
+/**
+ * Solana RPC URL — routes through the backend proxy so private API keys
+ * stay server-side.  Falls back to the free public devnet endpoint.
+ */
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const SOLANA_DEVNET_CHAIN_ID = 901;
+export const SOLANA_RPC_PROXY_URL = `${API_URL}/api/v1/rpc/${SOLANA_DEVNET_CHAIN_ID}`;
+/** @deprecated Use SOLANA_RPC_PROXY_URL — kept for any external callers */
+export const SOLANA_DEVNET_RPC = SOLANA_RPC_PROXY_URL;
 
 // ─── Anchor Instruction Discriminators ───────────────────────────
 // Computed as sha256("global:<instruction_name>")[0..8]
@@ -787,9 +795,11 @@ function createAssociatedTokenAccountInstruction(
 // ─── Utility: Get Solana Connection ──────────────────────────────
 
 /**
- * Create a Solana connection from a config-provided RPC URL or default
+ * Create a Solana connection.
+ * When no rpcUrl is provided the backend RPC proxy is used so
+ * private API keys never leave the server.
  */
 export function getSolanaConnection(rpcUrl?: string | null): Connection {
-	const url = rpcUrl || SOLANA_DEVNET_RPC;
+	const url = rpcUrl || SOLANA_RPC_PROXY_URL;
 	return new Connection(url, "confirmed");
 }

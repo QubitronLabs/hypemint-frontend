@@ -81,6 +81,7 @@ import {
 	useAuth,
 	useCreateToken,
 	useCreateTokenOnChain,
+	useCreateTokenRequest,
 	useCreationFee,
 	useNativeBalance,
 	useBuyTokens,
@@ -92,13 +93,17 @@ import {
 } from "@/hooks";
 import { getTxUrl } from "@/lib/wagmi";
 import { useChainId as useWagmiChainId } from "wagmi";
+import { DEFAULT_CHAIN_ID } from "@/lib/wagmi/config";
 import { toast } from "sonner";
 import {
 	getInitialSupplyPreview,
+	getChainTokenomics,
 	type InitialSupplyPreview,
+	type ChainTokenomics,
 } from "@/lib/api/tokens";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
-import { useActiveChainType } from "@/lib/network";
+import { useActiveChainType, useChainId as useDynamicChainId } from "@/lib/network";
+import { useNetwork as useDynamicNetwork } from "@/lib/network";
 import type { ChainType } from "@/lib/network";
 
 // ============================================================================
@@ -121,6 +126,9 @@ interface TokenPreviewProps {
 	websiteUrl: string;
 	twitterUrl: string;
 	telegramUrl: string;
+	initialPriceUsd?: number;
+	initialMcapUsd?: number;
+	graduationThresholdUsd?: number;
 }
 
 function TokenPreviewCard({
@@ -132,8 +140,28 @@ function TokenPreviewCard({
 	websiteUrl,
 	twitterUrl,
 	telegramUrl,
+	initialPriceUsd,
+	initialMcapUsd,
+	graduationThresholdUsd,
 }: TokenPreviewProps) {
 	const hasSocialLinks = websiteUrl || twitterUrl || telegramUrl;
+
+	// Format price for display
+	const formatPrice = (price?: number): string => {
+		if (!price || price === 0) return "—";
+		if (price < 0.000001) return `$${price.toExponential(2)}`;
+		if (price < 0.01) return `$${price.toFixed(8)}`;
+		if (price < 1) return `$${price.toFixed(4)}`;
+		return `$${price.toFixed(2)}`;
+	};
+
+	// Format market cap for display
+	const formatMcap = (mcap?: number): string => {
+		if (!mcap || mcap === 0) return "—";
+		if (mcap >= 1_000_000) return `$${(mcap / 1_000_000).toFixed(1)}M`;
+		if (mcap >= 1_000) return `$${(mcap / 1_000).toFixed(1)}K`;
+		return `$${mcap.toFixed(0)}`;
+	};
 
 	return (
 		<motion.div
@@ -195,7 +223,7 @@ function TokenPreviewCard({
 								Price
 							</p>
 							<p className="text-sm font-mono font-medium text-green-500">
-								$0.0001
+								{formatPrice(initialPriceUsd)}
 							</p>
 						</div>
 						<div className="bg-muted/50 rounded-lg p-2">
@@ -203,7 +231,7 @@ function TokenPreviewCard({
 								Market Cap
 							</p>
 							<p className="text-sm font-mono font-medium">
-								$100K
+								{formatMcap(initialMcapUsd)}
 							</p>
 						</div>
 						<div className="bg-muted/50 rounded-lg p-2">
@@ -223,6 +251,11 @@ function TokenPreviewCard({
 						<div className="h-2 bg-muted rounded-full overflow-hidden">
 							<div className="h-full bg-linear-to-r from-primary to-purple-500 w-0 transition-all" />
 						</div>
+						{graduationThresholdUsd ? (
+							<p className="text-[10px] text-muted-foreground mt-1 text-right">
+								Graduation at {formatMcap(graduationThresholdUsd)}
+							</p>
+						) : null}
 					</div>
 
 					{/* Social Links Preview */}
@@ -337,6 +370,8 @@ export function TokenCreationForm() {
 	const { setShowAuthFlow } = useDynamicContext();
 	const activeChainType = useActiveChainType();
 	const walletChainId = useWagmiChainId();
+	const dynamicChainId = useDynamicChainId();
+	const dynamicNetwork = useDynamicNetwork();
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	// ========================================================================
@@ -383,6 +418,10 @@ export function TokenCreationForm() {
 
 	/** Backend API mutation for storing token metadata */
 	const createTokenApi = useCreateToken();
+
+	/** Gasless token creation — backend signs the on-chain tx */
+	const createTokenRequestApi = useCreateTokenRequest();
+	const isGaslessCreating = createTokenRequestApi.isPending;
 
 	// === Solana-specific Hooks ===
 	const {
@@ -440,6 +479,9 @@ export function TokenCreationForm() {
 		useState<InitialSupplyPreview | null>(null);
 	const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
+	/** CPMM tokenomics data for live preview (fetched per chain) */
+	const [tokenomics, setTokenomics] = useState<ChainTokenomics | null>(null);
+
 	/** Debounced buy amount to prevent excessive API calls */
 	const debouncedBuyAmount = useDebounce(initialBuyAmount, 300);
 
@@ -480,6 +522,34 @@ export function TokenCreationForm() {
 	// ========================================================================
 	// EFFECTS
 	// ========================================================================
+
+	/**
+	 * Effect: Fetch CPMM Tokenomics for Live Preview
+	 *
+	 * Fetches initial price, market cap, and graduation threshold from
+	 * the backend's CPMM engine for the user's actual chain.
+	 * Uses dynamicChainId (from Dynamic SDK network store) which updates
+	 * immediately when the user switches networks in their wallet.
+	 *
+	 * NOTE: We send the user's ACTUAL chain ID to the tokenomics API
+	 * (not the deployment-resolved one) so that the preview shows correct
+	 * native token/price for whatever chain the user is on. The deployment
+	 * check is only needed for actual token creation.
+	 */
+	useEffect(() => {
+		async function fetchTokenomics() {
+			try {
+				// Use the user's actual chain ID for preview data.
+				// Prefer Dynamic SDK chain (reactive), then wagmi, then default.
+				const previewChainId = dynamicChainId ?? walletChainId ?? DEFAULT_CHAIN_ID;
+				const data = await getChainTokenomics(previewChainId);
+				setTokenomics(data);
+			} catch (err) {
+				console.error("Failed to fetch tokenomics:", err);
+			}
+		}
+		fetchTokenomics();
+	}, [dynamicChainId, walletChainId]);
 
 	/**
 	 * Effect: Check Symbol Availability
@@ -538,8 +608,9 @@ export function TokenCreationForm() {
 
 			setIsLoadingPreview(true);
 			try {
+				const previewChainId = dynamicChainId ?? walletChainId ?? DEFAULT_CHAIN_ID;
 				const preview =
-					await getInitialSupplyPreview(debouncedBuyAmount);
+					await getInitialSupplyPreview(debouncedBuyAmount, previewChainId);
 				setSupplyPreview(preview);
 			} catch (error) {
 				console.error("Failed to fetch supply preview:", error);
@@ -550,7 +621,7 @@ export function TokenCreationForm() {
 		}
 
 		fetchSupplyPreview();
-	}, [debouncedBuyAmount, wantInitialBuy]);
+	}, [debouncedBuyAmount, wantInitialBuy, dynamicChainId, walletChainId]);
 
 	// ========================================================================
 	// COMPUTED VALUES
@@ -694,15 +765,12 @@ export function TokenCreationForm() {
 	 *
 	 * 1. Validates user is connected and authenticated
 	 * 2. Uploads image to backend storage if needed
-	 * 3. Calls HypeFactory.createToken() on blockchain
-	 *    - Deploys new HypeToken contract
-	 *    - Deploys new HypeBondingCurve contract
-	 *    - Links them together
+	 * 3. Calls backend gasless endpoint (EVM) or wallet signing (Solana)
+	 *    - Backend signs the createToken tx using its signer wallet
+	 *    - User pays zero gas for EVM token creation
 	 * 4. (Optional) Makes initial purchase if dev buy enabled
-	 *    - Calls bondingCurve.buy() with specified amount
-	 *    - Creator receives tokens at initial price
-	 * 5. Stores token metadata in backend database
-	 * 6. Redirects to token detail page
+	 *    - User signs this transaction from their own wallet
+	 * 5. Redirects to token detail page
 	 */
 	const handleSubmit = async () => {
 		// Ensure user is authenticated
@@ -719,8 +787,88 @@ export function TokenCreationForm() {
 				}
 			}
 
-			// Step 2: Create token on blockchain
-			toast.info(`Creating token on ${isSolana ? "Solana" : "EVM"}...`, {
+			// ================================================================
+			//  EVM GASLESS FLOW: Backend signs the transaction
+			// ================================================================
+			if (!isSolana) {
+				toast.info("Creating token...", {
+					id: "create-token",
+				});
+
+				try {
+					// Use Dynamic SDK's active chain (reactive to network switches),
+					// fall back to wagmi chain, then DEFAULT_CHAIN_ID.
+					// Do NOT override with DEFAULT_CHAIN_ID — let the backend validate
+					// factory availability and return a clear error if unsupported.
+					const activeChainId = dynamicChainId ?? walletChainId ?? DEFAULT_CHAIN_ID;
+
+					// Call gasless endpoint — backend signs & submits the tx
+					const result = await createTokenRequestApi.mutateAsync({
+						name,
+						symbol: symbol.toUpperCase(),
+						description,
+						imageUrl: finalImageUrl,
+						websiteUrl: websiteUrl || undefined,
+						twitterUrl: twitterUrl || undefined,
+						telegramUrl: telegramUrl || undefined,
+						hypeBoostEnabled,
+						chainId: activeChainId,
+					});
+
+					const backendTokenId = result.token.id;
+					const bondingCurveAddr = result.bondingCurve?.contractAddress;
+
+					toast.success("Token created successfully!", {
+						id: "create-token",
+						description: `Tx: ${result.txHash.slice(0, 10)}...`,
+					});
+
+					// Optional initial buy (dev buy) — user signs this from their wallet
+					if (
+						wantInitialBuy &&
+						initialBuyAmount &&
+						parseFloat(initialBuyAmount) > 0 &&
+						bondingCurveAddr
+					) {
+						setIsInitialBuying(true);
+						toast.info("Making initial purchase...", {
+							id: "initial-buy",
+						});
+
+						try {
+							await buyTokens({
+								bondingCurveAddress: bondingCurveAddr as Address,
+								maticAmount: initialBuyAmount,
+							});
+
+							toast.success("Initial purchase successful!", {
+								id: "initial-buy",
+								description: `You now own ${symbol.toUpperCase()} tokens!`,
+							});
+						} catch (buyErr) {
+							console.error("Initial buy failed:", buyErr);
+							toast.error(
+								"Initial purchase failed, but token was created",
+								{ id: "initial-buy" },
+							);
+						} finally {
+							setIsInitialBuying(false);
+						}
+					}
+
+					router.push(`/token/${backendTokenId}`);
+					return;
+				} catch (err) {
+					const msg = err instanceof Error ? err.message : "Failed to create token";
+					toast.error(msg, { id: "create-token" });
+					return;
+				}
+			}
+
+			// ================================================================
+			//  SOLANA ON-CHAIN FLOW
+			// ================================================================
+			toast.info("Creating token on Solana...", {
 				id: "create-token",
 			});
 
@@ -728,7 +876,7 @@ export function TokenCreationForm() {
 			let bondingCurveAddress: string | undefined;
 			let resultTxHash: string | undefined;
 
-			if (isSolana) {
+			{
 				// ── Solana Flow ──
 				const solanaResult = await solanaCreateToken({
 					name,
@@ -746,39 +894,17 @@ export function TokenCreationForm() {
 				tokenAddress = solanaResult.tokenAddress;
 				bondingCurveAddress = solanaResult.bondingCurveAddress;
 				resultTxHash = solanaResult.txSignature;
-			} else {
-				// ── EVM Flow ──
-				const evmResult = await createTokenOnChain({
-					name,
-					symbol: symbol.toUpperCase(),
-					imageURI: finalImageUrl || "",
-					description: description || "",
-					hypeBoostEnabled,
-				});
-
-				if (!evmResult) return;
-
-				tokenAddress = evmResult.tokenAddress;
-				bondingCurveAddress = evmResult.bondingCurveAddress;
-				resultTxHash = evmResult.txHash;
 			}
 
 			if (tokenAddress && resultTxHash) {
 				toast.success("Token created successfully!", {
 					id: "create-token",
 					description: `Transaction: ${resultTxHash.slice(0, 10)}...`,
-					action: isSolana ? undefined : {
-						label: "View",
-						onClick: () =>
-							window.open(getTxUrl(resultTxHash!, walletChainId), "_blank"),
-					},
 				});
 
 				// Step 3: Store metadata in backend
-				// Use the wallet's actual chain ID (not generic "first EVM deployment")
-				const targetChainId = isSolana
-					? (getDeploymentByChainType("SOLANA")?.chainId ?? 901)
-					: walletChainId;
+				// Solana chain ID
+				const targetChainId = getDeploymentByChainType("SOLANA")?.chainId ?? 901;
 
 				let backendTokenId: string = tokenAddress;
 				try {
@@ -818,7 +944,7 @@ export function TokenCreationForm() {
 					});
 
 					try {
-						if (isSolana && bondingCurveAddress) {
+						if (bondingCurveAddress) {
 							// Solana initial buy
 							const buySignature = await solanaBuyTokens({
 								bondingCurveAddress,
@@ -826,21 +952,6 @@ export function TokenCreationForm() {
 							});
 
 							if (buySignature) {
-								toast.success("Initial purchase successful!", {
-									id: "initial-buy",
-									description: `You now own ${symbol.toUpperCase()} tokens!`,
-								});
-							}
-						} else {
-							// EVM initial buy
-							const buyHash = await buyTokens({
-								bondingCurveAddress:
-									bondingCurveAddress as Address,
-								maticAmount: initialBuyAmount,
-								slippageBps: 500,
-							});
-
-							if (buyHash) {
 								toast.success("Initial purchase successful!", {
 									id: "initial-buy",
 									description: `You now own ${symbol.toUpperCase()} tokens!`,
@@ -1016,7 +1127,7 @@ export function TokenCreationForm() {
 										onChange={(e) =>
 											setDescription(e.target.value)
 										}
-										className="min-h-[80px] dark:bg-input/30 resize-none"
+										className="min-h-20 dark:bg-input/30 resize-none"
 										maxLength={500}
 									/>
 								</div>
@@ -1450,51 +1561,17 @@ export function TokenCreationForm() {
 							</div>
 						</div>
 
-						{/* Launch Info */}
-						{isAuthenticated && (
+						{/* Gasless Creation Info (EVM only) */}
+						{isAuthenticated && !isSolana && (
 							<div className="bg-muted/50 rounded-xl p-4">
-								<div className="grid grid-cols-2 gap-4 text-sm">
-									{wantInitialBuy && initialBuyAmount && (
-										<div>
-											<p className="text-muted-foreground">
-												Initial Buy
-											</p>
-											<p className="font-mono font-medium text-primary">
-												+{initialBuyAmount}{" "}
-												{nativeSymbol}
-											</p>
-										</div>
-									)}
-									<div>
-										<p className="text-muted-foreground">
-											Total Cost
-										</p>
-										<p className="font-mono font-medium text-primary">
-											{formatUnits(totalCost, decimals)}{" "}
-											{nativeSymbol}
-										</p>
+								<div className="flex items-center gap-3 mb-2">
+									<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10 border border-green-500/20">
+										<Zap className="h-5 w-5 text-green-500" />
 									</div>
 									<div>
-										<p className="text-muted-foreground">
-											Your Balance
-										</p>
-										<p
-											className={cn(
-												"font-mono font-medium",
-												hasEnoughBalance
-													? "text-green-500"
-													: "text-red-500",
-											)}
-										>
-											{chainBalance?.value
-												? parseFloat(
-														formatUnits(
-															chainBalance.value,
-															decimals,
-														),
-													).toFixed(4)
-												: "0"}{" "}
-											{nativeSymbol}
+										<p className="text-sm font-semibold">Gasless Token Creation</p>
+										<p className="text-xs text-muted-foreground">
+											Free — No gas required! Creating on <span className="font-semibold text-primary">{dynamicNetwork?.name || `Chain ${dynamicChainId ?? walletChainId ?? DEFAULT_CHAIN_ID}`}</span>
 										</p>
 									</div>
 								</div>
@@ -1502,21 +1579,21 @@ export function TokenCreationForm() {
 						)}
 
 						{/* Errors */}
-						{isAuthenticated && !hasEnoughBalance && (
+
+						{isAuthenticated && contractError && (
 							<div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-500">
-								<AlertCircle className="h-4 w-4 flex-shrink-0" />
+								<AlertCircle className="h-4 w-4 k-0" />
 								<span className="text-sm">
-									Insufficient balance. Need at least{" "}
-									{formatUnits(totalCost, decimals)} {nativeSymbol}.
+									{contractError?.message}
 								</span>
 							</div>
 						)}
 
-						{isAuthenticated && (contractError || solanaContractError) && (
+						{isAuthenticated && solanaContractError && (
 							<div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-500">
-								<AlertCircle className="h-4 w-4 flex-shrink-0" />
+								<AlertCircle className="h-4 w-4 k-0" />
 								<span className="text-sm">
-									{(isSolana ? solanaContractError : contractError)?.message}
+									{solanaContractError?.message}
 								</span>
 							</div>
 						)}
@@ -1528,20 +1605,10 @@ export function TokenCreationForm() {
 										Transaction Submitted
 									</p>
 									<p className="text-xs text-muted-foreground font-mono">
-										{(isSolana ? solanaTxSignature : txHash)?.slice(0, 20)}...
-										{(isSolana ? solanaTxSignature : txHash)?.slice(-8)}
+										{(txHash || solanaTxSignature)?.slice(0, 20)}...
+										{(txHash || solanaTxSignature)?.slice(-8)}
 									</p>
 								</div>
-								{!isSolana && txHash && (
-								<a
-									href={getTxUrl(txHash, walletChainId)}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="text-primary hover:underline flex items-center gap-1 text-sm"
-								>
-									View <ExternalLink className="h-3 w-3" />
-								</a>
-								)}
 							</div>
 						)}
 
@@ -1551,7 +1618,7 @@ export function TokenCreationForm() {
 							disabled={
 								isAuthenticated
 									? !isFormValid ||
-										!hasEnoughBalance ||
+										isGaslessCreating ||
 										isCreating ||
 										isConfirming ||
 										isSolanaCreating ||
@@ -1571,12 +1638,17 @@ export function TokenCreationForm() {
 									<Loader2 className="h-5 w-5 animate-spin" />
 									Uploading Image...
 								</>
-							) : isCreating || isSolanaCreating ? (
+							) : isGaslessCreating ? (
+								<>
+									<Loader2 className="h-5 w-5 animate-spin" />
+									Creating Token...
+								</>
+							) : isSolanaCreating ? (
 								<>
 									<Loader2 className="h-5 w-5 animate-spin" />
 									Confirm in Wallet
 								</>
-							) : isConfirming || isSolanaConfirming ? (
+							) : isSolanaConfirming ? (
 								<>
 									<Loader2 className="h-5 w-5 animate-spin" />
 									Creating Token...
@@ -1588,12 +1660,15 @@ export function TokenCreationForm() {
 									<Loader2 className="h-5 w-5 animate-spin" />
 									Making Initial Purchase...
 								</>
+							) : !isSolana ? (
+								<>
+									<Zap className="h-5 w-5" />
+									Create Token (Free — No Gas!)
+								</>
 							) : (
 								<>
 									<Rocket className="h-5 w-5" />
-									{wantInitialBuy && initialBuyAmount
-										? `Launch Token + Buy ${initialBuyAmount} ${nativeSymbol}`
-										: "Launch Token"}
+									Launch Token on Solana
 								</>
 							)}
 						</Button>
@@ -1615,6 +1690,9 @@ export function TokenCreationForm() {
 							websiteUrl={websiteUrl}
 							twitterUrl={twitterUrl}
 							telegramUrl={telegramUrl}
+							initialPriceUsd={tokenomics?.initialPriceUsd}
+							initialMcapUsd={tokenomics?.initialMcapUsd}
+							graduationThresholdUsd={tokenomics?.graduationThresholdUsd}
 						/>
 					</motion.div>
 				</div>

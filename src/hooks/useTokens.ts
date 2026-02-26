@@ -9,12 +9,13 @@ import {
 	getGraduatedTokens,
 	getToken,
 	createToken,
+	createTokenRequest,
 	getMyTokens,
 	syncTokenWithBlockchain,
 	getTokenHolders,
 	getWalletTokenBalance,
 } from "@/lib/api/tokens";
-import type { PaginatedResult } from "@/lib/api/tokens";
+import type { PaginatedResult, CreateTokenRequestInput } from "@/lib/api/tokens";
 import type { TokenListParams, CreateTokenInput } from "@/types";
 
 // Query keys for cache management
@@ -127,6 +128,24 @@ export function useCreateToken() {
 		mutationFn: (input: CreateTokenInput) => createToken(input),
 		onSuccess: () => {
 			// Invalidate all token lists to refresh
+			queryClient.invalidateQueries({ queryKey: tokenKeys.lists() });
+			queryClient.invalidateQueries({ queryKey: tokenKeys.trending() });
+			queryClient.invalidateQueries({ queryKey: tokenKeys.new() });
+			queryClient.invalidateQueries({ queryKey: tokenKeys.myTokens() });
+		},
+	});
+}
+
+/**
+ * Hook for gasless token creation via backend custom signing.
+ * Backend signs and submits the tx — returns completed result synchronously.
+ */
+export function useCreateTokenRequest() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: (input: CreateTokenRequestInput) => createTokenRequest(input),
+		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: tokenKeys.lists() });
 			queryClient.invalidateQueries({ queryKey: tokenKeys.trending() });
 			queryClient.invalidateQueries({ queryKey: tokenKeys.new() });

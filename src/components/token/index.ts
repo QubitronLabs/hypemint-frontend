@@ -5,3 +5,5 @@ export { TokenChat } from "./TokenChat";
 export { VestingCard } from "./VestingCard";
 export { BubbleMapDialog } from "./BubbleMapDialog";
 export { TrendingCarousel } from "./TrendingCarousel";
+export { GraduationBadge } from "./GraduationBadge";
+export { PostGraduationWidget } from "./PostGraduationWidget";

@@ -254,7 +254,7 @@ function TokenFilterPanel({
 				</PopoverTrigger>
 				<PopoverContent
 					align="end"
-					className="w-[340px] sm:w-[400px] p-4 bg-card border-border"
+					className="w-85 sm:w-100 p-4 bg-card border-border"
 					sideOffset={8}
 				>
 					<div className="space-y-5">
@@ -678,7 +678,7 @@ function HomePage() {
 					volume24h: "0",
 					priceChange24h: 0,
 					bondingCurveProgress: 0,
-					graduationTarget: "69000000000000000000000",
+					graduationTarget: newToken.graduationThresholdUsd?.toString() || "0",
 					currentBondingAmount: "0",
 					holdersCount: 0,
 					tradesCount: 0,
@@ -718,9 +718,8 @@ function HomePage() {
 				};
 				setActivityFeed((prev) => [activity, ...prev].slice(0, 20));
 
-				const updateTokenInCache = (oldData: any) => {
-					if (!oldData || !Array.isArray(oldData)) return oldData;
-					return oldData.map((token: Token) => {
+				const updateTokenArray = (tokens: Token[]) =>
+					tokens.map((token: Token) => {
 						if (token.id === trade.tokenId) {
 							return {
 								...token,
@@ -736,14 +735,46 @@ function HomePage() {
 									trade.marketCap !== undefined
 										? trade.marketCap
 										: token.marketCap,
+								marketCapUsd:
+									trade.marketCapUsd !== undefined
+										? trade.marketCapUsd
+										: token.marketCapUsd,
 								currentPrice:
 									trade.price !== undefined
 										? trade.price
 										: token.currentPrice,
+								currentPriceUsd:
+									trade.priceUsd !== undefined
+										? trade.priceUsd
+										: token.currentPriceUsd,
+								priceChange5m:
+									trade.priceChange5m !== undefined
+										? parseFloat(trade.priceChange5m)
+										: token.priceChange5m,
+								priceChange1h:
+									trade.priceChange1h !== undefined
+										? parseFloat(trade.priceChange1h)
+										: token.priceChange1h,
+								priceChange6h:
+									trade.priceChange6h !== undefined
+										? parseFloat(trade.priceChange6h)
+										: token.priceChange6h,
 							};
 						}
 						return token;
 					});
+
+				const updateTokenInCache = (oldData: any) => {
+					if (!oldData) return oldData;
+					// Handle paginated results: { data: Token[], pagination: {...} }
+					if (oldData.data && Array.isArray(oldData.data)) {
+						return { ...oldData, data: updateTokenArray(oldData.data) };
+					}
+					// Handle flat arrays: Token[]
+					if (Array.isArray(oldData)) {
+						return updateTokenArray(oldData);
+					}
+					return oldData;
 				};
 
 				queryClient.setQueriesData(
@@ -751,19 +782,19 @@ function HomePage() {
 					updateTokenInCache,
 				);
 				queryClient.setQueriesData(
-					{ queryKey: tokenKeys.trending() },
+					{ queryKey: ["tokens", "trending"] },
 					updateTokenInCache,
 				);
 				queryClient.setQueriesData(
-					{ queryKey: tokenKeys.new() },
+					{ queryKey: ["tokens", "new"] },
 					updateTokenInCache,
 				);
 				queryClient.setQueriesData(
-					{ queryKey: tokenKeys.live({}) },
+					{ queryKey: ["tokens", "live"] },
 					updateTokenInCache,
 				);
 				queryClient.setQueriesData(
-					{ queryKey: tokenKeys.graduated({}) },
+					{ queryKey: ["tokens", "graduated"] },
 					updateTokenInCache,
 				);
 			},
@@ -920,7 +951,7 @@ function HomePage() {
 	const filteredTokens = activeFilter === "all"
 		? searchFilteredTokens
 		: searchFilteredTokens.filter((token: Token) => {
-			const mcap = parseFloat(token.marketCap || "0");
+			const mcap = parseFloat(token.marketCapUsd || token.marketCap || "0");
 			const vol = parseFloat(token.volume24h || "0");
 			if (appliedMcap && (mcap < appliedMcap[0] || mcap > appliedMcap[1]))
 				return false;
@@ -1079,11 +1110,11 @@ function HomePage() {
 													key={i}
 													className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3 flex gap-3"
 												>
-													<Skeleton className="w-[88px] h-[88px] rounded-lg shrink-0" />
+													<Skeleton className="w-2288px] rounded-lg shrink-0" />
 													<div className="flex-1 min-w-0 flex flex-col gap-1.5">
 														<div className="flex items-center justify-between gap-2">
 															<Skeleton className="h-4 w-24" />
-															<Skeleton className="h-[10px] w-[150px] rounded-full" />
+															<Skeleton className="h-2.5[150px] rounded-full" />
 														</div>
 														<Skeleton className="h-3.5 w-12" />
 														<Skeleton className="h-3 w-32" />
@@ -1105,14 +1136,14 @@ function HomePage() {
 										exit={{ opacity: 0 }}
 										className="space-y-0"
 									>
-										<div className="flex items-center gap-3 px-4 py-2.5 border-b border-[#333] bg-[#0a0a0a] min-w-[1200px]">
+										<div className="flex items-center gap-3 px-4 py-2.5 border-b border-[#333] bg-[#0a0a0a] min-w-300">
 											<Skeleton className="h-3 w-full" />
 										</div>
 										{Array.from({ length: PAGE_SIZE }).map(
 											(_, i) => (
 												<div
 													key={i}
-													className="flex items-center gap-3 px-4 py-3 border-b border-[#1a1a1a] min-w-[1200px]"
+													className="flex items-center gap-3 px-4 py-3 border-b border-[#1a1a1a] min-w-300"
 												>
 													<Skeleton className="w-5 h-4 shrink-0" />
 													<Skeleton className="w-8 h-8 rounded-lg shrink-0" />
@@ -1200,7 +1231,7 @@ function HomePage() {
 									className="overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
 								>
 									{/* List Header */}
-									<div className="flex items-center gap-3 px-4 py-2.5 text-[10px] text-[#666] font-medium uppercase border-b border-[#333] bg-[#0a0a0a] sticky top-0 z-10 min-w-[1200px]">
+									<div className="flex items-center gap-3 px-4 py-2.5 text-[10px] text-[#666] font-medium uppercase border-b border-[#333] bg-[#0a0a0a] sticky top-0 z-10 min-w-3">
 										<div className="flex-[2.5] min-w-0">
 											<span className="ml-14">Coin</span>
 										</div>
@@ -1316,7 +1347,7 @@ function HomePage() {
 														setCurrentPage(p)
 													}
 													className={cn(
-														"min-w-[32px] h-8 px-2 text-xs font-medium rounded-md transition-all",
+														"min-w-8 h-8 px-2 text-xs font-medium rounded-md transition-all",
 														p === current
 															? "bg-primary text-primary-foreground"
 															: "text-muted-foreground hover:text-foreground hover:bg-muted",
@@ -1399,9 +1430,9 @@ function HomePageSkeleton() {
 						{Array.from({ length: 6 }).map((_, i) => (
 							<div
 								key={i}
-								className="min-w-[200px] rounded-xl overflow-hidden"
+								className="min-w-5rded-xl overflow-hidden"
 							>
-								<Skeleton className="h-[140px] w-[200px]" />
+								<Skeleton className="h-35 w-50" />
 							</div>
 						))}
 					</div>
@@ -1420,7 +1451,7 @@ function HomePageSkeleton() {
 							key={i}
 							className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3 flex gap-3"
 						>
-							<Skeleton className="w-[88px] h-[88px] rounded-lg shrink-0" />
+							<Skeleton className="w-22 h-22nded-lg shrink-0" />
 							<div className="flex-1 min-w-0 flex flex-col gap-1.5">
 								<Skeleton className="h-4 w-24" />
 								<Skeleton className="h-3.5 w-12" />

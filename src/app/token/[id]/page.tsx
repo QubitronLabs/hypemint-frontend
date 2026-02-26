@@ -40,11 +40,11 @@ import {
 	TokenChat,
 	VestingCard,
 	BubbleMapDialog,
+	PostGraduationWidget,
 } from "@/components/token";
 import {
 	TradeTape,
 	OnChainTradingPanel,
-	TradingPanel,
 } from "@/components/trade";
 
 import { useToken, tokenKeys, useTokenHolders } from "@/hooks/useTokens";
@@ -237,10 +237,8 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 				queryClient.invalidateQueries({
 					queryKey: tradeKeys.byToken(id),
 				});
-				// Invalidate token detail to get updated stats
-				queryClient.invalidateQueries({
-					queryKey: tokenKeys.detail(id),
-				});
+				// Token detail is updated optimistically via price:${id} channel below
+				// — do NOT invalidate here to avoid race-condition refetch overwriting the optimistic update
 				// Invalidate holders query to get updated count from blockchain
 				queryClient.invalidateQueries({
 					queryKey: tokenKeys.holders(id),
@@ -258,7 +256,17 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						return {
 							...oldData,
 							currentPrice: message.data.price,
+							currentPriceUsd: message.data.priceUsd || (() => {
+								const np = parseFloat(oldData.nativePriceAtCreation || "0");
+								const p = message.data.price || oldData.currentPrice;
+								return np > 0 ? (parseFloat(p) * np).toFixed(18) : oldData.currentPriceUsd;
+							})(),
 							marketCap: message.data.marketCap,
+							marketCapUsd: message.data.marketCapUsd || (() => {
+								const np = parseFloat(oldData.nativePriceAtCreation || "0");
+								const mc = message.data.marketCap || oldData.marketCap;
+								return np > 0 ? (parseFloat(mc) * np).toFixed(2) : oldData.marketCapUsd;
+							})(),
 							holdersCount:
 								message.data.holdersCount ??
 								oldData.holdersCount,
@@ -283,8 +291,31 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							currentBondingAmount:
 								message.data.currentBondingAmount ??
 								oldData.currentBondingAmount,
+							circulatingSupply:
+								message.data.circulatingSupply ??
+								oldData.circulatingSupply,
 							athProgress:
 								message.data.athProgress ?? oldData.athProgress,
+						};
+					},
+				);
+			}
+
+			// Handle graduation event — update status in cache
+			if (
+				message.channel === `token:${id}` &&
+				message.event === "token_graduated"
+			) {
+				queryClient.setQueryData(
+					tokenKeys.detail(id),
+					(oldData: Token | undefined) => {
+						if (!oldData) return oldData;
+						return {
+							...oldData,
+							status: "graduated" as const,
+							bondingCurveProgress: 100,
+							dexPoolAddress: message.data.poolAddress ?? null,
+							dexName: message.data.dexName ?? null,
 						};
 					},
 				);
@@ -302,10 +333,12 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 		if (isConnected && id) {
 			subscribe(`trades:${id}`);
 			subscribe(`price:${id}`);
+			subscribe(`token:${id}`);
 
 			return () => {
 				unsubscribe(`trades:${id}`);
 				unsubscribe(`price:${id}`);
+				unsubscribe(`token:${id}`);
 			};
 		}
 	}, [isConnected, id, subscribe, unsubscribe]);
@@ -423,7 +456,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 											/>
 											{/* Inner image area - no pointer events propagation to border */}
 											<div
-												className="absolute inset-[2px] p-1 rounded-lg bg-muted overflow-hidden cursor-pointer z-[1]"
+												className="absolute inset-0.5 p-1 rounded-lg bg-muted overflow-hidden cursor-pointer z-1"
 												onClick={() =>
 													setShowImageModal(true)
 												}
@@ -457,7 +490,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 												<Tooltip>
 													<TooltipTrigger asChild>
 														<div
-															className="absolute inset-0 rounded-lg z-[2] pointer-events-none"
+															className="absolute inset-0 rounded-lg z- ointer-events-none"
 															style={
 																{
 																	/* Ring that only catches pointer events on the 2px border */
@@ -465,13 +498,13 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 															}
 														>
 															{/* Top edge */}
-															<div className="absolute top-0 left-0 right-0 h-[2px] pointer-events-auto cursor-help" />
+															<div className="absolute top-0 left-0 right-0 h-0.5 pointer-events-auto cursor-help" />
 															{/* Bottom edge */}
-															<div className="absolute bottom-0 left-0 right-0 h-[2px] pointer-events-auto cursor-help" />
+															<div className="absolute bottom-0 left-0 right-0 h-0.5ointer-events-auto cursor-help" />
 															{/* Left edge */}
-															<div className="absolute top-0 left-0 bottom-0 w-[2px] pointer-events-auto cursor-help" />
+															<div className="absolute top-0 left-0 bottom-0 w-0.5ointer-events-auto cursor-help" />
 															{/* Right edge */}
-															<div className="absolute top-0 right-0 bottom-0 w-[2px] pointer-events-auto cursor-help" />
+															<div className="absolute top-0 right-0 bottom-0 w-0.5ointer-events-auto cursor-help" />
 														</div>
 													</TooltipTrigger>
 													<TooltipContent
@@ -502,9 +535,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 																	{bondingAmount.toFixed(
 																		4,
 																	)}{" "}
-																	{
-																		token?.nativeCurrency?.symbol
-																	}{" "}
+																	{token.nativeCurrency?.symbol }{" "}
 																	in the
 																	bonding
 																	curve
@@ -649,7 +680,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 										Market Cap
 									</p>
 									<p className="text-2xl sm:text-3xl font-bold">
-										{formatMarketCap(token.marketCap)}
+										{formatMarketCap(token.marketCapUsd || token.marketCap)}
 									</p>
 									<p
 										className={cn(
@@ -674,19 +705,10 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 											<Tooltip>
 												<TooltipTrigger asChild>
 													<div className="relative w-48 sm:w-68 h-2 bg-[#222] rounded-full cursor-help">
-														<motion.div
-															initial={{
-																width: 0,
-															}}
-															animate={{
-																width: `${Math.min(100, Math.max(0, token.athProgress ?? 0))}%`,
-															}}
-															transition={{
-																duration: 0.8,
-																ease: "easeOut",
-															}}
-															className="h-full rounded-full"
+														<div
+															className="h-full rounded-full transition-[width] duration-800 ease-out"
 															style={{
+																width: `${Math.min(100, Math.max(0, token.athProgress ?? 0))}%`,
 																background:
 																	(() => {
 																		const p =
@@ -727,7 +749,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 															}}
 														/>
 														{(token.athProgress ??
-															0) >= 99.5 && (
+															0) >= 100 && (
 															<motion.img
 																initial={{
 																	opacity: 0,
@@ -764,23 +786,16 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 											<Tooltip>
 												<TooltipTrigger asChild>
 													<span
-														className="text-sm font-semibold tabular-nums cursor-help"
-														style={{
-															color: (() => {
-																const change = parseFloat(token.priceChange5m || "0");
-																if (change > 0) return "#00ff88";
-																if (change < 0) return "#ef4444";
-																return "#a1a1aa";
-															})(),
-														}}
+														className="text-sm font-semibold tabular-nums cursor-help text-amber-400"
 													>
-														{parseFloat(token.priceChange5m || "0") >= 0
-															? "+"
-															: ""}
-														{parseFloat(token.priceChange5m || "0").toFixed(
-															2,
-														)}
-														%
+														${(() => {
+															const athP = parseFloat(token.athPrice || "0");
+															const nativeP = token.nativePriceAtCreation ? Number(token.nativePriceAtCreation) : 0;
+															const athMcapUsd = athP * 1_000_000_000 * nativeP;
+															if (athMcapUsd >= 1_000_000) return (athMcapUsd / 1_000_000).toFixed(2) + "M";
+															if (athMcapUsd >= 1_000) return (athMcapUsd / 1_000).toFixed(2) + "K";
+															return athMcapUsd.toFixed(2);
+														})()}
 													</span>
 												</TooltipTrigger>
 												<TooltipContent
@@ -788,7 +803,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 													className="bg-zinc-900 border-zinc-700 text-white text-xs"
 													arrowClassName="bg-zinc-900 fill-zinc-900"
 												>
-													<p>5 min price change</p>
+													<p>All-Time High Market Cap (USD)</p>
 												</TooltipContent>
 											</Tooltip>
 										</TooltipProvider>
@@ -827,7 +842,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 								Price
 							</p>
 							<p className="font-semibold tabular-nums">
-								{formatPrice(token.currentPrice)}
+								{formatPrice(token.currentPriceUsd || token.currentPrice)}
 							</p>
 						</div>
 						<div className="bg-card border border-border rounded-lg p-3 text-center">
@@ -1028,37 +1043,41 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						</div>
 						</motion.div>
 					)}
-					{/* Trading Panel - On-Chain or Centralized */}
-					{primaryWallet
-					&&(
+					{/* Trading Panel - On-Chain Only (user pays gas for buy/sell) */}
+					{primaryWallet && token.bondingCurveAddress && token.contractAddress && (
 					<motion.div
 					initial={{ opacity: 0, x: 20 }}
 					animate={{ opacity: 1, x: 0 }}
 					>
-						{token.bondingCurveAddress && token.contractAddress ? (
-							<OnChainTradingPanel
-							tokenAddress={token.contractAddress as Address}
-							bondingCurveAddress={
-									token.bondingCurveAddress as Address
-								}
-								nativeSymbol={token?.nativeCurrency?.symbol as string}
-								tokenSymbol={token.symbol || "TOKEN"}
-								tokenName={token.name || "Unknown Token"}
-								currentPrice={token.currentPrice || "0.00001"}
-								chainType={token.chainType === "SOLANA" ? "SOLANA" : "EVM"}
-								chainId={token.chainId}
-							/>
-						) : (
-							<TradingPanel
+						<OnChainTradingPanel
 							tokenId={id}
+							tokenAddress={token.contractAddress as Address}
+							bondingCurveAddress={token.bondingCurveAddress as Address}
+							nativeSymbol={(token.nativeCurrency?.symbol as string) }
 							tokenSymbol={token.symbol || "TOKEN"}
 							tokenName={token.name || "Unknown Token"}
 							currentPrice={token.currentPrice || "0.00001"}
-							totalSupply={token.totalSupply || "1000000000"}
-							/>
-						)}
-					</motion.div>)
-					}
+							chainType={token.chainType === "SOLANA" ? "SOLANA" : "EVM"}
+							chainId={token.chainId}
+						/>
+					</motion.div>
+					)}
+
+					{/* Token creation pending - no contract address yet */}
+					{primaryWallet && (!token.contractAddress || !token.bondingCurveAddress) && (
+					<motion.div
+						initial={{ opacity: 0, x: 20 }}
+						animate={{ opacity: 1, x: 0 }}
+					>
+						<div className="bg-card border border-border rounded-xl p-6 text-center">
+							<Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
+							<h3 className="font-semibold text-sm mb-1">Token Creation Pending</h3>
+							<p className="text-xs text-muted-foreground">
+								This token is being deployed on-chain. Trading will be available once the contract is confirmed.
+							</p>
+						</div>
+					</motion.div>
+					)}
 					
 					{/* Bonding Curve */}
 					<motion.div
@@ -1068,12 +1087,30 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						className="bg-card border border-border rounded-xl p-4"
 					>
 						<BondingCurveProgress
-						nativeSymbol={token?.nativeCurrency?.symbol as string}
+						nativeSymbol={token.nativeCurrency?.symbol as string}
 							progress={token.bondingCurveProgress ?? 0}
 							currentAmount={token.currentBondingAmount || "0"}
 							targetAmount={token.graduationTarget || "100"}
+							nativePriceUsd={token.nativePriceAtCreation ? Number(token.nativePriceAtCreation) : null}
+							graduationThresholdUsd={token.graduationThresholdUsd ?? null}
 						/>
 					</motion.div>
+
+					{/* Post-Graduation DEX Widget — only show when token is explicitly graduated */}
+					{(token.status === "graduated" || token.isGraduated === true) && (
+						<motion.div
+							initial={{ opacity: 0, x: 20 }}
+							animate={{ opacity: 1, x: 0 }}
+							transition={{ delay: 0.15 }}
+						>
+							<PostGraduationWidget
+								tokenAddress={token.contractAddress || ""}
+								poolAddress={(token as any).dexPoolAddress}
+								dexName={(token as any).dexName}
+								chainId={token.chainId}
+							/>
+						</motion.div>
+					)}
 
 					{/* Token Info */}
 					<motion.div
@@ -1118,7 +1155,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 										? (Number(token.currentBondingAmount || "0") / 1e9).toFixed(4)
 										: fromWei(token.currentBondingAmount || "0").toFixed(4)
 									}{" "}
-									{token?.nativeCurrency?.symbol}
+									{token.nativeCurrency?.symbol}
 								</span>
 							</div>
 							<div className="flex items-center justify-between">

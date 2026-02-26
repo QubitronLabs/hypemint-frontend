@@ -175,7 +175,7 @@ export function TrendingCarousel() {
 			<div ref={emblaRef} className="overflow-hidden">
 				<div className="flex -ml-4">
 					{carouselTokens.map((token) => {
-						const mcap = formatCompactMarketCap(token.marketCap);
+						const mcap = formatCompactMarketCap(token.marketCapUsd || token.marketCap);
 
 						return (
 							<div key={token.id} className={SLIDE_CLASSES}>

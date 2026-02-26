@@ -305,7 +305,7 @@ export function CreatorDashboard({ className }: CreatorDashboardProps) {
 														<p className="font-medium">
 															{formatCurrency(
 																parseFloat(
-																	token.marketCap ||
+																		token.marketCapUsd || token.marketCap ||
 																		"0",
 																),
 															)}
@@ -567,7 +567,7 @@ function TokenCreatorCard({ token }: { token: Token }) {
 							Market Cap
 						</p>
 						<p className="font-medium">
-							{formatCurrency(parseFloat(token.marketCap || "0"))}
+							{formatCurrency(parseFloat(token.marketCapUsd || token.marketCap || "0"))}
 						</p>
 					</div>
 					<div>

@@ -10,6 +10,7 @@ import type {
 interface ApiResponse<T> {
   success: boolean;
   data: T;
+  error?: { code?: string; message?: string; statusCode?: number } | null;
   meta?: {
     pagination?: {
       page: number;
@@ -117,37 +118,47 @@ export async function getToken(id: string): Promise<Token | null> {
     // Native currency divisor: SOL = 1e9 (lamports), ETH/MATIC = 1e18 (wei)
     const nativeDivisor = isSolana ? 1e9 : 1e18;
 
-    const currentSupply = BigInt(
-      curve.currentSupply || token.totalSupply || "0",
-    );
-    const graduationSupply = BigInt(
-      curve.graduationSupply || (isSolana ? "1000000000000" : "1000000000000000000000000000"),
-    );
-
-    const graduationThreshold = BigInt(
-      curve.graduationMcap || curve.graduationMarketCap || curve.graduationThreshold || "69000000000000000000000" // 69k * 1e18
-    ); 
+    // Detect CPMM: bonding curve has virtual reserves set
+    const isCPMM = curve.virtualNativeReserves && 
+      curve.virtualTokenReserves && 
+      BigInt(curve.virtualNativeReserves || "0") > 0n;
 
     let progress = 0;
     if (curve.isGraduated) {
       progress = 100;
-    } else {
-      // Calculate based on Market Cap (preferred) or Supply as backup
-      // Backend provides token.marketCap as DECIMAL string (already converted)
-      // graduationThreshold is stored in WEI format for both chains
-      
+    } else if (isCPMM && curve.graduationThresholdUsd && parseFloat(curve.graduationThresholdUsd) > 0) {
+      // CPMM: Progress = (currentMcapUsd - initialMcapUsd) / (gradUsd - initialMcapUsd)
+      // This ensures 0% at creation (seed buy only) and 100% at graduation
       const marketCapDecimal = parseFloat(token.marketCap || "0");
-      const graduationThresholdDecimal = Number(graduationThreshold) / 1e18;
-
-      if (graduationThresholdDecimal > 0) {
-        progress = (marketCapDecimal / graduationThresholdDecimal) * 100;
-      } else if (graduationSupply > 0n) {
-        // Backup: Supply-based
-        const currentSupplySafe = BigInt(curve.currentSupply || "0");
-        progress = Number((currentSupplySafe * 10000n) / graduationSupply) / 100;
+      const nativePrice = parseFloat(curve.nativePriceAtCreation || "0.1");
+      const mcapUsd = marketCapDecimal * nativePrice;
+      const gradUsd = parseFloat(curve.graduationThresholdUsd);
+      const initMcapUsd = parseFloat(curve.initialMarketCapUsd || "0");
+      const range = gradUsd - initMcapUsd;
+      if (range > 0) {
+        progress = ((mcapUsd - initMcapUsd) / range) * 100;
+        progress = Math.min(99, Math.max(0, progress));
       }
-      
-      progress = Math.min(99, Math.max(0, progress));
+    } else {
+      // Legacy: reserve vs graduation threshold (both in native wei)
+      const graduationThreshold = BigInt(
+        curve.graduationMcap || curve.graduationMarketCap || curve.graduationThreshold || "0"
+      );
+      if (graduationThreshold > 0n) {
+        const currentReserve = BigInt(curve.currentReserve || "0");
+        progress = Number((currentReserve * 10000n) / graduationThreshold) / 100;
+        progress = Math.min(99, Math.max(0, progress));
+      } else {
+        // Fallback: supply-based
+        const graduationSupply = BigInt(
+          curve.graduationSupply || (isSolana ? "1000000000000" : "1000000000000000000000000000"),
+        );
+        const currentSupplySafe = BigInt(curve.currentSupply || "0");
+        if (graduationSupply > 0n) {
+          progress = Number((currentSupplySafe * 10000n) / graduationSupply) / 100;
+          progress = Math.min(99, Math.max(0, progress));
+        }
+      }
     }
 
     // Use token.currentPrice which is already converted to decimal by backend
@@ -160,27 +171,50 @@ export async function getToken(id: string): Promise<Token | null> {
     // Volume24h is already converted to decimal by backend
     const volume24h = token.volume24h || "0";
 
-    // Convert circulatingSupply from raw token units to human-readable
-    // Solana: 6 decimals, EVM: 18 decimals
-    const circulatingSupplyDecimal = curve.currentSupply 
-      ? (Number(BigInt(curve.currentSupply)) / tokenDecimalsDivisor).toString()
-      : "0";
+    // Circulating supply is computed by backend from bonding curve data
+    const circulatingSupplyDecimal = token.circulatingSupply || "800000000";
 
     // Convert bonding curve reserve from raw native units to human-readable
-    const currentBondingAmountDecimal = curve.currentReserve
-      ? (Number(BigInt(curve.currentReserve)) / nativeDivisor).toString()
-      : "0";
+    // Subtract the platform's seed buy so it shows only user-contributed reserves
+    let currentBondingAmountDecimal = "0";
+    if (curve.currentReserve) {
+      const currentReserveRaw = BigInt(curve.currentReserve);
+      const seedBuyRaw = BigInt(curve.seedBuyAmount || "0");
+      const userReserve = currentReserveRaw > seedBuyRaw ? currentReserveRaw - seedBuyRaw : 0n;
+      currentBondingAmountDecimal = (Number(userReserve) / nativeDivisor).toString();
+    }
+
+    // Compute USD market cap: use backend-provided value or calculate from native mcap
+    const nativePrice = parseFloat(curve.nativePriceAtCreation || "0");
+    const marketCapUsd = token.marketCapUsd
+      || (nativePrice > 0 ? (parseFloat(marketCap) * nativePrice).toFixed(2) : "0");
+
+    // Compute USD price: use backend-provided value or calculate from native price
+    const currentPriceUsd = token.currentPriceUsd
+      || (nativePrice > 0 ? (parseFloat(currentPrice) * nativePrice).toFixed(18) : "0");
+
+    // Graduation target: For CPMM use graduation mcap in native units, else legacy
+    const graduationTarget = isCPMM
+      ? (curve.graduationMcapNative || curve.graduationThresholdUsd || "0")
+      : (curve.graduationMcap || curve.graduationMarketCap || "0");
 
     return {
       ...token,
       currentPrice,
+      currentPriceUsd,
       marketCap,
+      marketCapUsd,
       volume24h,
       circulatingSupply: circulatingSupplyDecimal,
       bondingCurveAddress: curve.contractAddress || undefined,
       bondingCurveProgress: progress,
-      graduationTarget: curve.graduationMcap || curve.graduationMarketCap || "69000", // Default target
+      graduationTarget,
       currentBondingAmount: currentBondingAmountDecimal,
+      // USD-based values for bonding curve progress display
+      graduationThresholdUsd: curve.graduationThresholdUsd ? Number(curve.graduationThresholdUsd) : null,
+      initialMarketCapUsd: curve.initialMarketCapUsd ? Number(curve.initialMarketCapUsd) : null,
+      nativePriceAtCreation: curve.nativePriceAtCreation || null,
+      isGraduated: curve.isGraduated || false,
       holdersCount: token.holdersCount || 0,
       tradesCount: token.tradesCount || 0,
       description: token.description || "",
@@ -208,6 +242,50 @@ export async function createToken(input: CreateTokenInput): Promise<Token> {
     return responseData.token;
   }
   return responseData;
+}
+
+// ============================================================
+//  Gasless Token Creation (backend custom-signing)
+// ============================================================
+
+export interface CreateTokenRequestInput {
+  name: string;
+  symbol: string;
+  description?: string;
+  imageUrl?: string;
+  websiteUrl?: string;
+  twitterUrl?: string;
+  telegramUrl?: string;
+  hypeBoostEnabled?: boolean;
+  slope?: string;
+  basePrice?: string;
+  chainId?: number;
+}
+
+export interface CreateTokenRequestResult {
+  token: Token;
+  bondingCurve: BondingCurve;
+  txHash: string;
+}
+
+/**
+ * Request gasless token creation via backend custom signing.
+ * The backend signs and submits the transaction — user pays zero gas.
+ *
+ * Returns the created token, bonding curve, and tx hash synchronously.
+ */
+export async function createTokenRequest(
+  input: CreateTokenRequestInput,
+): Promise<CreateTokenRequestResult> {
+  const { data } = await apiClient.post<ApiResponse<CreateTokenRequestResult>>(
+    "/api/v1/tokens/create-gasless",
+    input,
+  );
+  if (!data.success || !data.data) {
+    const msg = data.error?.message || "Token creation failed";
+    throw new Error(msg);
+  }
+  return data.data;
 }
 
 // Check if token symbol is available
@@ -435,11 +513,14 @@ export interface InitialSupplyPreview {
 
 export async function getInitialSupplyPreview(
   maticAmount: string,
+  chainId?: number,
 ): Promise<InitialSupplyPreview | null> {
   try {
+    const params: Record<string, string> = { amount: maticAmount };
+    if (chainId) params.chainId = chainId.toString();
     const { data } = await apiClient.get<ApiResponse<InitialSupplyPreview>>(
       `/api/v1/config/initial-supply-preview`,
-      { params: { amount: maticAmount } },
+      { params },
     );
     return data.data;
   } catch (error) {
@@ -494,6 +575,37 @@ export async function getBuyQuote(
     return data.data;
   } catch (error) {
     console.error("Failed to get buy quote:", error);
+    return null;
+  }
+}
+
+// Get CPMM tokenomics for a specific chain (live preview values)
+export interface ChainTokenomics {
+  totalSupply: number;
+  lpReserveTokens: number;
+  curveSupply: number;
+  internalBuyTokens: number;
+  graduationMultiplier: number;
+  initialPriceUsd?: number;
+  initialPriceNative?: number;
+  initialMcapUsd?: number;
+  graduationThresholdUsd?: number;
+  nativePriceUsd?: number;
+  nativeSymbol?: string;
+  seedBuyCostNative?: string;
+}
+
+export async function getChainTokenomics(
+  chainId: number,
+): Promise<ChainTokenomics | null> {
+  try {
+    const { data } = await apiClient.get<ApiResponse<ChainTokenomics>>(
+      `/api/v1/config/tokenomics`,
+      { params: { chainId: chainId.toString() } },
+    );
+    return data.data;
+  } catch (error) {
+    console.error("Failed to get chain tokenomics:", error);
     return null;
   }
 }

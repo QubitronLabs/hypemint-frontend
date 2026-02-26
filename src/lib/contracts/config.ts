@@ -149,8 +149,15 @@ export const DEFAULT_CREATION_FEE = BigInt("10000000000000000"); // 0.01 MATIC
 // Default slippage tolerance (5%)
 export const DEFAULT_SLIPPAGE_BPS = 500;
 
-// Graduation threshold in USD
-export const GRADUATION_THRESHOLD_USD = 69000;
+// Launchpad tokenomics constants (match backend)
+export const GRADUATION_THRESHOLD_USD = 32245; // Dynamic per-token — this is just the default
+export const INITIAL_MCAP_USD = 2174;
+export const SEED_BUY_USD = 15;
+export const TOTAL_TOKEN_SUPPLY = 1_000_000_000;
+export const LP_RESERVE_TOKENS = 200_000_000;
+export const CURVE_SUPPLY = 800_000_000;
+// NOTE: Seed buy tokens are now derived dynamically by the backend from SEED_BUY_USD.
+// The value varies by chain (~6.9M on Polygon, may differ on other chains).
 
 // HypeBoost default configuration
 export const HYPE_BOOST_DEFAULTS = {

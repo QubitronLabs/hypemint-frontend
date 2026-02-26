@@ -228,7 +228,7 @@ export function useManualSync(tokenId: string) {
 				});
 
 				toast.success("Synced with blockchain", {
-					description: `Market cap: ${result.marketCap ? `$${(parseFloat(result.marketCap) / 1e18).toLocaleString()}` : "N/A"}`,
+					description: `Market cap: ${result.marketCapUsd ? `$${parseFloat(result.marketCapUsd).toLocaleString()}` : result.marketCap ? `$${parseFloat(result.marketCap).toLocaleString()}` : "N/A"}`,
 				});
 
 				return result;

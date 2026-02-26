@@ -102,10 +102,10 @@ export function TokenListItem({ token, index, className }: TokenListItemProps) {
 	}, [token.priceChange6h]);
 
 	const formattedMarketCap = useMemo(() => {
-		const mcap = fromWei(token.marketCap);
+		const mcap = fromWei(token.marketCapUsd || token.marketCap);
 		if (isNaN(mcap) || mcap === 0) return "$0";
 		return `$${formatNumber(mcap)}`;
-	}, [token.marketCap]);
+	}, [token.marketCapUsd, token.marketCap]);
 
 	const formattedVolume = useMemo(() => {
 		const vol = parseFloat(token.volume24h || "0") / 1e18;

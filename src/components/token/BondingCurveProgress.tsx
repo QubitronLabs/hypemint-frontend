@@ -2,36 +2,47 @@
 
 import { motion } from "framer-motion";
 import { cn, fromWei, formatNumber } from "@/lib/utils";
-import { useNativeCurrencySymbol } from "@/hooks";
 
 interface BondingCurveProgressProps {
 	nativeSymbol: string;
 	progress: number;
 	currentAmount: string;
 	targetAmount: string;
+	/** Native token USD price for displaying USD values */
+	nativePriceUsd?: number | null;
+	/** Graduation threshold in USD (e.g., 32245) */
+	graduationThresholdUsd?: number | null;
 	className?: string;
 }
 
 /**
  * BondingCurveProgress - Visual indicator toward token graduation
  *
- * Shows progress toward moving from bonding curve to DEX liquidity
+ * Shows progress toward moving from bonding curve to DEX liquidity.
+ * Displays amounts in USD when native price is available.
  */
 export function BondingCurveProgress({
 	nativeSymbol,
 	progress,
 	currentAmount,
 	targetAmount,
+	nativePriceUsd,
+	graduationThresholdUsd,
 	className,
 }: BondingCurveProgressProps) {
 	const formattedProgress = Math.min(progress, 100);
-	
 
-	const formatAmount = (amount: string) => {
-		// Convert from Wei if needed
-		const num = fromWei(amount);
-		return formatNumber(num);
+	// Format native amount to human-readable
+	const formatNativeAmount = (amount: string): number => {
+		return fromWei(amount);
 	};
+
+	// Calculate USD values
+	const currentNative = formatNativeAmount(currentAmount);
+	const targetNative = formatNativeAmount(targetAmount);
+	const hasUsdPrice = nativePriceUsd && nativePriceUsd > 0;
+	const currentUsd = hasUsdPrice ? currentNative * nativePriceUsd : 0;
+	const targetUsd = graduationThresholdUsd || (hasUsdPrice ? targetNative * nativePriceUsd : 0);
 
 	return (
 		<div className={cn("space-y-2", className)}>
@@ -63,13 +74,16 @@ export function BondingCurveProgress({
 				/>
 			</div>
 
-			{/* Amount labels */}
+			{/* Amount labels — native amount in curve + USD graduation target */}
 			<div className="flex items-center justify-between text-xs text-muted-foreground">
 				<span className="tabular-nums">
-					{formatAmount(currentAmount)} {nativeSymbol} in curve
+					{formatNumber(currentNative)} {nativeSymbol} in curve
 				</span>
 				<span className="tabular-nums">
-					{formatAmount(targetAmount)} {nativeSymbol} to graduate
+					{targetUsd > 0
+						? `$${formatNumber(targetUsd)} to graduate`
+						: `${formatNumber(targetNative)} ${nativeSymbol} to graduate`
+					}
 				</span>
 			</div>
 

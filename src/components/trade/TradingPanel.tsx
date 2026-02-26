@@ -91,6 +91,8 @@ export function TradingPanel({
   const isChainMismatch = activeChainType !== tokenChainType;
   const isSolanaToken = tokenChainType === "SOLANA";
   const nativeSymbol = isSolanaToken ? "SOL" : "ETH";
+  console.log("%c[OnChainTradingPanel] Chain lookup for native symbol:", "color: cyan");
+    console.log("----------------------------------------------------------------------------------");
 
   // Calculate trade metrics
   const tradeMetrics = useMemo(() => {

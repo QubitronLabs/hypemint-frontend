@@ -386,6 +386,11 @@ export function useGlobalTradeFeed(
     bondingCurveProgress?: number;
     athProgress?: number;
     marketCap?: string;
+    marketCapUsd?: string;
+    priceUsd?: string;
+    priceChange5m?: string;
+    priceChange1h?: string;
+    priceChange6h?: string;
   }) => void,
 ) {
   const { subscribe, unsubscribe, isConnected } = useWebSocket({

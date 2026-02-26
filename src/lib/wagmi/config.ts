@@ -1,10 +1,12 @@
 /**
  * Wagmi Configuration for HypeMint
  *
- * Configures Wagmi with Polygon chain support and Ganache for local testing
+ * Uses the backend RPC proxy (POST /api/v1/rpc/:chainId) as the primary
+ * transport so Alchemy API keys stay server-side.  Falls back to public
+ * RPCs if the proxy is unreachable.
  */
 
-import { http, createConfig } from "wagmi";
+import { http, fallback, createConfig } from "wagmi";
 import {
 	Chain,
 	mainnet,
@@ -23,7 +25,12 @@ import {
 	avalancheFuji,
 	lineaSepolia,
 	baseSepolia,
+	base,
+	zksync,
 } from "wagmi/chains";
+
+// Backend API URL — RPC proxy lives at POST ${API_URL}/api/v1/rpc/:chainId
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 // Ganache Local Development Chain
 export const ganache: Chain = {
@@ -51,40 +58,42 @@ export const ganache: Chain = {
 	testnet: true,
 };
 
-// RPC URLs from environment
-const ETHEREUM_RPC_URL =
-	process.env.NEXT_PUBLIC_ETHEREUM_RPC_URL || "https://eth.merkle.io";
-const POLYGON_RPC_URL =
-	process.env.NEXT_PUBLIC_POLYGON_RPC_URL || "https://polygon.drpc.org";
-const POLYGON_AMOY_RPC_URL =
-	process.env.NEXT_PUBLIC_POLYGON_AMOY_RPC_URL ||
-	"https://rpc-amoy.polygon.technology";
-const ARBITRUM_RPC_URL =
-	process.env.NEXT_PUBLIC_ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc";
-const OPTIMISM_RPC_URL =
-	process.env.NEXT_PUBLIC_OPTIMISM_RPC_URL || "https://mainnet.optimism.io";
-const BNB_RPC_URL =
-	process.env.NEXT_PUBLIC_BNB_RPC_URL || "https://bsc-dataseed.binance.org";
-const AVALANCHE_RPC_URL =
-	process.env.NEXT_PUBLIC_AVALANCHE_RPC_URL || "https://api.avax.network/ext/bc/C/rpc";
-const LINEA_RPC_URL =
-	process.env.NEXT_PUBLIC_LINEA_RPC_URL || "https://rpc.linea.build";
-const BNB_TESTNET_RPC_URL =
-	process.env.NEXT_PUBLIC_BNB_TESTNET_RPC_URL || "https://data-seed-prebsc-1-s1.binance.org:8545";
-const SEPOLIA_RPC_URL =
-	process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || "https://rpc.sepolia.org";
-const ARBITRUM_SEPOLIA_RPC_URL =
-	process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc";
-const OPTIMISM_SEPOLIA_RPC_URL =
-	process.env.NEXT_PUBLIC_OPTIMISM_SEPOLIA_RPC_URL || "https://sepolia.optimism.io";
-const AVALANCHE_FUJI_RPC_URL =
-	process.env.NEXT_PUBLIC_AVALANCHE_FUJI_RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc";
-const LINEA_SEPOLIA_RPC_URL =
-	process.env.NEXT_PUBLIC_LINEA_SEPOLIA_RPC_URL || "https://rpc.sepolia.linea.build";
-const BASE_SEPOLIA_RPC_URL =
-	process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org";
-const GANACHE_RPC_URL =
-	process.env.NEXT_PUBLIC_GANACHE_RPC_URL || "http://127.0.0.1:7545";
+// ---------------------------------------------------------------------------
+//  Transport helpers
+// ---------------------------------------------------------------------------
+// Public RPCs as fallbacks (no API key needed — free, lower rate limits)
+const PUBLIC_RPCS: Record<number, string> = {
+	[mainnet.id]: "https://eth.merkle.io",
+	[polygon.id]: "https://polygon.drpc.org",
+	[polygonAmoy.id]: "https://rpc-amoy.polygon.technology",
+	[arbitrum.id]: "https://arb1.arbitrum.io/rpc",
+	[optimism.id]: "https://mainnet.optimism.io",
+	[bsc.id]: "https://bsc-dataseed.binance.org",
+	[avalanche.id]: "https://api.avax.network/ext/bc/C/rpc",
+	[linea.id]: "https://rpc.linea.build",
+	[bscTestnet.id]: "https://data-seed-prebsc-1-s1.binance.org:8545",
+	[sepolia.id]: "https://rpc.sepolia.org",
+	[arbitrumSepolia.id]: "https://sepolia-rollup.arbitrum.io/rpc",
+	[optimismSepolia.id]: "https://sepolia.optimism.io",
+	[avalancheFuji.id]: "https://api.avax-test.network/ext/bc/C/rpc",
+	[lineaSepolia.id]: "https://rpc.sepolia.linea.build",
+	[baseSepolia.id]: "https://sepolia.base.org",
+	[base.id]: "https://mainnet.base.org",
+	[zksync.id]: "https://mainnet.era.zksync.io",
+};
+
+/**
+ * Build transport for a chain: backend proxy → public RPC fallback.
+ * For Ganache, always use the local URL directly.
+ */
+function proxyTransport(chainId: number) {
+	if (chainId === ganache.id) {
+		return http(process.env.NEXT_PUBLIC_GANACHE_RPC_URL || "http://127.0.0.1:7545");
+	}
+	const publicRpc = PUBLIC_RPCS[chainId];
+	const proxyUrl = `${API_URL}/api/v1/rpc/${chainId}`;
+	return publicRpc ? fallback([http(proxyUrl), http(publicRpc)]) : http(proxyUrl);
+}
 
 // Check which chain to use (set NEXT_PUBLIC_CHAIN_MODE=local for Ganache)
 const isLocalMode = process.env.NEXT_PUBLIC_CHAIN_MODE === "local";
@@ -92,25 +101,27 @@ const isLocalMode = process.env.NEXT_PUBLIC_CHAIN_MODE === "local";
 // Create Wagmi config
 export const wagmiConfig = createConfig({
 	chains: isLocalMode
-		? [ganache, polygonAmoy, polygon, mainnet, arbitrum, optimism, bsc, avalanche, linea, bscTestnet, sepolia, arbitrumSepolia, optimismSepolia, avalancheFuji, lineaSepolia, baseSepolia]
-		: [polygon, mainnet, arbitrum, optimism, bsc, avalanche, linea, polygonAmoy, bscTestnet, sepolia, arbitrumSepolia, optimismSepolia, avalancheFuji, lineaSepolia, baseSepolia, ganache],
+		? [ganache, polygonAmoy, polygon, mainnet, arbitrum, optimism, bsc, avalanche, linea, base, zksync, bscTestnet, sepolia, arbitrumSepolia, optimismSepolia, avalancheFuji, lineaSepolia, baseSepolia]
+		: [polygon, mainnet, arbitrum, optimism, bsc, avalanche, linea, base, zksync, polygonAmoy, bscTestnet, sepolia, arbitrumSepolia, optimismSepolia, avalancheFuji, lineaSepolia, baseSepolia, ganache],
 	transports: {
-		[mainnet.id]: http(ETHEREUM_RPC_URL),
-		[polygon.id]: http(POLYGON_RPC_URL),
-		[polygonAmoy.id]: http(POLYGON_AMOY_RPC_URL),
-		[arbitrum.id]: http(ARBITRUM_RPC_URL),
-		[optimism.id]: http(OPTIMISM_RPC_URL),
-		[bsc.id]: http(BNB_RPC_URL),
-		[avalanche.id]: http(AVALANCHE_RPC_URL),
-		[linea.id]: http(LINEA_RPC_URL),
-		[bscTestnet.id]: http(BNB_TESTNET_RPC_URL),
-		[sepolia.id]: http(SEPOLIA_RPC_URL),
-		[arbitrumSepolia.id]: http(ARBITRUM_SEPOLIA_RPC_URL),
-		[optimismSepolia.id]: http(OPTIMISM_SEPOLIA_RPC_URL),
-		[avalancheFuji.id]: http(AVALANCHE_FUJI_RPC_URL),
-		[lineaSepolia.id]: http(LINEA_SEPOLIA_RPC_URL),
-		[baseSepolia.id]: http(BASE_SEPOLIA_RPC_URL),
-		[ganache.id]: http(GANACHE_RPC_URL),
+		[mainnet.id]: proxyTransport(mainnet.id),
+		[polygon.id]: proxyTransport(polygon.id),
+		[polygonAmoy.id]: proxyTransport(polygonAmoy.id),
+		[arbitrum.id]: proxyTransport(arbitrum.id),
+		[optimism.id]: proxyTransport(optimism.id),
+		[bsc.id]: proxyTransport(bsc.id),
+		[avalanche.id]: proxyTransport(avalanche.id),
+		[linea.id]: proxyTransport(linea.id),
+		[bscTestnet.id]: proxyTransport(bscTestnet.id),
+		[sepolia.id]: proxyTransport(sepolia.id),
+		[arbitrumSepolia.id]: proxyTransport(arbitrumSepolia.id),
+		[optimismSepolia.id]: proxyTransport(optimismSepolia.id),
+		[avalancheFuji.id]: proxyTransport(avalancheFuji.id),
+		[lineaSepolia.id]: proxyTransport(lineaSepolia.id),
+		[baseSepolia.id]: proxyTransport(baseSepolia.id),
+		[base.id]: proxyTransport(base.id),
+		[zksync.id]: proxyTransport(zksync.id),
+		[ganache.id]: proxyTransport(ganache.id),
 	},
 	ssr: true, // Enable SSR for Next.js
 });
@@ -172,6 +183,10 @@ export function getChain(chainId: number) {
 			return avalancheFuji;
 		case lineaSepolia.id:
 			return lineaSepolia;
+		case base.id:
+			return base;
+		case zksync.id:
+			return zksync;
 		case baseSepolia.id:
 			return baseSepolia;
 		case ganache.id:
@@ -191,6 +206,8 @@ const FALLBACK_EXPLORER_URLS: Record<number, string> = {
 	[bsc.id]: "https://bscscan.com",
 	[avalanche.id]: "https://snowtrace.io",
 	[linea.id]: "https://lineascan.build",
+	[base.id]: "https://basescan.org",
+	[zksync.id]: "https://explorer.zksync.io",
 	[bscTestnet.id]: "https://testnet.bscscan.com",
 	[sepolia.id]: "https://sepolia.etherscan.io",
 	[arbitrumSepolia.id]: "https://sepolia.arbiscan.io",

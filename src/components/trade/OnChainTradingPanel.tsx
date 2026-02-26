@@ -45,17 +45,18 @@ import {
 	calculateCurrentPrice as calcSolanaPrice,
 } from "@/hooks";
 import { getTxUrl, isSolanaChain } from "@/lib/wagmi";
-import { recordOnChainTrade } from "@/lib/api/trades";
+import { syncTrade } from "@/lib/api/trades";
 import { toast } from "sonner";
 import { useChainId, useNetworkStore } from "@/lib/network/store";
 import { EvmWalletConnector } from "../network/NetworkStateSynchronizer";
 import { WalletConnector } from "@dynamic-labs/sdk-react-core";
-import { SUPPORTED_CHAINS } from "@/types";
+import { SUPPORTED_CHAINS, getNativeSymbolForChain } from "@/types";
 
 // Note: Trade recording is now handled by backend blockchain event listener
 // Frontend only needs to display confirmation UI
 
 interface OnChainTradingPanelProps {
+	tokenId: string;
 	tokenAddress: Address;
 	bondingCurveAddress: Address;
 	tokenSymbol: string;
@@ -94,7 +95,7 @@ function formatNumber(num: number | string): string {
 }
 
 // Format price with better precision for small values
-function formatPriceDisplay(num: number, symbol: string = "POL"): string {
+function formatPriceDisplay(num: number, symbol: string = "ETH"): string {
 	if (isNaN(num) || !isFinite(num)) return "0";
 	if (num >= 1e9) return `>999M`;
 	if (num >= 1e6) return (num / 1e6).toFixed(2) + "M";
@@ -125,6 +126,7 @@ function validateTradeAmount(
 }
 
 export function OnChainTradingPanel({
+	tokenId,
 	tokenAddress,
 	nativeSymbol,
 	bondingCurveAddress,
@@ -195,14 +197,12 @@ export function OnChainTradingPanel({
 		((isSolana && !connectedWalletIsSolana) ||
 			(!isSolana && connectedWalletIsSolana));
 
-	// Ensure nativeSymbol always has a value
-	// Lookup from SUPPORTED_CHAINS as a chain-aware fallback instead of hardcoding "POL"
-	const chainFallbackSymbol = useMemo(() => {
+	// Determine the correct native symbol from the token's chainId
+	// Always prefer chain-based lookup over the API prop to avoid stale/incorrect values
+	const effectiveNativeSymbol = useMemo(() => {
 		if (isSolana) return "SOL";
-		const chain = SUPPORTED_CHAINS.find((c) => c.id === normalizedChainId);
-		return chain?.nativeCurrency?.symbol || "ETH";
+		return getNativeSymbolForChain(normalizedChainId);
 	}, [isSolana, normalizedChainId]);
-	const effectiveNativeSymbol = nativeSymbol || chainFallbackSymbol;
 
 	// Get dynamic native currency symbol
 
@@ -670,6 +670,33 @@ export function OnChainTradingPanel({
 			};
 		}
 
+		// Fallback: estimate using spot price when on-chain quote not available
+		if (parsedAmount > 0 && price > 0) {
+			if (tradeType === "buy") {
+				const estimatedTokens = parsedAmount / price;
+				console.log("[OnChainTrading] Fallback IFFFFFFFFFFFFF");
+				return {
+					outputAmount: estimatedTokens,
+					fees: 0,
+					effectivePrice: price,
+					priceImpact: 0,
+					isHighImpact: false,
+					isUnreasonable: !isFinite(estimatedTokens) || estimatedTokens > 1e18,
+				};
+			} else {
+				const estimatedNative = parsedAmount * price;
+				console.log("[OnChainTrading] Fallback EELLLLLLLLSSSSEEEE");
+				return {
+					outputAmount: estimatedNative,
+					fees: 0,
+					effectivePrice: price,
+					priceImpact: 0,
+					isHighImpact: false,
+					isUnreasonable: !isFinite(estimatedNative) || estimatedNative > 1e9,
+				};
+			}
+		}
+
 		return {
 			outputAmount: 0,
 			fees: 0,
@@ -680,47 +707,11 @@ export function OnChainTradingPanel({
 		};
 	}, [amount, tradeType, currentPrice, buyQuote, sellQuote, isSolana, solanaCurveState, evmOnChainPrice]);
 
-	// Sync confirmed trades to backend (verified on-chain before recording)
-	// Solana hooks report trades automatically, so skip for Solana
-	const syncTradeToBackend = useCallback(
-		async (hash: string, type: "buy" | "sell") => {
-			if (isSolana) return; // Solana hooks already report trades
-
-			// Small delay to allow backend RPC to propagate the receipt
-			await new Promise((r) => setTimeout(r, 3000));
-
-			// Retry up to 3 times with increasing delay
-			for (let attempt = 1; attempt <= 3; attempt++) {
-				try {
-					// Backend verifies the transaction on-chain before recording
-					await recordOnChainTrade({
-						tokenId: tokenAddress,
-						bondingCurveAddress,
-						type,
-						maticAmount: "0", // Will be extracted from blockchain
-						tokenAmount: "0", // Will be extracted from blockchain
-						txHash: hash,
-						chainId: normalizedChainId,
-					});
-					return; // Success - exit retry loop
-				} catch (err) {
-					console.warn(
-						`[OnChainTrading] Failed to sync trade to backend (attempt ${attempt}/3):`,
-						err,
-					);
-					if (attempt < 3) {
-						// Wait longer before next retry
-						await new Promise((r) => setTimeout(r, attempt * 5000));
-					}
-				}
-			}
-			console.error("[OnChainTrading] All backend sync attempts failed for:", hash);
-		},
-		[tokenAddress, bondingCurveAddress, normalizedChainId, isSolana],
-	);
+	// Trade recording is handled by backend blockchain event listener + instant sync API.
+	// Frontend calls syncTrade() after confirmation for instant data updates.
 
 	// Refetch balances and sync when trades are confirmed
-	// Note: Backend event listener also records the trade independently
+	// Note: Backend event listener records the trade independently via on-chain events
 	useEffect(() => {
 		if (
 			isBuyConfirmed &&
@@ -741,7 +732,10 @@ export function OnChainTradingPanel({
 						),
 				},
 			});
-			syncTradeToBackend(buyTxHash, "buy");
+			// Instantly sync trade to backend for fast UI updates
+			syncTrade({ txHash: buyTxHash, tokenId, chainId: normalizedChainId })
+				.then((res) => console.log("[OnChainTrading] Buy sync result:", res))
+				.catch((err) => console.warn("[OnChainTrading] Buy sync failed (event listener will catch up):", err));
 			// Clear amount immediately
 			setAmount("");
 			// Refetch balances after confirmed trade
@@ -758,7 +752,8 @@ export function OnChainTradingPanel({
 	}, [
 		isBuyConfirmed,
 		buyTxHash,
-		syncTradeToBackend,
+		tokenId,
+		normalizedChainId,
 		refetchNativeBalance,
 		refetchTokenBalance,
 	]);
@@ -815,7 +810,10 @@ export function OnChainTradingPanel({
 						),
 				},
 			});
-			syncTradeToBackend(sellTxHash, "sell");
+			// Instantly sync trade to backend for fast UI updates
+			syncTrade({ txHash: sellTxHash, tokenId, chainId: normalizedChainId })
+				.then((res) => console.log("[OnChainTrading] Sell sync result:", res))
+				.catch((err) => console.warn("[OnChainTrading] Sell sync failed (event listener will catch up):", err));
 			// Clear amount immediately
 			setAmount("");
 			// Refetch balances after confirmed trade
@@ -832,7 +830,8 @@ export function OnChainTradingPanel({
 	}, [
 		isSellConfirmed,
 		sellTxHash,
-		syncTradeToBackend,
+		tokenId,
+		normalizedChainId,
 		refetchNativeBalance,
 		refetchTokenBalance,
 	]);
@@ -886,6 +885,25 @@ export function OnChainTradingPanel({
 			}, 3000);
 		}
 	}, [isApproveConfirmed, refetchAllowance, resetApprove]);
+
+	// Show toast for pre-submission errors (gas estimation, chain switch, etc.)
+	useEffect(() => {
+		if (error) {
+			const msg = error.message || "Transaction failed";
+			// Extract user-friendly message from common wagmi/viem errors
+			let friendlyMsg = msg;
+			if (msg.includes("User rejected") || msg.includes("user rejected")) {
+				friendlyMsg = "Transaction cancelled by user";
+			} else if (msg.includes("insufficient funds") || msg.includes("InsufficientFunds")) {
+				friendlyMsg = "Insufficient balance for this transaction";
+			} else if (msg.includes("exceeds the configured cap")) {
+				friendlyMsg = "Gas fee too high — try again later";
+			} else if (msg.length > 120) {
+				friendlyMsg = msg.slice(0, 120) + "...";
+			}
+			toast.error(friendlyMsg, { id: "trade-error", duration: 5000 });
+		}
+	}, [error]);
 
 	// Handle approve
 	const handleApprove = async () => {
@@ -943,6 +961,7 @@ export function OnChainTradingPanel({
 						bondingCurveAddress,
 						maticAmount: amount,
 						slippageBps: slippage * 100,
+						chainId: normalizedChainId,
 					});
 					if (hash) {
 						toast.info("Buy order submitted!", {
@@ -1013,6 +1032,7 @@ export function OnChainTradingPanel({
 						tokenAmount: amount,
 						minMatic: minMaticStr,
 						slippageBps: slippage * 100,
+						chainId: normalizedChainId,
 					});
 					if (hash) {
 						toast.info("Sell order submitted!", {
@@ -1054,10 +1074,13 @@ export function OnChainTradingPanel({
 			if (qa === "25%") percentage = 0.25;
 			else if (qa === "50%") percentage = 0.5;
 			else if (qa === "75%") percentage = 0.75;
-			// else if (qa === "MAX") 0.99
-			else if (qa === "MAX") percentage = 0.9999999;
 
-			setAmount((balance * percentage).toFixed(6));
+			if (qa === "MAX") {
+				// Use raw balance string directly for 100% accuracy
+				setAmount(formatTokenDisplay(tokenBalance as bigint));
+			} else {
+				setAmount((balance * percentage).toFixed(6));
+			}
 		}
 	};
 
@@ -1207,54 +1230,6 @@ export function OnChainTradingPanel({
 													: effectiveNativeSymbol}
 											</>
 										)}
-									</span>
-								</div>
-								<div className="flex justify-between text-sm">
-									<span className="text-muted-foreground">
-										Avg. Price per Token
-									</span>
-									<span className="font-medium">
-										{tradeMetrics.isUnreasonable
-											? "--"
-											: formatPriceDisplay(
-													tradeMetrics.effectivePrice,
-													effectiveNativeSymbol,
-												)}{" "}
-										{effectiveNativeSymbol}
-									</span>
-								</div>
-								<div className="flex justify-between text-sm">
-									<span className="text-muted-foreground">
-										Fees (2%)
-									</span>
-									<span className="font-medium">
-										{tradeMetrics.isUnreasonable
-											? "--"
-											: formatNumber(
-													tradeMetrics.fees,
-												)}{" "}
-										{effectiveNativeSymbol}
-									</span>
-								</div>
-								<div className="flex justify-between text-sm">
-									<span className="text-muted-foreground">
-										Price Impact
-									</span>
-									<span
-										className={cn(
-											"font-medium",
-											tradeMetrics.isHighImpact
-												? "text-destructive"
-												: "text-muted-foreground",
-										)}
-									>
-										{tradeMetrics.isUnreasonable
-											? "--"
-											: `${tradeMetrics.priceImpact.toFixed(2)}%`}
-										{tradeMetrics.isHighImpact &&
-											!tradeMetrics.isUnreasonable && (
-												<AlertTriangle className="h-3 w-3 inline ml-1" />
-											)}
 									</span>
 								</div>
 							</div>

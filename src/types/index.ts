@@ -78,7 +78,9 @@ export interface Token {
 	circulatingSupply?: string;
 	initialPrice: string;
 	currentPrice: string;
+	currentPriceUsd?: string;
 	marketCap: string;
+	marketCapUsd?: string;
 	volume24h: string;
 	priceChange24h: number;
 	priceChange5m?: string;
@@ -108,13 +110,18 @@ export interface Token {
 		decimals: number;
 		chainName: string;
 	};
+	// Launchpad tokenomics fields (from backend)
+	graduationThresholdUsd?: number | null;
+	initialMarketCapUsd?: number | null;
+	nativePriceAtCreation?: string | null;
+	isGraduated?: boolean;
 }
 
 export interface BondingCurve {
 	id: string;
 	tokenId: string;
 	contractAddress: `0xe${string}`;
-	curveType: "linear" | "exponential" | "sigmoid";
+	curveType: "linear" | "exponential" | "sigmoid" | "cpmm";
 	initialPrice: string;
 	slope: string;
 	reserveRatio: number;
@@ -126,6 +133,18 @@ export interface BondingCurve {
 	isGraduated: boolean;
 	createdAt: string;
 	updatedAt: string;
+	// CPMM virtual reserve fields
+	virtualNativeReserves?: string;
+	virtualTokenReserves?: string;
+	realNativeReserves?: string;
+	realTokenReserves?: string;
+	scalingFactor?: string;
+	initialPriceNative?: string;
+	initialMcapNative?: string;
+	graduationMcapNative?: string;
+	solPriceAtCreation?: string;
+	nativePriceAtCreation?: string;
+	graduationThresholdUsd?: string;
 }
 
 export interface TokenListParams {
@@ -243,6 +262,8 @@ export interface TradeEvent {
 	timestamp?: string;
 	bondingCurveProgress?: number;
 	marketCap?: string;
+	marketCapUsd?: string;
+	priceUsd?: string;
 }
 
 // Chain configuration
@@ -374,6 +395,16 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
 		explorerUrl: "https://sepolia.basescan.org",
 	},
 ];
+
+/**
+ * Get the correct native currency symbol for a chain ID.
+ * Uses SUPPORTED_CHAINS as the source of truth.
+ * Falls back to "ETH" for unknown EVM chains.
+ */
+export function getNativeSymbolForChain(chainId: number): string {
+	const chain = SUPPORTED_CHAINS.find((c) => c.id === chainId);
+	return chain?.nativeCurrency?.symbol || "ETH";
+}
 
 // Solana chain type (not EVM, uses string identifiers)
 export type SolanaCluster = "mainnet-beta" | "devnet" | "testnet";

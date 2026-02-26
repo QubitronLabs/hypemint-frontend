@@ -169,13 +169,14 @@ export function calculateCurveProgress(
 }
 
 // Get graduation status text
+// Uses per-token dynamic threshold from backend (defaults to $32,245 graduation target)
 export function getGraduationStatus(
   isGraduated: boolean,
   marketCap: bigint,
-  thresholdUsd: number = 69000
+  thresholdUsd: number = 32245
 ): string {
   if (isGraduated) {
-    return "Graduated to QuickSwap 🎉";
+    return "Graduated to DEX 🎉";
   }
   const marketCapUsd = Number(formatEther(marketCap));
   const remaining = thresholdUsd - marketCapUsd;

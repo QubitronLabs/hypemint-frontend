@@ -113,10 +113,10 @@ export function TokenCard({ token, className }: TokenCardProps) {
 	const priceChangePositive = priceChange >= 0;
 
 	const formattedMarketCap = useMemo(() => {
-		const mcap = fromWei(token.marketCap);
+		const mcap = fromWei(token.marketCapUsd || token.marketCap);
 		if (isNaN(mcap) || mcap === 0) return "$0";
 		return `$${formatNumber(mcap)}`;
-	}, [token.marketCap]);
+	}, [token.marketCapUsd, token.marketCap]);
 
 	const formattedPriceChange = useMemo(() => {
 		const change = Math.abs(priceChange);
@@ -150,7 +150,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
 	);
 
 	// Is ATH at 100%?
-	const isAtAth = athProgress >= 99.5;
+	const isAtAth = athProgress >= 100;
 
 	// Format creator display name
 	const creatorDisplay = useMemo(() => {
@@ -277,17 +277,10 @@ export function TokenCard({ token, className }: TokenCardProps) {
 						<Tooltip>
 							<TooltipTrigger asChild>
 								<div className="relative flex-1 max-w-44 h-1.5 sm:h-2 bg-[#222] rounded-full  shrink-0 cursor-help">
-									<motion.div
-										initial={{ width: 0 }}
-										animate={{
-											width: `${Math.max(athProgress > 0 ? 4 : 0, athProgress)}%`,
-										}}
-										transition={{
-											duration: 0.8,
-											ease: "easeOut",
-										}}
-										className="h-full rounded-full"
+									<div
+										className="h-full rounded-full transition-[width] duration-800 ease-out"
 										style={{
+											width: `${Math.max(athProgress > 0 ? 4 : 0, athProgress)}%`,
 											background: `linear-gradient(to right, ${athColors.from}, ${athColors.to})`,
 											minWidth:
 												athProgress > 0 ? "3px" : "0px",
@@ -317,7 +310,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
 							<TooltipContent
 								side="top"
 								sideOffset={6}
-								className="bg-[#1a1a1a] text-white border border-[#333] px-3 py-2 rounded-lg text-[11px] max-w-[200px] shadow-xl"
+								className="bg-[#1a1a1a] text-white border border-[#333] px-3 py-2 rounded-lg text-[11px] max-w-50 shadow-xl"
 							>
 								<p className="font-medium text-white/90">
 									ATH Progress ({athProgress.toFixed(1)}%)

@@ -128,7 +128,7 @@ export function addRecentViewed(token: Token) {
 		symbol: token.symbol,
 		imageUrl: token.imageUrl,
 		description: token.description,
-		marketCap: token.marketCap,
+		marketCap: token.marketCapUsd || token.marketCap,
 		viewedAt: Date.now(),
 	});
 	saveRecentViewed(viewed);
@@ -722,7 +722,7 @@ export function SearchBox({ config, className }: SearchBoxProps) {
 													<div className="text-right shrink-0">
 														<span className="text-sm font-semibold text-white block">
 															{formatCompactMarketCap(
-																token.marketCap,
+															token.marketCapUsd || token.marketCap,
 															)}
 														</span>
 														<span className="text-[11px] text-white/40">

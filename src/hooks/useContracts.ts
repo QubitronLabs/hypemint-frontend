@@ -13,7 +13,7 @@ import {
 	usePublicClient,
 	useChainId as useWagmiChainId,
 } from "wagmi";
-import { parseEther, type Address, type Hash } from "viem";
+import { parseEther, parseGwei, type Address, type Hash } from "viem";
 import {
 	HYPE_FACTORY_ABI,
 	HYPE_BONDING_CURVE_ABI,
@@ -81,6 +81,8 @@ export interface BuyParams {
 	bondingCurveAddress: Address;
 	maticAmount: string; // in MATIC (not wei)
 	slippageBps?: number;
+	/** Override chain ID (defaults to active EVM chain from wallet) */
+	chainId?: number;
 }
 
 export interface SellParams {
@@ -89,6 +91,8 @@ export interface SellParams {
 	tokenAmount: string; // in tokens (not wei)
 	minMatic?: string; // minimum MATIC to receive (calculated from quote with slippage)
 	slippageBps?: number;
+	/** Override chain ID (defaults to active EVM chain from wallet) */
+	chainId?: number;
 }
 
 // Hook: Get user's native balance for the current network
@@ -311,6 +315,12 @@ export function useCreateToken() {
 							});
 						}
 
+						// Polygon / Amoy RPCs need explicit gas params
+						const isPolygonChain = [137, 80002].includes(targetChainId);
+						const gasOverrides = isPolygonChain
+							? { maxPriorityFeePerGas: parseGwei("30"), maxFeePerGas: parseGwei("150") }
+							: {};
+
 						hash = await writeContractAsync({
 							address: factoryAddress,
 							abi: HYPE_FACTORY_ABI,
@@ -328,6 +338,7 @@ export function useCreateToken() {
 							account: address,
 							chainId: targetChainId,
 							nonce,
+							...gasOverrides,
 						});
 						break; // success – exit retry loop
 					} catch (retryErr: any) {
@@ -590,7 +601,6 @@ export function useSellQuote(
 export function useBuyTokens() {
 	const { walletAddress: address } = useAuth();
 	const evmChainId = useActiveEvmChainId();
-	const publicClient = usePublicClient();
 	const [txHash, setTxHash] = useState<Hash | undefined>();
 	const [isBuying, setIsBuying] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
@@ -616,6 +626,9 @@ export function useBuyTokens() {
 				return null;
 			}
 
+			// Use token's chain if provided, else fall back to active EVM chain
+			const targetChainId = params.chainId ?? evmChainId;
+
 			setIsBuying(true);
 			setError(null);
 
@@ -626,26 +639,6 @@ export function useBuyTokens() {
 				// For simplicity, set minTokens to 0 (could calculate properly with quote)
 				const minTokens = BigInt(0);
 
-				// Check for pending transactions before submitting
-				if (publicClient && address) {
-					const pendingCount = await getPendingTransactionCount(publicClient, address);
-					if (pendingCount > 0) {
-						console.warn(`[useBuyTokens] ${pendingCount} pending tx(s) detected — waiting...`);
-						const cleared = await waitForPendingTransactions(publicClient, address, 20_000, 2_000);
-						if (!cleared) {
-							setError(new Error(`You have ${pendingCount} pending transaction(s). Please wait for them to confirm or cancel them in your wallet.`));
-							setIsBuying(false);
-							return null;
-						}
-					}
-				}
-
-				// Get explicit nonce
-				let nonce: number | undefined;
-				if (publicClient && address) {
-					nonce = await publicClient.getTransactionCount({ address, blockTag: "pending" });
-				}
-
 				// Debug logging
 				console.log("[useBuyTokens] Buy params:", {
 					bondingCurveAddress: params.bondingCurveAddress,
@@ -653,9 +646,14 @@ export function useBuyTokens() {
 					maticWei: maticWei.toString(),
 					minTokens: minTokens.toString(),
 					slippageBps: slippage,
-					chainId: evmChainId,
-					nonce,
+					chainId: targetChainId,
 				});
+
+				// Polygon/Amoy RPCs require a minimum gas tip cap (25+ Gwei)
+				const isPolygonChain = [137, 80002].includes(targetChainId);
+				const gasOverrides = isPolygonChain
+					? { maxPriorityFeePerGas: parseGwei("30"), maxFeePerGas: parseGwei("150") }
+					: {};
 
 				const hash = await writeContractAsync({
 					address: params.bondingCurveAddress,
@@ -664,8 +662,8 @@ export function useBuyTokens() {
 					args: [minTokens],
 					value: maticWei,
 					account: address,
-					chainId: evmChainId,
-					nonce,
+					chainId: targetChainId,
+					...gasOverrides,
 				});
 
 				console.log("[useBuyTokens] Transaction hash:", hash);
@@ -687,7 +685,7 @@ export function useBuyTokens() {
 				setIsBuying(false);
 			}
 		},
-		[address, evmChainId, publicClient, writeContractAsync],
+		[address, evmChainId, writeContractAsync],
 	);
 
 	return {
@@ -709,7 +707,6 @@ export function useBuyTokens() {
 export function useSellTokens() {
 	const { walletAddress: address } = useAuth();
 	const evmChainId = useActiveEvmChainId();
-	const publicClient = usePublicClient();
 	const [txHash, setTxHash] = useState<Hash | undefined>();
 	const [isSelling, setIsSelling] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
@@ -735,6 +732,9 @@ export function useSellTokens() {
 				return null;
 			}
 
+			// Use token's chain if provided, else fall back to active EVM chain
+			const targetChainId = params.chainId ?? evmChainId;
+
 			setIsSelling(true);
 			setError(null);
 
@@ -745,34 +745,19 @@ export function useSellTokens() {
 					? parseEther(params.minMatic)
 					: BigInt(0);
 
-				// Check for pending transactions before submitting
-				if (publicClient && address) {
-					const pendingCount = await getPendingTransactionCount(publicClient, address);
-					if (pendingCount > 0) {
-						console.warn(`[useSellTokens] ${pendingCount} pending tx(s) detected — waiting...`);
-						const cleared = await waitForPendingTransactions(publicClient, address, 20_000, 2_000);
-						if (!cleared) {
-							setError(new Error(`You have ${pendingCount} pending transaction(s). Please wait for them to confirm or cancel them in your wallet.`));
-							setIsSelling(false);
-							return null;
-						}
-					}
-				}
-
-				// Get explicit nonce
-				let nonce: number | undefined;
-				if (publicClient && address) {
-					nonce = await publicClient.getTransactionCount({ address, blockTag: "pending" });
-				}
-
 				console.log("[useSellTokens] Sell params:", {
 					bondingCurveAddress: params.bondingCurveAddress,
 					tokenAmount: params.tokenAmount,
 					tokenWei: tokenWei.toString(),
 					minMatic: minMatic.toString(),
-					chainId: evmChainId,
-					nonce,
+					chainId: targetChainId,
 				});
+
+				// Polygon/Amoy RPCs require a minimum gas tip cap (25+ Gwei)
+				const isPolygonChain = [137, 80002].includes(targetChainId);
+				const gasOverrides = isPolygonChain
+					? { maxPriorityFeePerGas: parseGwei("30"), maxFeePerGas: parseGwei("150") }
+					: {};
 
 				const hash = await writeContractAsync({
 					address: params.bondingCurveAddress,
@@ -780,8 +765,8 @@ export function useSellTokens() {
 					functionName: "sell",
 					args: [tokenWei, minMatic],
 					account: address,
-					chainId: evmChainId,
-					nonce,
+					chainId: targetChainId,
+					...gasOverrides,
 				});
 
 				setTxHash(hash);
@@ -802,7 +787,7 @@ export function useSellTokens() {
 				setIsSelling(false);
 			}
 		},
-		[address, evmChainId, publicClient, writeContractAsync],
+		[address, evmChainId, writeContractAsync],
 	);
 
 	return {
@@ -866,6 +851,12 @@ export function useApproveToken() {
 			setError(null);
 
 			try {
+				// Polygon/Amoy RPCs require a minimum gas tip cap (25+ Gwei)
+				const isPolygonChain = [137, 80002].includes(evmChainId);
+				const gasOverrides = isPolygonChain
+					? { maxPriorityFeePerGas: parseGwei("30"), maxFeePerGas: parseGwei("150") }
+					: {};
+
 				const hash = await writeContractAsync({
 					address: tokenAddress,
 					abi: HYPE_TOKEN_ABI,
@@ -873,6 +864,7 @@ export function useApproveToken() {
 					args: [spenderAddress, amount],
 					account: address,
 					chainId: evmChainId,
+					...gasOverrides,
 				});
 
 				setTxHash(hash);

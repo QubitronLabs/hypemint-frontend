@@ -30,7 +30,6 @@ import {
 	type BondingCurveData,
 	type CreateTokenParams as ProgramCreateTokenParams,
 } from "@/lib/solana/program";
-import { useContractConfigStore } from "./useContractConfig";
 import { useActiveChainType } from "@/lib/network";
 import { recordOnChainTrade } from "@/lib/api/trades";
 
@@ -70,12 +69,16 @@ export interface SolanaSellParams {
 // Helper: Get Solana Connection from config
 // ============================================
 
+/**
+ * Return the backend RPC proxy URL for Solana.
+ * The proxy hides private API keys (Helius, QuickNode, etc.)
+ * and rate-limits requests per IP.  The old deployment.rpcUrl
+ * is no longer used on the frontend.
+ */
 function useSolanaRpcUrl(): string | null {
-	const deployments = useContractConfigStore((s) => s.deployments);
-	const solanaDeployment = deployments.find(
-		(d) => d.chainType === "SOLANA" && d.isActive,
-	);
-	return solanaDeployment?.rpcUrl ?? null;
+	// Always route through the backend proxy (same URL that program.ts uses)
+	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+	return `${API_URL}/api/v1/rpc/901`;
 }
 
 /**

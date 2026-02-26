@@ -14,8 +14,8 @@ import type { NativeCurrency } from "@dynamic-labs/sdk-api-core";
 
 // Default native currency when network is not connected
 const DEFAULT_NATIVE_CURRENCY: NativeCurrency = {
-	name: "POL",
-	symbol: "POL",
+	name: "ETH",
+	symbol: "ETH",
 	decimals: 18,
 };
 

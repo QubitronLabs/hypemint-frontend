@@ -499,7 +499,7 @@ export function AdvancedPriceChart({
 		return () => {
 			cancelled = true;
 		};
-	}, [tokenId, timeRange, dims.w]);
+	}, [tokenId, timeRange]);
 
 	// ============================================================================
 	// Resize Observer
