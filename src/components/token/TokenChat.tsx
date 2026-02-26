@@ -264,7 +264,13 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 
 	// Send comment
 	const handleSendComment = async () => {
-		if (!inlineMessage.trim() || !isAuthenticated || sending) return;
+		// Allow sending if user has either text OR selected image
+		if (
+			(!inlineMessage.trim() && !selectedImage) ||
+			!isAuthenticated ||
+			sending
+		)
+			return;
 
 		setSending(true);
 		try {
@@ -289,12 +295,13 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			}
 
 			// 2. Create comment with imageUrl
+			// If only image is selected (no text), send a space to satisfy backend validation
 			const payload: {
 				content: string;
 				parentId: string | null;
 				imageUrl?: string;
 			} = {
-				content: inlineMessage.trim(),
+				content: inlineMessage.trim() || (selectedImage ? " " : ""), // Send space for image-only comments
 				parentId: parentId || null,
 			};
 
@@ -360,7 +367,11 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			<UserAvatar
 				userId={comment.user.id}
 				avatarUrl={comment.user.avatarUrl}
-				username={comment.user.username || comment.user.displayName || undefined}
+				username={
+					comment.user.username ||
+					comment.user.displayName ||
+					undefined
+				}
 				sizeClassName={isReply ? "size-7" : "size-8"}
 				className="shrink-0"
 			/>
@@ -377,15 +388,17 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 					</span>
 				</div>
 
-				{/* Comment content with @mention for replies */}
-				<p className="text-sm text-foreground/90 break-words">
-					{isReply && parentUsername && (
-						<span className="text-primary font-medium">
-							@{parentUsername}{" "}
-						</span>
-					)}
-					{comment.content}
-				</p>
+				{/* Comment content with @mention for replies - hide if only space (image-only comment) */}
+				{comment.content.trim() && (
+					<p className="text-sm text-foreground/90 break-words">
+						{isReply && parentUsername && (
+							<span className="text-primary font-medium">
+								@{parentUsername}{" "}
+							</span>
+						)}
+						{comment.content}
+					</p>
+				)}
 
 				{/* Image if present */}
 				{comment.imageUrl && (
@@ -434,7 +447,7 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			{/* Top Input Row: Avatar + Input + Newest Dropdown */}
 			<div className="flex items-center gap-3 p-4 border-b border-border">
 				<UserAvatar
-					userId={user?.id || ''}
+					userId={user?.id || ""}
 					avatarUrl={user?.avatarUrl}
 					username={user?.username || user?.displayName || undefined}
 					sizeClassName="size-8"

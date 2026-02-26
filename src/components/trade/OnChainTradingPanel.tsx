@@ -90,7 +90,8 @@ function formatNumber(num: number | string): string {
 	if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
 	if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
 	if (n < 0.00000001 && n > 0) return "<0.00000001";
-	if (n < 1 && n > 0) return n.toFixed(8).replace(/0+$/, "").replace(/\.$/, ".0");
+	if (n < 1 && n > 0)
+		return n.toFixed(8).replace(/0+$/, "").replace(/\.$/, ".0");
 	return n.toFixed(n < 1 ? 8 : 4);
 }
 
@@ -483,7 +484,9 @@ export function OnChainTradingPanel({
 		if (tradeType !== "sell" || !amount || !tokenBalance) return false;
 		const parsedAmount = parseFloat(amount);
 		if (isNaN(parsedAmount) || parsedAmount <= 0) return false;
-		const balanceDisplay = parseFloat(formatTokenDisplay(tokenBalance as bigint));
+		const balanceDisplay = parseFloat(
+			formatTokenDisplay(tokenBalance as bigint),
+		);
 		return parsedAmount > balanceDisplay;
 	}, [tradeType, amount, tokenBalance, formatTokenDisplay]);
 
@@ -512,17 +515,28 @@ export function OnChainTradingPanel({
 		const evmSpotPrice = evmOnChainPrice
 			? parseFloat(formatEther(evmOnChainPrice))
 			: 0;
-		const price = !isSolana && evmSpotPrice > 0 ? evmSpotPrice : backendPrice;
+		const price =
+			!isSolana && evmSpotPrice > 0 ? evmSpotPrice : backendPrice;
 
 		// Solana: use client-side bonding curve math for accurate quotes
 		if (isSolana) {
 			if (solanaCurveState && parsedAmount > 0) {
-				const { totalSupply, slope, basePrice, protocolFeeBps, creatorFeeBps } = solanaCurveState;
+				const {
+					totalSupply,
+					slope,
+					basePrice,
+					protocolFeeBps,
+					creatorFeeBps,
+				} = solanaCurveState;
 				const totalFeeBps = protocolFeeBps + creatorFeeBps;
 				// Current spot price in lamports per token-unit
-				const spotPriceLamports = calcSolanaPrice(totalSupply, slope, basePrice);
+				const spotPriceLamports = calcSolanaPrice(
+					totalSupply,
+					slope,
+					basePrice,
+				);
 				// Convert spot price to SOL per display-token (6 decimals)
-				const spotPriceSol = Number(spotPriceLamports) / 1e9 * 1e6;
+				const spotPriceSol = (Number(spotPriceLamports) / 1e9) * 1e6;
 
 				if (tradeType === "buy") {
 					// Convert SOL input to lamports
@@ -538,26 +552,39 @@ export function OnChainTradingPanel({
 						};
 					}
 					// Deduct fees
-					const feeAmount = lamportsIn * BigInt(totalFeeBps) / 10000n;
+					const feeAmount =
+						(lamportsIn * BigInt(totalFeeBps)) / 10000n;
 					const netLamports = lamportsIn - feeAmount;
 					// Calculate tokens out using bonding curve math
-					const tokensOutRaw = calculateTokensForSol(netLamports, totalSupply, slope, basePrice);
+					const tokensOutRaw = calculateTokensForSol(
+						netLamports,
+						totalSupply,
+						slope,
+						basePrice,
+					);
 					const tokensOut = Number(tokensOutRaw) / 1e6; // Convert to display tokens
-					const fees = Number(feeAmount) / 1e9; // Fees in SOL
-					const effectivePrice = tokensOut > 0 ? parsedAmount / tokensOut : 0;
-					const priceImpact = spotPriceSol > 0 ? ((effectivePrice - spotPriceSol) / spotPriceSol) * 100 : 0;
+					// const fees = Number(feeAmount) / 1e9; // Fees in SOL
+					// const effectivePrice = tokensOut > 0 ? parsedAmount / tokensOut : 0;
+					// const priceImpact = spotPriceSol > 0 ? ((effectivePrice - spotPriceSol) / spotPriceSol) * 100 : 0;
 
 					return {
 						outputAmount: tokensOut,
-						fees,
-						effectivePrice,
-						priceImpact: isFinite(priceImpact) ? Math.abs(priceImpact) : 0,
-						isHighImpact: Math.abs(priceImpact) > 5,
-						isUnreasonable: !isFinite(tokensOut) || tokensOut > 1e18,
+						// fees,
+						// effectivePrice,
+						// priceImpact: isFinite(priceImpact) ? Math.abs(priceImpact) : 0,
+						// isHighImpact: Math.abs(priceImpact) > 5,
+						fees: 0,
+						effectivePrice: 0,
+						priceImpact: 0,
+						isHighImpact: false,
+						isUnreasonable:
+							!isFinite(tokensOut) || tokensOut > 1e18,
 					};
 				} else {
 					// Sell: convert display tokens to raw token units
-					const tokenAmountRaw = BigInt(Math.round(parsedAmount * 1e6));
+					const tokenAmountRaw = BigInt(
+						Math.round(parsedAmount * 1e6),
+					);
 					// Guard: cannot sell more than current supply
 					if (tokenAmountRaw > totalSupply || tokenAmountRaw <= 0n) {
 						return {
@@ -570,31 +597,45 @@ export function OnChainTradingPanel({
 						};
 					}
 					// Calculate gross SOL return
-					const grossLamports = calculateSolForTokens(tokenAmountRaw, totalSupply, slope, basePrice);
-					const feeAmount = grossLamports * BigInt(totalFeeBps) / 10000n;
+					const grossLamports = calculateSolForTokens(
+						tokenAmountRaw,
+						totalSupply,
+						slope,
+						basePrice,
+					);
+					const feeAmount =
+						(grossLamports * BigInt(totalFeeBps)) / 10000n;
 					const netLamports = grossLamports - feeAmount;
 					const solOut = Number(netLamports) / 1e9;
-					const fees = Number(feeAmount) / 1e9;
-					const effectivePrice = parsedAmount > 0 ? solOut / parsedAmount : 0;
-					const priceImpact = spotPriceSol > 0 ? ((spotPriceSol - effectivePrice) / spotPriceSol) * 100 : 0;
+					// const fees = Number(feeAmount) / 1e9;
+					// const effectivePrice = parsedAmount > 0 ? solOut / parsedAmount : 0;
+					// const priceImpact = spotPriceSol > 0 ? ((spotPriceSol - effectivePrice) / spotPriceSol) * 100 : 0;
 
 					return {
 						outputAmount: solOut,
-						fees,
-						effectivePrice,
-						priceImpact: isFinite(priceImpact) ? Math.abs(priceImpact) : 0,
-						isHighImpact: Math.abs(priceImpact) > 5,
+						// fees,
+						// effectivePrice,
+						// priceImpact: isFinite(priceImpact) ? Math.abs(priceImpact) : 0,
+						// isHighImpact: Math.abs(priceImpact) > 5,
+						fees: 0,
+						effectivePrice: 0,
+						priceImpact: 0,
+						isHighImpact: false,
 						isUnreasonable: !isFinite(solOut) || solOut > 1e9,
 					};
 				}
 			} else {
 				// Fallback when curve state not loaded yet
 				if (tradeType === "buy") {
-					const estimatedTokens = price > 0 ? parsedAmount / price : 0;
+					const estimatedTokens =
+						price > 0 ? parsedAmount / price : 0;
 					return {
 						outputAmount: estimatedTokens,
-						fees: parsedAmount * 0.02,
-						effectivePrice: price,
+						// fees: parsedAmount * 0.02,
+						// effectivePrice: price,
+						// priceImpact: 0,
+						fees: 0,
+						effectivePrice: 0,
 						priceImpact: 0,
 						isHighImpact: false,
 						isUnreasonable: false,
@@ -603,8 +644,11 @@ export function OnChainTradingPanel({
 					const estimatedSol = parsedAmount * price;
 					return {
 						outputAmount: estimatedSol,
-						fees: estimatedSol * 0.02,
-						effectivePrice: price,
+						// fees: estimatedSol * 0.02,
+						// effectivePrice: price,
+						// priceImpact: 0,
+						fees: 0,
+						effectivePrice: 0,
 						priceImpact: 0,
 						isHighImpact: false,
 						isUnreasonable: false,
@@ -620,23 +664,25 @@ export function OnChainTradingPanel({
 				bigint,
 			];
 			const tokensOut = parseFloat(formatEther(tokenAmount));
-			const totalFees = parseFloat(formatEther(protocolFee + creatorFee));
-			const effectivePrice = tokensOut > 0 ? parsedAmount / tokensOut : 0;
-			const priceImpact =
-				price > 0 ? ((effectivePrice - price) / price) * 100 : 0;
+			// const totalFees = parseFloat(formatEther(protocolFee + creatorFee));
+			// const effectivePrice = tokensOut > 0 ? parsedAmount / tokensOut : 0;
+			// const priceImpact =
+			// 	price > 0 ? ((effectivePrice - price) / price) * 100 : 0;
 
 			// Safety check for unreasonable values
-			const isUnreasonable =
-				!isFinite(tokensOut) ||
-				tokensOut > 1e18 ||
-				!isFinite(effectivePrice);
+			const isUnreasonable = !isFinite(tokensOut) || tokensOut > 1e18;
+			// || !isFinite(effectivePrice);
 
 			return {
 				outputAmount: isUnreasonable ? 0 : tokensOut,
-				fees: isFinite(totalFees) ? totalFees : 0,
-				effectivePrice: isUnreasonable ? 0 : effectivePrice,
-				priceImpact: isFinite(priceImpact) ? Math.abs(priceImpact) : 0,
-				isHighImpact: Math.abs(priceImpact) > 5,
+				// fees: isFinite(totalFees) ? totalFees : 0,
+				// effectivePrice: isUnreasonable ? 0 : effectivePrice,
+				// priceImpact: isFinite(priceImpact) ? Math.abs(priceImpact) : 0,
+				// isHighImpact: Math.abs(priceImpact) > 5,
+				fees: 0,
+				effectivePrice: 0,
+				priceImpact: 0,
+				isHighImpact: false,
 				isUnreasonable,
 			};
 		}
@@ -648,24 +694,26 @@ export function OnChainTradingPanel({
 				bigint,
 			];
 			const maticOut = parseFloat(formatEther(maticAmount));
-			const totalFees = parseFloat(formatEther(protocolFee + creatorFee));
-			const effectivePrice =
-				parsedAmount > 0 ? maticOut / parsedAmount : 0;
-			const priceImpact =
-				price > 0 ? ((price - effectivePrice) / price) * 100 : 0;
+			// const totalFees = parseFloat(formatEther(protocolFee + creatorFee));
+			// const effectivePrice =
+			// 	parsedAmount > 0 ? maticOut / parsedAmount : 0;
+			// const priceImpact =
+			// 	price > 0 ? ((price - effectivePrice) / price) * 100 : 0;
 
 			// Safety check for unreasonable values (e.g., more than 1 billion MATIC)
-			const isUnreasonable =
-				!isFinite(maticOut) ||
-				maticOut > 1e9 ||
-				!isFinite(effectivePrice);
+			const isUnreasonable = !isFinite(maticOut) || maticOut > 1e9;
+			// || !isFinite(effectivePrice);
 
 			return {
 				outputAmount: isUnreasonable ? 0 : maticOut,
-				fees: isFinite(totalFees) ? totalFees : 0,
-				effectivePrice: isUnreasonable ? 0 : effectivePrice,
-				priceImpact: isFinite(priceImpact) ? Math.abs(priceImpact) : 0,
-				isHighImpact: Math.abs(priceImpact) > 5,
+				// fees: isFinite(totalFees) ? totalFees : 0,
+				// effectivePrice: isUnreasonable ? 0 : effectivePrice,
+				// priceImpact: isFinite(priceImpact) ? Math.abs(priceImpact) : 0,
+				// isHighImpact: Math.abs(priceImpact) > 5,
+				fees: 0,
+				effectivePrice: 0,
+				priceImpact: 0,
+				isHighImpact: false,
 				isUnreasonable,
 			};
 		}
@@ -705,7 +753,16 @@ export function OnChainTradingPanel({
 			isHighImpact: false,
 			isUnreasonable: false,
 		};
-	}, [amount, tradeType, currentPrice, buyQuote, sellQuote, isSolana, solanaCurveState, evmOnChainPrice]);
+	}, [
+		amount,
+		tradeType,
+		currentPrice,
+		buyQuote,
+		sellQuote,
+		isSolana,
+		solanaCurveState,
+		evmOnChainPrice,
+	]);
 
 	// Trade recording is handled by backend blockchain event listener + instant sync API.
 	// Frontend calls syncTrade() after confirmation for instant data updates.
@@ -720,7 +777,7 @@ export function OnChainTradingPanel({
 		) {
 			handledBuyConfirmedRef.current = buyTxHash;
 			console.log("[OnChainTrading] Buy trade confirmed:", buyTxHash);
-			toast.success("Buy transaction confirmed!", {	
+			toast.success("Buy transaction confirmed!", {
 				id: "trade-result",
 				description: `Transaction successful`,
 				action: {
@@ -951,7 +1008,10 @@ export function OnChainTradingPanel({
 							action: {
 								label: "View",
 								onClick: () =>
-									window.open(getTxUrl(sig, normalizedChainId), "_blank"),
+									window.open(
+										getTxUrl(sig, normalizedChainId),
+										"_blank",
+									),
 							},
 						});
 					}
@@ -970,7 +1030,10 @@ export function OnChainTradingPanel({
 							action: {
 								label: "View",
 								onClick: () =>
-									window.open(getTxUrl(hash, normalizedChainId), "_blank"),
+									window.open(
+										getTxUrl(hash, normalizedChainId),
+										"_blank",
+									),
 							},
 						});
 					}
@@ -998,7 +1061,10 @@ export function OnChainTradingPanel({
 							action: {
 								label: "View",
 								onClick: () =>
-									window.open(getTxUrl(sig, normalizedChainId), "_blank"),
+									window.open(
+										getTxUrl(sig, normalizedChainId),
+										"_blank",
+									),
 							},
 						});
 					}
@@ -1041,7 +1107,10 @@ export function OnChainTradingPanel({
 							action: {
 								label: "View",
 								onClick: () =>
-									window.open(getTxUrl(hash, normalizedChainId), "_blank"),
+									window.open(
+										getTxUrl(hash, normalizedChainId),
+										"_blank",
+									),
 							},
 						});
 					}
@@ -1442,10 +1511,7 @@ export function OnChainTradingPanel({
 									</span>
 								</div>
 								<a
-									href={getTxUrl(
-										txHash,
-										normalizedChainId,
-									)}
+									href={getTxUrl(txHash, normalizedChainId)}
 									target="_blank"
 									rel="noopener noreferrer"
 									className="text-primary hover:underline flex items-center gap-1 text-sm"

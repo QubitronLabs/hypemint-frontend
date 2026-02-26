@@ -103,7 +103,7 @@ export async function getNewTokens(
 export async function getToken(id: string): Promise<Token | null> {
   try {
     const { data } = await apiClient.get<
-      ApiResponse<{ token: Token; bondingCurve: any; nativeCurrency?: { symbol: string; decimals: number; chainName: string } }>
+      ApiResponse<{ token: Token; bondingCurve: BondingCurve; nativeCurrency?: { symbol: string; decimals: number; chainName: string } }>
     >(`/api/v1/tokens/${id}`);
 
     if (!data.data) return null;
@@ -429,14 +429,20 @@ export async function syncTokenWithBlockchain(tokenId: string): Promise<{
 }> {
   try {
     const { data } = await apiClient.post<
-      ApiResponse<{
-        synced: boolean;
-        message?: string;
-        bondingCurveState?: any;
-        holdersCount?: number;
-        marketCap?: string;
-      }>
-    >(`/api/v1/tokens/${tokenId}/sync`);
+		ApiResponse<{
+			synced: boolean;
+			message?: string;
+			bondingCurveState?: {
+				reserveBalance: string;
+				currentSupply: string;
+				currentPrice: string;
+				graduated: boolean;
+				graduationThreshold: string;
+			};
+			holdersCount?: number;
+			marketCap?: string;
+		}>
+	>(`/api/v1/tokens/${tokenId}/sync`);
     return data.data;
   } catch (error) {
     console.error("Failed to sync token:", error);

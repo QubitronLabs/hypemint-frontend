@@ -129,7 +129,10 @@ export interface BondingCurve {
 	currentReserve: string;
 	currentPrice: string;
 	graduationMarketCap: string;
+	graduationMcap: string;
 	graduationSupply: string;
+	totalProtocolFees: string;
+	totalCreatorFees: string;
 	isGraduated: boolean;
 	createdAt: string;
 	updatedAt: string;
@@ -145,6 +148,9 @@ export interface BondingCurve {
 	solPriceAtCreation?: string;
 	nativePriceAtCreation?: string;
 	graduationThresholdUsd?: string;
+	initialMarketCapUsd?: string;
+	seedBuyAmount?: string;
+	graduationThreshold?: string;
 }
 
 export interface TokenListParams {
