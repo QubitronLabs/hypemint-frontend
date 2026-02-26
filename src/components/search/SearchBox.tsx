@@ -57,6 +57,7 @@ interface RecentViewedToken {
 	imageUrl?: string;
 	description?: string;
 	marketCap: string;
+	marketCapUsd?: string;
 	viewedAt: number;
 }
 
@@ -128,7 +129,8 @@ export function addRecentViewed(token: Token) {
 		symbol: token.symbol,
 		imageUrl: token.imageUrl,
 		description: token.description,
-		marketCap: token.marketCapUsd || token.marketCap,
+		marketCap: token.marketCap,
+		marketCapUsd: token.marketCapUsd,
 		viewedAt: Date.now(),
 	});
 	saveRecentViewed(viewed);

@@ -47,6 +47,7 @@ import {
 	useNewTokenFeed,
 	useGlobalTradeFeed,
 	useTokenGraduations,
+	useNativePriceFeed,
 } from "@/hooks/useWebSocket";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -849,6 +850,66 @@ function HomePage() {
 				queryClient.setQueriesData(
 					{ queryKey: tokenKeys.graduated({}) },
 					markAsGraduated,
+				);
+			},
+			[queryClient],
+		),
+	);
+
+	// ─── WebSocket: Native Price Updates ─────────────────────
+	// Recompute USD values for all cached tokens when native token prices change
+	useNativePriceFeed(
+		useCallback(
+			(prices: Record<number, number>) => {
+				const updateUsdValues = (tokens: Token[]) =>
+					tokens.map((token: Token) => {
+						const nativePrice = prices[token.chainId];
+						if (!nativePrice || nativePrice <= 0) return token;
+						const mcapNative = parseFloat(token.marketCap || "0");
+						const priceNative = parseFloat(token.currentPrice || "0");
+						return {
+							...token,
+							marketCapUsd:
+								mcapNative > 0
+									? (mcapNative * nativePrice).toFixed(2)
+									: token.marketCapUsd,
+							currentPriceUsd:
+								priceNative > 0
+									? (priceNative * nativePrice).toFixed(18)
+									: token.currentPriceUsd,
+						};
+					});
+
+				const updateCache = (oldData: any) => {
+					if (!oldData) return oldData;
+					if (oldData.data && Array.isArray(oldData.data)) {
+						return { ...oldData, data: updateUsdValues(oldData.data) };
+					}
+					if (Array.isArray(oldData)) {
+						return updateUsdValues(oldData);
+					}
+					return oldData;
+				};
+
+				queryClient.setQueriesData(
+					{ queryKey: tokenKeys.lists() },
+					updateCache,
+				);
+				queryClient.setQueriesData(
+					{ queryKey: ["tokens", "trending"] },
+					updateCache,
+				);
+				queryClient.setQueriesData(
+					{ queryKey: ["tokens", "new"] },
+					updateCache,
+				);
+				queryClient.setQueriesData(
+					{ queryKey: ["tokens", "live"] },
+					updateCache,
+				);
+				queryClient.setQueriesData(
+					{ queryKey: ["tokens", "graduated"] },
+					updateCache,
 				);
 			},
 			[queryClient],

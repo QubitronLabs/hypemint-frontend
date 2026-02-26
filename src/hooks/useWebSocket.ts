@@ -448,6 +448,35 @@ export function useRealtimeSync() {
 }
 
 /**
+ * Hook for real-time native token (POL/ETH/SOL) USD price updates.
+ * Broadcasts arrive every ~60s from the server's price feed.
+ */
+export function useNativePriceFeed(
+  onPrices: (prices: Record<number, number>) => void,
+) {
+  const { subscribe, unsubscribe, isConnected } = useWebSocket({
+    onMessage: (message) => {
+      if (
+        message.channel === "native-prices" &&
+        message.event === "price_update"
+      ) {
+        const data = message.data as { prices?: Record<number, number> };
+        if (data?.prices) {
+          onPrices(data.prices);
+        }
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (isConnected) {
+      subscribe("native-prices");
+      return () => unsubscribe("native-prices");
+    }
+  }, [isConnected, subscribe, unsubscribe]);
+}
+
+/**
  * Hook to use with React Query for automatic cache invalidation on realtime events
  * Should be used at the app level (e.g., in layout or providers)
  */

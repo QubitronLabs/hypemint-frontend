@@ -320,6 +320,30 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 					},
 				);
 			}
+
+			// Handle native price updates — recompute USD market cap in real-time (like pump.fun)
+			if (
+				message.channel === "native-prices" &&
+				message.event === "price_update"
+			) {
+				queryClient.setQueryData(
+					tokenKeys.detail(id),
+					(oldData: Token | undefined) => {
+						if (!oldData) return oldData;
+						const chainId = Number(oldData.chainId);
+						const nativePriceUsd = message.data.prices?.[chainId];
+						if (!nativePriceUsd || nativePriceUsd <= 0) return oldData;
+						const mcapNative = parseFloat(oldData.marketCap || "0");
+						const priceNative = parseFloat(oldData.currentPrice || "0");
+						return {
+							...oldData,
+							marketCapUsd: (mcapNative * nativePriceUsd).toFixed(2),
+							currentPriceUsd: (priceNative * nativePriceUsd).toFixed(18),
+							nativePriceUsd: nativePriceUsd.toString(),
+						};
+					},
+				);
+			}
 		},
 		[id, queryClient],
 	);
@@ -328,17 +352,19 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 		onMessage: handleWebSocketMessage,
 	});
 
-	// Subscribe to token-specific channels
+	// Subscribe to token-specific channels + native price feed
 	useEffect(() => {
 		if (isConnected && id) {
 			subscribe(`trades:${id}`);
 			subscribe(`price:${id}`);
 			subscribe(`token:${id}`);
+			subscribe("native-prices");
 
 			return () => {
 				unsubscribe(`trades:${id}`);
 				unsubscribe(`price:${id}`);
 				unsubscribe(`token:${id}`);
+				unsubscribe("native-prices");
 			};
 		}
 	}, [isConnected, id, subscribe, unsubscribe]);
