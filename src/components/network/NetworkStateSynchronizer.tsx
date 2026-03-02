@@ -10,6 +10,10 @@ import type { EvmNetwork } from "@dynamic-labs/types";
 import { useNetworkStore, type ChainType } from "@/lib/network";
 import { useQueryClient } from "@tanstack/react-query";
 import { SOLANA_DEVNET_CHAIN_ID } from "@/lib/wagmi/config";
+import {
+	isSolanaWallet,
+	type SolanaWalletConnector,
+} from "@dynamic-labs/solana";
 
 // Helper type to safely access evmNetworks from the generic connector
 export interface EvmWalletConnector {
@@ -50,7 +54,7 @@ function detectChainType(wallet: { chain?: string } | null): ChainType {
  */
 export function NetworkStateSynchronizer() {
 	const { primaryWallet, sdkHasLoaded } = useDynamicContext();
-	const { setNetworkData, clearNetworkData, setChainType } = useNetworkStore();
+	const { setNetworkData, clearNetworkData } = useNetworkStore();
 	const queryClient = useQueryClient();
 	const lastChainIdRef = useRef<number | null>(null);
 
@@ -71,17 +75,88 @@ export function NetworkStateSynchronizer() {
 			try {
 				// Detect chain type from the primary wallet
 				const walletChainType = detectChainType(primaryWallet as { chain?: string });
-				setChainType(walletChainType);
 
-				console.log(
-					`[NetworkSync] Wallet chain type detected: ${walletChainType}`,
-				);
-
-				// For Solana wallets, we handle network info differently
+				// For Solana wallets, detect the cluster (devnet vs mainnet)
+				// using the Dynamic.xyz connector's getNetwork() API.
+				//
+				// Dynamic.xyz network IDs (from getSelectedNetwork().chainId):
+				//   Mainnet Beta: 101
+				//   Devnet:       103
 				if (walletChainType === "SOLANA") {
+					let solanaChainId = SOLANA_DEVNET_CHAIN_ID; // default devnet
+
+					try {
+						if (primaryWallet && isSolanaWallet(primaryWallet)) {
+							const connector =
+								primaryWallet.connector as unknown as SolanaWalletConnector;
+
+							// Primary source of truth: getNetwork() returns the wallet's actual cluster.
+							// This is async and reflects the real wallet state.
+							let clusterResolved = false;
+							try {
+								const clusterName = await connector.getNetwork();
+								console.log(
+									`[NetworkSync] Solana cluster from getNetwork(): "${clusterName}"`,
+								);
+
+								if (
+									clusterName === "mainnet-beta" ||
+									clusterName === "mainnet"
+								) {
+									solanaChainId = 900;
+									clusterResolved = true;
+								} else if (clusterName === "testnet") {
+									solanaChainId = 902;
+									clusterResolved = true;
+								} else if (clusterName === "devnet") {
+									solanaChainId = 901;
+									clusterResolved = true;
+								}
+							} catch (err) {
+								console.warn("[NetworkSync] getNetwork() failed, using fallback:", err);
+							}
+
+							// Fallback ONLY: use Dynamic's numeric network ID when
+							// getNetwork() didn't resolve. Do NOT use as override —
+							// getSelectedNetwork() is sync and can return stale data
+							// during network transitions, causing flip-flop.
+							if (!clusterResolved) {
+								const selectedNetwork = connector.getSelectedNetwork();
+								if (selectedNetwork) {
+									const networkId = String(selectedNetwork.chainId);
+									console.log(
+										`[NetworkSync] Solana fallback networkId: "${networkId}"`,
+									);
+									if (networkId === "101") {
+										solanaChainId = 900; // mainnet-beta
+									} else if (networkId === "103") {
+										solanaChainId = 901; // devnet
+									}
+								}
+							}
+						}
+					} catch (err) {
+						console.warn("[NetworkSync] Solana network detection failed:", err);
+						// Fall back to devnet
+					}
+
+					// Skip if Solana chain hasn't changed — prevents flip-flop
+					// when useEffect re-fires due to primaryWallet ref changes
+					if (lastChainIdRef.current === solanaChainId) {
+						return;
+					}
+
+					const isMainnet = solanaChainId === 900;
+					console.log(
+						`[NetworkSync] Solana chain resolved: ${solanaChainId} (${isMainnet ? "mainnet" : "devnet"})`,
+					);
+
 					setNetworkData({
-						network: { name: "Solana", vanityName: "Solana Devnet" },
-						chainId: SOLANA_DEVNET_CHAIN_ID,
+						network: {
+							name: isMainnet ? "Solana" : "Solana Devnet",
+							vanityName: isMainnet ? "Solana" : "Solana Devnet",
+						},
+						chainId: solanaChainId,
 						chainLogo: "/chains/solana.svg",
 						nativeCurrency: {
 							name: "SOL",
@@ -90,9 +165,7 @@ export function NetworkStateSynchronizer() {
 						},
 						activeChainType: "SOLANA",
 					});
-					lastChainIdRef.current = SOLANA_DEVNET_CHAIN_ID;
-
-					console.log("[NetworkSync] Invalidating all queries for Solana switch...");
+					lastChainIdRef.current = solanaChainId;
 					queryClient.invalidateQueries();
 					return;
 				}
@@ -194,8 +267,7 @@ export function NetworkStateSynchronizer() {
 		};
 
 		// Handler for network change events
-		const handleNetworkChange = () => {
-			console.log("[NetworkSync] Network change event received");
+		const handleNetworkChange = () => { 
 			updateNetworkState();
 		};
 
@@ -212,7 +284,7 @@ export function NetworkStateSynchronizer() {
 				handleNetworkChange,
 			);
 		};
-	}, [primaryWallet, sdkHasLoaded, setNetworkData, clearNetworkData, setChainType, queryClient]);
+	}, [primaryWallet, sdkHasLoaded, setNetworkData, clearNetworkData, queryClient]);
 
 	// This component renders nothing - it's just a state synchronizer
 	return null;

@@ -281,20 +281,24 @@ export function getChainDisplayName(chainId: number): string {
 		11155111: "Sepolia",
 		11155420: "Optimism Sepolia",
 		1337: "Ganache Local",
+		900: "Solana Mainnet",
 		901: "Solana Devnet",
 	};
 	return FALLBACK_NAMES[chainId] || `Chain ${chainId}`;
 }
 
-// Solana chain ID used in our system
+// Solana chain IDs used in our system
 export const SOLANA_DEVNET_CHAIN_ID = 901;
+export const SOLANA_MAINNET_CHAIN_ID = 900;
 
 /**
  * Check if a chain is Solana-based.
  * Handles both string and number chainId (DB stores as varchar).
+ * 900 = mainnet, 901 = devnet, 902 = testnet
  */
 export function isSolanaChain(chainId: number | string): boolean {
-	return Number(chainId) === 901;
+	const id = Number(chainId);
+	return id >= 900 && id <= 999;
 }
 
 // Get transaction URL — supports both EVM and Solana chains
@@ -307,7 +311,8 @@ export function getTxUrl(
 	console.log({baseUrl});
 	if (!baseUrl) return "";
 	if (isSolanaChain(numericChainId)) {
-		return `${baseUrl}/tx/${txHash}?cluster=devnet`;
+		const cluster = numericChainId === 900 ? "" : "?cluster=devnet";
+		return `${baseUrl}/tx/${txHash}${cluster}`;
 	}
 	return `${baseUrl}/tx/${txHash}`;
 }
@@ -321,7 +326,8 @@ export function getAddressUrl(
 	const baseUrl = getExplorerBaseUrl(numericChainId);
 	if (!baseUrl) return "";
 	if (isSolanaChain(numericChainId)) {
-		return `${baseUrl}/address/${address}?cluster=devnet`;
+		const cluster = numericChainId === 900 ? "" : "?cluster=devnet";
+		return `${baseUrl}/address/${address}${cluster}`;
 	}
 	return `${baseUrl}/address/${address}`;
 }
@@ -335,7 +341,8 @@ export function getTokenUrl(
 	const baseUrl = getExplorerBaseUrl(numericChainId);
 	if (!baseUrl) return "";
 	if (isSolanaChain(numericChainId)) {
-		return `${baseUrl}/address/${address}?cluster=devnet`;
+		const cluster = numericChainId === 900 ? "" : "?cluster=devnet";
+		return `${baseUrl}/address/${address}${cluster}`;
 	}
 	return `${baseUrl}/token/${address}`;
 }

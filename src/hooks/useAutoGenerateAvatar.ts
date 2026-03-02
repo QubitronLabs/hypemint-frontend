@@ -42,8 +42,7 @@ export function useAutoGenerateAvatar() {
 
         // Generate and save avatar
         const generateAndSaveAvatar = async () => {
-            try {
-                console.log('[Avatar] Generating avatar for user:', user.id);
+            try { 
 
                 // Generate deterministic avatar URL based on user ID
                 const avatarUrl = generateAvatarUrl(user.id, 'avataaars');
@@ -53,8 +52,7 @@ export function useAutoGenerateAvatar() {
 
                 // Update local store
                 updateUser({ avatarUrl: updatedUser.avatarUrl });
-
-                console.log('[Avatar] Avatar generated and saved successfully');
+ 
             } catch (error) {
                 console.error('[Avatar] Failed to generate avatar:', error);
                 // Reset flag so we can retry next time

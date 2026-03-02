@@ -103,8 +103,7 @@ function AuthSync({ children }: { children: ReactNode }) {
         // Get JWT token using getAuthToken utility
         const authToken = await getAuthToken();
 
-        if (authToken) {
-          console.log("[Auth] JWT obtained successfully");
+        if (authToken) { 
           setJwt(authToken);
         }
 
@@ -124,26 +123,20 @@ function AuthSync({ children }: { children: ReactNode }) {
             const backendUser = await getCurrentUser();
             setUser(backendUser);
             lastWalletRef.current = currentWallet;
-            console.log(
-              "[Auth] User fetched:",
-              backendUser.username || "(no username)",
-            );
+             
           } catch (err: any) {
             // Check if this is a 401 error (token expired)
-            if (err?.response?.status === 401) {
-              console.warn("[Auth] Token expired during sync - forcing logout");
+            if (err?.response?.status === 401) { 
               await forceLogout();
               return;
             }
             // User might not exist in backend yet - that's OK
             // Set as fetched to prevent retry loop
             setUserFetched(true);
-            lastWalletRef.current = currentWallet;
-            console.log("[Auth] No backend user yet (new user)");
+            lastWalletRef.current = currentWallet; 
           }
         }
-      } catch (error) {
-        console.error("[Auth] Auth sync failed:", error);
+      } catch (error) { 
       } finally {
         setLoading(false);
         isSyncingRef.current = false;

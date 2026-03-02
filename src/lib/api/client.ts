@@ -26,8 +26,6 @@ export async function forceLogout(): Promise<void> {
   isHandlingLogout = true;
 
   try {
-    console.warn("[Auth] Force logout triggered - clearing all auth state");
-
     // Clear our auth store
     useAuthStore.getState().logout();
 
@@ -70,7 +68,7 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${jwt}`;
       // console.log("[API] Request with JWT:", config.url);
     } else {
-      console.log("[API] Request WITHOUT JWT:", config.url);
+      // console.log("[API] Request WITHOUT JWT:", config.url);
     }
 
     return config;

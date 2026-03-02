@@ -206,8 +206,8 @@ export function Portfolio({ className }: PortfolioProps) {
 			// Chain-aware conversion: Solana uses smaller decimals than EVM
 			const tokenChainType = (trade.token as any)?.chainType;
 			const isSolanaToken = tokenChainType === "SOLANA";
-			// Token decimals: Solana SPL = 6, EVM = 18
-			const tokenDivisor = isSolanaToken ? 1e6 : 1;
+			// Token decimals: Solana = 9, EVM = 18
+			const tokenDivisor = isSolanaToken ? 1e9 : 1;
 			// Native decimals: SOL = 9 (lamports), ETH/MATIC = 18 (wei)
 			const nativeDivisor = isSolanaToken ? 1e9 : 1;
 

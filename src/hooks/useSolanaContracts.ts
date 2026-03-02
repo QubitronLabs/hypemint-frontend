@@ -23,6 +23,7 @@ import {
 	buildBuyWithSolTransaction,
 	buildSellTransaction,
 	getSolanaConnection,
+	getSolanaRpcProxyUrl,
 	fetchBondingCurveState,
 	findATA,
 	findFactoryStatePDA,
@@ -30,8 +31,8 @@ import {
 	type BondingCurveData,
 	type CreateTokenParams as ProgramCreateTokenParams,
 } from "@/lib/solana/program";
-import { useActiveChainType } from "@/lib/network";
-import { recordOnChainTrade } from "@/lib/api/trades";
+import { useActiveChainType, useChainId } from "@/lib/network";
+import { syncTrade } from "@/lib/api/trades";
 
 // ============================================
 // Types (matching EVM hook signatures)
@@ -71,37 +72,23 @@ export interface SolanaSellParams {
 
 /**
  * Return the backend RPC proxy URL for Solana.
- * The proxy hides private API keys (Helius, QuickNode, etc.)
- * and rate-limits requests per IP.  The old deployment.rpcUrl
- * is no longer used on the frontend.
+ * Dynamically uses the active chain ID (900=mainnet, 901=devnet)
+ * from the network store so switching networks routes through
+ * the correct backend proxy endpoint.
  */
-function useSolanaRpcUrl(): string | null {
-	// Always route through the backend proxy (same URL that program.ts uses)
-	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-	return `${API_URL}/api/v1/rpc/901`;
+function useSolanaRpcUrl(): string {
+	const chainId = useChainId();
+	return getSolanaRpcProxyUrl(chainId);
 }
 
 /**
- * Get a Solana Connection from Dynamic.xyz connector or create one from config RPC
+ * Get a Solana Connection that ALWAYS routes through the backend
+ * RPC proxy.  We intentionally skip the Dynamic.xyz connector's
+ * getWalletClient() because it returns a Connection pointing at
+ * public RPCs (e.g. api.mainnet-beta.solana.com) which return
+ * 403 Forbidden without an API key.
  */
-function getConnectionFromWalletOrConfig(
-	wallet: unknown,
-	rpcUrl: string | null,
-): Connection {
-	// Try to get connection from Dynamic.xyz wallet connector first
-	if (wallet && typeof wallet === "object" && "connector" in wallet && isSolanaWallet(wallet as Parameters<typeof isSolanaWallet>[0])) {
-		try {
-			const w = wallet as { connector: unknown };
-			const connector =
-				w.connector as unknown as SolanaWalletConnector;
-			const connection = connector.getWalletClient();
-			if (connection) return connection;
-		} catch {
-			// Fall through to manual connection
-		}
-	}
-
-	// Fallback: create from config RPC URL
+function getProxyConnection(rpcUrl: string): Connection {
 	return getSolanaConnection(rpcUrl);
 }
 
@@ -143,11 +130,8 @@ export function useSolanaCreateToken() {
 
 				const creatorPubkey = new PublicKey(walletAddress);
 
-				// Get connection
-				const connection = getConnectionFromWalletOrConfig(
-					primaryWallet,
-					rpcUrl,
-				);
+				// Get connection via backend proxy (never use wallet's direct RPC)
+				const connection = getProxyConnection(rpcUrl);
 
 				console.log(
 					"[useSolanaCreateToken] Building create_token transaction...",
@@ -181,6 +165,11 @@ export function useSolanaCreateToken() {
 					result.bondingCurveAddress.toBase58(),
 				);
 
+				// Fresh blockhash right before signing (same as used for confirm)
+				const { blockhash, lastValidBlockHeight } =
+					await connection.getLatestBlockhash("confirmed");
+				result.transaction.recentBlockhash = blockhash;
+
 				// Get the signer from Dynamic.xyz
 				const connector =
 					primaryWallet.connector as unknown as SolanaWalletConnector;
@@ -204,15 +193,15 @@ export function useSolanaCreateToken() {
 				setIsCreating(false);
 				setIsConfirming(true);
 
-				// Send the signed transaction
+				// Send with retries — devnet can drop transactions
 				console.log(
 					"[useSolanaCreateToken] Sending transaction to network...",
 				);
 				const signature = await connection.sendRawTransaction(
 					signedTx.serialize(),
 					{
-						skipPreflight: false,
-						preflightCommitment: "confirmed",
+						skipPreflight: true,
+						maxRetries: 3,
 					},
 				);
 
@@ -222,15 +211,12 @@ export function useSolanaCreateToken() {
 					signature,
 				);
 
-				// Wait for confirmation
-				const latestBlockhash =
-					await connection.getLatestBlockhash("confirmed");
+				// Confirm using the SAME blockhash used in the transaction
 				await connection.confirmTransaction(
 					{
 						signature,
-						blockhash: latestBlockhash.blockhash,
-						lastValidBlockHeight:
-							latestBlockhash.lastValidBlockHeight,
+						blockhash,
+						lastValidBlockHeight,
 					},
 					"confirmed",
 				);
@@ -286,6 +272,7 @@ export function useSolanaCreateToken() {
 export function useSolanaBuyTokens() {
 	const { primaryWallet } = useDynamicContext();
 	const rpcUrl = useSolanaRpcUrl();
+	const chainId = useChainId();
 	const [isBuying, setIsBuying] = useState(false);
 	const [isConfirming, setIsConfirming] = useState(false);
 	const [isConfirmed, setIsConfirmed] = useState(false);
@@ -313,10 +300,7 @@ export function useSolanaBuyTokens() {
 				}
 
 				const buyerPubkey = new PublicKey(walletAddress);
-				const connection = getConnectionFromWalletOrConfig(
-					primaryWallet,
-					rpcUrl,
-				);
+				const connection = getProxyConnection(rpcUrl);
 
 				// Fetch the bonding curve state to get the token mint
 				const bondingCurvePubkey = new PublicKey(
@@ -339,13 +323,11 @@ export function useSolanaBuyTokens() {
 					);
 				}
 
-				// Set minTokensOut to 0 for now (no slippage protection)
-				// In production, use a quote endpoint to calculate expected tokens
-				const minTokensOut = BigInt(0);
-
-				console.log(
-					`[useSolanaBuyTokens] Buying with ${params.solAmount} SOL (${lamports} lamports)`,
-				);
+				// The on-chain LINEAR bonding curve gives wrong/zero token amounts.
+				// Set minTokensOut=0 since pricing is handled by backend CPMM.
+				// The backend syncTrade endpoint uses simulateBuyWithNative() to compute
+				// the authoritative token amounts after the on-chain SOL transfer succeeds.
+				const minTokensOut = 0n;
 
 				const transaction = await buildBuyWithSolTransaction(
 					connection,
@@ -356,6 +338,15 @@ export function useSolanaBuyTokens() {
 						minTokensOut,
 					},
 				);
+
+				// Get a FRESH blockhash right before signing to maximize the
+				// validity window. The build function fetches one earlier, but
+				// time passes during intermediate RPC calls (fetchBondingCurveState,
+				// getAccountInfo, etc.). We reuse this SAME blockhash for
+				// confirmTransaction to avoid timeout mismatches.
+				const { blockhash, lastValidBlockHeight } =
+					await connection.getLatestBlockhash("confirmed");
+				transaction.recentBlockhash = blockhash;
 
 				// Sign with wallet
 				const connector =
@@ -369,68 +360,47 @@ export function useSolanaBuyTokens() {
 				setIsBuying(false);
 				setIsConfirming(true);
 
-				// Send
+				// Send with retries — devnet can drop transactions
 				const signature = await connection.sendRawTransaction(
 					signedTx.serialize(),
 					{
-						skipPreflight: false,
-						preflightCommitment: "confirmed",
+						skipPreflight: true,
+						maxRetries: 3,
 					},
 				);
 				setTxSignature(signature);
 
-				// Confirm
-				const latestBlockhash =
-					await connection.getLatestBlockhash("confirmed");
+				// Confirm using the SAME blockhash used in the transaction
 				await connection.confirmTransaction(
 					{
 						signature,
-						blockhash: latestBlockhash.blockhash,
-						lastValidBlockHeight:
-							latestBlockhash.lastValidBlockHeight,
+						blockhash,
+						lastValidBlockHeight,
 					},
 					"confirmed",
 				);
 
 				setIsConfirming(false);
-				setIsConfirmed(true);
-				console.log(
-					"[useSolanaBuyTokens] Buy confirmed:",
-					signature,
-				);
 
-				// Fetch updated bonding curve state to calculate actual tokens received
-				let actualTokenAmount = lamports.toString(); // fallback
+				// Sync trade to backend for stats, chart, and WebSocket updates.
+				// The backend computes the CPMM token amount (on-chain gives wrong/0 tokens).
+				// We pass nativeAmount so the backend can use simulateBuyWithNative().
 				try {
-					const updatedCurveState = await fetchBondingCurveState(
-						connection,
-						bondingCurvePubkey,
-					);
-					const supplyBefore = curveState.totalSupply;
-					const supplyAfter = updatedCurveState.totalSupply;
-					const tokenDelta = supplyAfter - supplyBefore;
-					if (tokenDelta > BigInt(0)) {
-						actualTokenAmount = tokenDelta.toString();
-					}
-					console.log("[useSolanaBuyTokens] Token amount received:", actualTokenAmount);
-				} catch (e) {
-					console.warn("[useSolanaBuyTokens] Could not fetch updated curve state, using fallback");
-				}
-
-				// Report trade to backend for stats, chart, and WebSocket updates
-				try {
-					await recordOnChainTrade({
-						tokenId: curveState.tokenMint.toBase58(),
-						bondingCurveAddress: params.bondingCurveAddress,
-						type: "buy",
-						maticAmount: lamports.toString(),
-						tokenAmount: actualTokenAmount,
+					await syncTrade({
 						txHash: signature,
+						tokenId: curveState.tokenMint.toBase58(),
+					chainId: chainId ?? 901,
+						type: "buy",
+						nativeAmount: lamports.toString(),
+						tokenAmount: "0", // Backend will compute via CPMM
 					});
-					console.log("[useSolanaBuyTokens] Trade reported to backend");
 				} catch (reportErr) {
-					console.warn("[useSolanaBuyTokens] Failed to report trade:", reportErr);
+					// Non-critical: trade will be picked up by backend polling
 				}
+
+				// Set confirmed AFTER syncTrade completes to prevent useEffect race condition
+				// (useEffect would otherwise call syncTrade with 0 amounts before this one finishes)
+				setIsConfirmed(true);
 
 				return signature;
 			} catch (err) {
@@ -446,7 +416,7 @@ export function useSolanaBuyTokens() {
 				return null;
 			}
 		},
-		[primaryWallet, rpcUrl],
+		[primaryWallet, rpcUrl, chainId],
 	);
 
 	return {
@@ -475,6 +445,7 @@ export function useSolanaBuyTokens() {
 export function useSolanaSellTokens() {
 	const { primaryWallet } = useDynamicContext();
 	const rpcUrl = useSolanaRpcUrl();
+	const chainId = useChainId();
 	const [isSelling, setIsSelling] = useState(false);
 	const [isConfirming, setIsConfirming] = useState(false);
 	const [isConfirmed, setIsConfirmed] = useState(false);
@@ -502,48 +473,33 @@ export function useSolanaSellTokens() {
 				}
 
 				const sellerPubkey = new PublicKey(walletAddress);
-				const connection = getConnectionFromWalletOrConfig(
-					primaryWallet,
-					rpcUrl,
-				);
+				const connection = getProxyConnection(rpcUrl);
 
 				const tokenMint = new PublicKey(params.tokenAddress);
 
 				// Convert token amount (string with decimals) to smallest unit
-				// Token has 6 decimals (TOKEN_DECIMALS from program)
+				// Token uses 9 decimals in the CPMM system
 				const tokenFloat = parseFloat(params.tokenAmount);
 				const tokenSmallest = BigInt(
-					Math.round(tokenFloat * 1_000_000),
+					Math.round(tokenFloat * 1_000_000_000),
 				);
 
 				if (tokenSmallest <= 0n) {
 					throw new Error(
-						"Amount too small. Minimum is 0.000001 tokens.",
+						"Amount too small. Minimum is 0.000000001 tokens.",
 					);
 				}
 
-				// Calculate min SOL out with slippage
-				const minSolOut = params.minSol
-					? BigInt(
-							Math.round(
-								parseFloat(params.minSol) * 1_000_000_000,
-							),
-						)
-					: BigInt(0);
-
-				console.log(
-					`[useSolanaSellTokens] Selling ${params.tokenAmount} tokens`,
-				);
-
-				// Fetch bonding curve state BEFORE the sell to calculate actual SOL received
+				// Fetch bonding curve state BEFORE the sell to calculate slippage + actual SOL received
 				const [factoryStatePDA] = findFactoryStatePDA();
 				const [bondingCurvePDA] = findBondingCurvePDA(
 					factoryStatePDA,
 					tokenMint,
 				);
 				let reserveBefore = BigInt(0);
+				let curveStateBefore: Awaited<ReturnType<typeof fetchBondingCurveState>> | null = null;
 				try {
-					const curveStateBefore = await fetchBondingCurveState(
+					curveStateBefore = await fetchBondingCurveState(
 						connection,
 						bondingCurvePDA,
 					);
@@ -551,6 +507,31 @@ export function useSolanaSellTokens() {
 				} catch (e) {
 					console.warn("[useSolanaSellTokens] Could not fetch pre-sell curve state");
 				}
+
+				// Calculate min SOL out with slippage protection
+				// If explicit minSol provided, use it; otherwise estimate from curve state
+				let minSolOut: bigint;
+				if (params.minSol) {
+					minSolOut = BigInt(Math.round(parseFloat(params.minSol) * 1_000_000_000));
+				} else if (curveStateBefore) {
+					// Calculate expected SOL from bonding curve math, apply slippage tolerance
+					const slippageBps = params.slippageBps ?? 100; // default 1%
+					const expectedSol = calculateSolForTokens(
+						tokenSmallest,
+						curveStateBefore.totalSupply,
+						curveStateBefore.slope,
+						curveStateBefore.basePrice,
+					);
+					minSolOut = expectedSol > 0n
+						? expectedSol - (expectedSol * BigInt(slippageBps) / 10_000n)
+						: 0n;
+				} else {
+					minSolOut = 0n;
+				}
+
+				console.log(
+					`[useSolanaSellTokens] Selling ${params.tokenAmount} tokens`,
+				);
 
 				const transaction = await buildSellTransaction(
 					connection,
@@ -561,6 +542,11 @@ export function useSolanaSellTokens() {
 						minSolOut,
 					},
 				);
+
+				// Fresh blockhash right before signing (same as used for confirm)
+				const { blockhash, lastValidBlockHeight } =
+					await connection.getLatestBlockhash("confirmed");
+				transaction.recentBlockhash = blockhash;
 
 				// Sign with wallet
 				const connector =
@@ -574,35 +560,27 @@ export function useSolanaSellTokens() {
 				setIsSelling(false);
 				setIsConfirming(true);
 
-				// Send
+				// Send with retries — devnet can drop transactions
 				const signature = await connection.sendRawTransaction(
 					signedTx.serialize(),
 					{
-						skipPreflight: false,
-						preflightCommitment: "confirmed",
+						skipPreflight: true,
+						maxRetries: 3,
 					},
 				);
 				setTxSignature(signature);
 
-				// Confirm
-				const latestBlockhash =
-					await connection.getLatestBlockhash("confirmed");
+				// Confirm using the SAME blockhash used in the transaction
 				await connection.confirmTransaction(
 					{
 						signature,
-						blockhash: latestBlockhash.blockhash,
-						lastValidBlockHeight:
-							latestBlockhash.lastValidBlockHeight,
+						blockhash,
+						lastValidBlockHeight,
 					},
 					"confirmed",
 				);
 
 				setIsConfirming(false);
-				setIsConfirmed(true);
-				console.log(
-					"[useSolanaSellTokens] Sell confirmed:",
-					signature,
-				);
 
 				// Fetch updated bonding curve state to calculate actual SOL received
 				let actualSolReceived = minSolOut.toString(); // fallback to minSolOut
@@ -616,25 +594,26 @@ export function useSolanaSellTokens() {
 					if (solDelta > BigInt(0)) {
 						actualSolReceived = solDelta.toString();
 					}
-					console.log("[useSolanaSellTokens] SOL received:", actualSolReceived);
 				} catch (e) {
 					console.warn("[useSolanaSellTokens] Could not fetch updated curve state, using fallback");
 				}
 
-				// Report trade to backend for stats, chart, and WebSocket updates
+				// Sync trade to backend for stats, chart, and WebSocket updates
 				try {
-					await recordOnChainTrade({
-						tokenId: params.tokenAddress,
-						bondingCurveAddress: params.bondingCurveAddress,
-						type: "sell",
-						maticAmount: actualSolReceived,
-						tokenAmount: tokenSmallest.toString(),
+					await syncTrade({
 						txHash: signature,
+						tokenId: params.tokenAddress,
+					chainId: chainId ?? 901,
+						type: "sell",
+						nativeAmount: actualSolReceived,
+						tokenAmount: tokenSmallest.toString(),
 					});
-					console.log("[useSolanaSellTokens] Trade reported to backend");
 				} catch (reportErr) {
-					console.warn("[useSolanaSellTokens] Failed to report trade:", reportErr);
+					// Non-critical: trade will be picked up by backend polling
 				}
+
+				// Set confirmed AFTER syncTrade completes to prevent useEffect race condition
+				setIsConfirmed(true);
 
 				return signature;
 			} catch (err) {
@@ -650,7 +629,7 @@ export function useSolanaSellTokens() {
 				return null;
 			}
 		},
-		[primaryWallet, rpcUrl],
+		[primaryWallet, rpcUrl, chainId],
 	);
 
 	return {
@@ -697,10 +676,7 @@ export function useSolanaTokenBalance(
 
 		try {
 			setIsLoading(true);
-			const connection = getConnectionFromWalletOrConfig(
-				primaryWallet ?? null,
-				rpcUrl,
-			);
+			const connection = getProxyConnection(rpcUrl);
 
 			const mint = new PublicKey(tokenAddress);
 			const owner = new PublicKey(walletAddress);
@@ -732,7 +708,7 @@ export function useSolanaTokenBalance(
 		} finally {
 			setIsLoading(false);
 		}
-	}, [tokenAddress, walletAddress, primaryWallet, rpcUrl]);
+	}, [tokenAddress, walletAddress, rpcUrl]);
 
 	useEffect(() => {
 		fetchBalance();
@@ -800,48 +776,20 @@ export function useSolanaNativeBalance() {
 		try {
 			setIsLoading(true);
 
-			// Prefer direct RPC call for reliability across wallet switches
-			if (wallet && isSolanaWallet(wallet)) {
-				// Use Dynamic's connector getBalance - returns SOL as string
-				const solanaConnector =
-					wallet.connector as unknown as SolanaWalletConnector;
-				const balanceSol = await solanaConnector.getBalance(address);
+			// Always use the backend proxy — never the wallet connector's
+			// internal RPC which points at public endpoints like
+			// api.mainnet-beta.solana.com and returns 403 Forbidden.
+			const connection = getProxyConnection(rpcUrl);
+			const pubkey = new PublicKey(address);
+			const lamports = await connection.getBalance(pubkey);
+			const solFloat = lamports / 1e9;
 
-				if (balanceSol === undefined || balanceSol === null) {
-					setData(undefined);
-					return;
-				}
-
-				const solFloat = parseFloat(balanceSol);
-				const lamports = BigInt(Math.round(solFloat * 1e9));
-
-				setData({
-					value: lamports,
-					decimals: 9,
-					symbol: "SOL",
-					formatted: solFloat.toFixed(9),
-				});
-			} else {
-				// Fallback: direct RPC call when Dynamic wallet is not Solana type
-				// This happens when user switches chains in our UI but Dynamic
-				// primaryWallet hasn't changed yet
-				try {
-					const connection = getSolanaConnection(rpcUrl);
-					const pubkey = new PublicKey(address);
-					const lamports = await connection.getBalance(pubkey);
-					const solFloat = lamports / 1e9;
-
-					setData({
-						value: BigInt(lamports),
-						decimals: 9,
-						symbol: "SOL",
-						formatted: solFloat.toFixed(9),
-					});
-				} catch {
-					// Address might not be a valid Solana pubkey
-					setData(undefined);
-				}
-			}
+			setData({
+				value: BigInt(lamports),
+				decimals: 9,
+				symbol: "SOL",
+				formatted: solFloat.toFixed(9),
+			});
 			setError(null);
 		} catch (err) {
 			console.error(
@@ -853,6 +801,7 @@ export function useSolanaNativeBalance() {
 					? err
 					: new Error("Failed to fetch SOL balance"),
 			);
+			
 			setData(undefined);
 		} finally {
 			setIsLoading(false);
@@ -892,10 +841,7 @@ export function useSolanaBondingCurveState(tokenAddress?: string) {
 
 		try {
 			setIsLoading(true);
-			const connection = getConnectionFromWalletOrConfig(
-				primaryWallet ?? null,
-				rpcUrl,
-			);
+			const connection = getProxyConnection(rpcUrl);
 
 			const tokenMint = new PublicKey(tokenAddress);
 			const [factoryStatePDA] = findFactoryStatePDA();
@@ -905,7 +851,14 @@ export function useSolanaBondingCurveState(tokenAddress?: string) {
 			setData(curveState);
 			setError(null);
 		} catch (err) {
-			console.error("[useSolanaBondingCurveState] Failed to fetch:", err);
+			// "not found" is expected when the token doesn't have a bonding
+			// curve on the current chain — log as warn, not error.
+			const msg = err instanceof Error ? err.message : String(err);
+			if (msg.includes("not found")) {
+				console.warn("[useSolanaBondingCurveState]", msg);
+			} else {
+				console.error("[useSolanaBondingCurveState] Failed to fetch:", err);
+			}
 			setError(
 				err instanceof Error
 					? err
@@ -915,7 +868,7 @@ export function useSolanaBondingCurveState(tokenAddress?: string) {
 		} finally {
 			setIsLoading(false);
 		}
-	}, [tokenAddress, primaryWallet, rpcUrl]);
+	}, [tokenAddress, rpcUrl]);
 
 	useEffect(() => {
 		fetchState();

@@ -35,7 +35,7 @@ export const DEFAULT_SLOPE = BigInt(10_000);
 /** Default base price in lamports (matches on-chain DEFAULT_BASE_PRICE) */
 export const DEFAULT_BASE_PRICE = BigInt(1_000_000);
 /** Token decimals */
-export const TOKEN_DECIMALS = 6;
+export const TOKEN_DECIMALS = 9;
 
 /**
  * Solana RPC URL — routes through the backend proxy so private API keys
@@ -46,6 +46,16 @@ const SOLANA_DEVNET_CHAIN_ID = 901;
 export const SOLANA_RPC_PROXY_URL = `${API_URL}/api/v1/rpc/${SOLANA_DEVNET_CHAIN_ID}`;
 /** @deprecated Use SOLANA_RPC_PROXY_URL — kept for any external callers */
 export const SOLANA_DEVNET_RPC = SOLANA_RPC_PROXY_URL;
+
+/**
+ * Build the backend RPC proxy URL for any Solana chain ID.
+ * 900 = mainnet, 901 = devnet, 902 = testnet.
+ * Falls back to 901 (devnet) when chainId is not a Solana chain.
+ */
+export function getSolanaRpcProxyUrl(chainId?: number | null): string {
+	const solChainId = chainId && chainId >= 900 && chainId <= 999 ? chainId : 901;
+	return `${API_URL}/api/v1/rpc/${solChainId}`;
+}
 
 // ─── Anchor Instruction Discriminators ───────────────────────────
 // Computed as sha256("global:<instruction_name>")[0..8]
@@ -349,8 +359,7 @@ export async function fetchBondingCurveState(
 	connection: Connection,
 	bondingCurvePDA: PublicKey,
 ): Promise<BondingCurveData> {
-	const accountInfo = await connection.getAccountInfo(bondingCurvePDA);
-
+	const accountInfo = await connection.getAccountInfo(bondingCurvePDA); 
 	if (!accountInfo) {
 		throw new Error("Bonding curve state not found.");
 	}

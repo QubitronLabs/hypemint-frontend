@@ -128,9 +128,8 @@ export function TradeTape({
 	const formatAmount = (amount: string | undefined | null, isTokenAmount = false) => {
 		if (!amount) return "0";
 		if (isSolana) {
-			// Solana: raw units need proper conversion
-			// Token: 6 decimals (SPL), Native: 9 decimals (lamports)
-			const divisor = isTokenAmount ? 1e6 : 1e9;
+			// Solana: native (SOL) = 9 decimals (lamports), tokens = 9 decimals
+			const divisor = 1e9;
 			const val = parseFloat(amount) / divisor;
 			return formatNumber(val);
 		}

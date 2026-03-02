@@ -31,7 +31,8 @@ import {
 	useUserCreatedTokens,
 } from "@/hooks/useUsers";
 import { cn } from "@/lib/utils";
-import { getAddressUrl, isSolanaChain, SOLANA_DEVNET_CHAIN_ID } from "@/lib/wagmi/config";
+import { getAddressUrl, isSolanaChain } from "@/lib/wagmi/config";
+import { useChainId as useAppChainId } from "@/lib/network";
 
 interface UserProfilePageProps {
 	params: Promise<{ address: string }>;
@@ -40,6 +41,7 @@ interface UserProfilePageProps {
 export default function UserProfilePage({ params }: UserProfilePageProps) {
 	const { address } = use(params);
 	const { isAuthenticated, walletAddress } = useAuth();
+	const solanaChainId = useAppChainId();
 
 	const [copied, setCopied] = useState(false);
 	const [activeTab, setActiveTab] = useState("tokens");
@@ -212,7 +214,7 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
 								{shortAddress}
 							</button>
 							<a
-								href={getAddressUrl(address, address.startsWith("0x") ? undefined : SOLANA_DEVNET_CHAIN_ID)}
+								href={getAddressUrl(address, address.startsWith("0x") ? undefined : (solanaChainId ?? 901))}
 								target="_blank"
 								rel="noopener noreferrer"
 								className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"

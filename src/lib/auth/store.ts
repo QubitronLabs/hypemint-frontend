@@ -139,7 +139,7 @@ export const useAuthStore = create<AuthState>()(
             }),
             // Called after hydration is complete
             onRehydrateStorage: () => (state) => {
-                console.log('[Auth] Hydration complete, jwt:', state?.jwt ? 'present' : 'none');
+                
                 state?.setHasHydrated(true);
             },
         }

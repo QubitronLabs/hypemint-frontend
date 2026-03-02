@@ -79,7 +79,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
 	useAuth,
-	useCreateToken,
 	useCreateTokenOnChain,
 	useCreateTokenRequest,
 	useCreationFee,
@@ -102,7 +101,7 @@ import {
 	type ChainTokenomics,
 } from "@/lib/api/tokens";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
-import { useActiveChainType, useChainId as useDynamicChainId } from "@/lib/network";
+import { useActiveChainType, useChainId as useDynamicChainId, useNetworkHasHydrated } from "@/lib/network";
 import { useNetwork as useDynamicNetwork } from "@/lib/network";
 import type { ChainType } from "@/lib/network";
 
@@ -129,6 +128,8 @@ interface TokenPreviewProps {
 	initialPriceUsd?: number;
 	initialMcapUsd?: number;
 	graduationThresholdUsd?: number;
+	graduationMultiplier?: number;
+	nativeSymbol?: string;
 }
 
 function TokenPreviewCard({
@@ -143,6 +144,8 @@ function TokenPreviewCard({
 	initialPriceUsd,
 	initialMcapUsd,
 	graduationThresholdUsd,
+	graduationMultiplier,
+	nativeSymbol,
 }: TokenPreviewProps) {
 	const hasSocialLinks = websiteUrl || twitterUrl || telegramUrl;
 
@@ -254,6 +257,7 @@ function TokenPreviewCard({
 						{graduationThresholdUsd ? (
 							<p className="text-[10px] text-muted-foreground mt-1 text-right">
 								Graduation at {formatMcap(graduationThresholdUsd)}
+								{/* {graduationMultiplier ? ` (${graduationMultiplier}× initial mcap)` : ""} */}
 							</p>
 						) : null}
 					</div>
@@ -372,6 +376,7 @@ export function TokenCreationForm() {
 	const walletChainId = useWagmiChainId();
 	const dynamicChainId = useDynamicChainId();
 	const dynamicNetwork = useDynamicNetwork();
+	const networkHasHydrated = useNetworkHasHydrated();
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	// ========================================================================
@@ -417,15 +422,12 @@ export function TokenCreationForm() {
 	} = useBuyTokens();
 
 	/** Backend API mutation for storing token metadata */
-	const createTokenApi = useCreateToken();
-
-	/** Gasless token creation — backend signs the on-chain tx */
+	/** Gasless token creation — backend signs the on-chain tx (EVM + Solana) */
 	const createTokenRequestApi = useCreateTokenRequest();
 	const isGaslessCreating = createTokenRequestApi.isPending;
 
 	// === Solana-specific Hooks ===
 	const {
-		createToken: solanaCreateToken,
 		isCreating: isSolanaCreating,
 		isConfirming: isSolanaConfirming,
 		txSignature: solanaTxSignature,
@@ -537,19 +539,30 @@ export function TokenCreationForm() {
 	 * check is only needed for actual token creation.
 	 */
 	useEffect(() => {
+		// Wait for network store hydration to avoid fetching with stale/wrong chainId.
+		// Before hydration, dynamicChainId is null — wagmi's chainId (EVM-only) would be
+		// used as fallback, which is incorrect when the user is on Solana.
+		if (!networkHasHydrated) return;
+
+		let cancelled = false;
+
 		async function fetchTokenomics() {
 			try {
 				// Use the user's actual chain ID for preview data.
 				// Prefer Dynamic SDK chain (reactive), then wagmi, then default.
 				const previewChainId = dynamicChainId ?? walletChainId ?? DEFAULT_CHAIN_ID;
 				const data = await getChainTokenomics(previewChainId);
-				setTokenomics(data);
+				if (!cancelled) {
+					setTokenomics(data);
+				}
 			} catch (err) {
 				console.error("Failed to fetch tokenomics:", err);
 			}
 		}
 		fetchTokenomics();
-	}, [dynamicChainId, walletChainId]);
+
+		return () => { cancelled = true; };
+	}, [dynamicChainId, walletChainId, networkHasHydrated]);
 
 	/**
 	 * Effect: Check Symbol Availability
@@ -596,6 +609,10 @@ export function TokenCreationForm() {
 	 * Uses bonding curve math to calculate the token allocation.
 	 */
 	useEffect(() => {
+		if (!networkHasHydrated) return;
+
+		let cancelled = false;
+
 		async function fetchSupplyPreview() {
 			if (
 				!wantInitialBuy ||
@@ -611,17 +628,25 @@ export function TokenCreationForm() {
 				const previewChainId = dynamicChainId ?? walletChainId ?? DEFAULT_CHAIN_ID;
 				const preview =
 					await getInitialSupplyPreview(debouncedBuyAmount, previewChainId);
-				setSupplyPreview(preview);
+				if (!cancelled) {
+					setSupplyPreview(preview);
+				}
 			} catch (error) {
 				console.error("Failed to fetch supply preview:", error);
-				setSupplyPreview(null);
+				if (!cancelled) {
+					setSupplyPreview(null);
+				}
 			} finally {
-				setIsLoadingPreview(false);
+				if (!cancelled) {
+					setIsLoadingPreview(false);
+				}
 			}
 		}
 
 		fetchSupplyPreview();
-	}, [debouncedBuyAmount, wantInitialBuy, dynamicChainId, walletChainId]);
+
+		return () => { cancelled = true; };
+	}, [debouncedBuyAmount, wantInitialBuy, dynamicChainId, walletChainId, networkHasHydrated]);
 
 	// ========================================================================
 	// COMPUTED VALUES
@@ -866,77 +891,44 @@ export function TokenCreationForm() {
 			}
 
 			// ================================================================
-			//  SOLANA ON-CHAIN FLOW
+			//  SOLANA GASLESS FLOW: Backend signs the transaction
 			// ================================================================
 			toast.info("Creating token on Solana...", {
 				id: "create-token",
 			});
 
-			let tokenAddress: string | undefined;
-			let bondingCurveAddress: string | undefined;
-			let resultTxHash: string | undefined;
+			try {
+				// Use the network store's chain ID (900=mainnet, 901=devnet)
+				// instead of getDeploymentByChainType which always returns the first active entry.
+				const targetChainId = dynamicChainId ?? 901;
 
-			{
-				// ── Solana Flow ──
-				const solanaResult = await solanaCreateToken({
+				// Call gasless endpoint — backend signs & submits the Solana tx
+				const result = await createTokenRequestApi.mutateAsync({
 					name,
 					symbol: symbol.toUpperCase(),
-					imageURI: finalImageUrl || "",
-					description: description || "",
+					description,
+					imageUrl: finalImageUrl,
+					websiteUrl: websiteUrl || undefined,
+					twitterUrl: twitterUrl || undefined,
+					telegramUrl: telegramUrl || undefined,
 					hypeBoostEnabled,
+					chainId: targetChainId,
 				});
 
-				if (!solanaResult) {
-					// Error already set by the hook
-					return;
-				}
+				const backendTokenId = result.token.id;
+				const bondingCurveAddr = result.bondingCurve?.contractAddress;
 
-				tokenAddress = solanaResult.tokenAddress;
-				bondingCurveAddress = solanaResult.bondingCurveAddress;
-				resultTxHash = solanaResult.txSignature;
-			}
-
-			if (tokenAddress && resultTxHash) {
 				toast.success("Token created successfully!", {
 					id: "create-token",
-					description: `Transaction: ${resultTxHash.slice(0, 10)}...`,
+					description: `Tx: ${result.txHash.slice(0, 10)}...`,
 				});
 
-				// Step 3: Store metadata in backend
-				// Solana chain ID
-				const targetChainId = getDeploymentByChainType("SOLANA")?.chainId ?? 901;
-
-				let backendTokenId: string = tokenAddress;
-				try {
-					const apiResult = await createTokenApi.mutateAsync({
-						name,
-						symbol: symbol.toUpperCase(),
-						description,
-						imageUrl: finalImageUrl,
-						websiteUrl: websiteUrl || undefined,
-						twitterUrl: twitterUrl || undefined,
-						telegramUrl: telegramUrl || undefined,
-						totalSupply: "1000000000",
-						initialPrice: "0.00001",
-						chainId: targetChainId,
-						contractAddress: tokenAddress,
-						bondingCurveAddress: bondingCurveAddress || "",
-						hypeBoostEnabled,
-					});
-
-					if (apiResult.id) {
-						backendTokenId = apiResult.id;
-					}
-				} catch (apiError) {
-					console.warn("Failed to store token metadata:", apiError);
-				}
-
-				// Step 4: Initial buy (dev buy) if enabled
-				// This makes the creator the first token holder
+				// Optional initial buy (dev buy) — user signs from their Solana wallet
 				if (
 					wantInitialBuy &&
 					initialBuyAmount &&
-					parseFloat(initialBuyAmount) > 0
+					parseFloat(initialBuyAmount) > 0 &&
+					bondingCurveAddr
 				) {
 					setIsInitialBuying(true);
 					toast.info("Making initial purchase...", {
@@ -944,41 +936,34 @@ export function TokenCreationForm() {
 					});
 
 					try {
-						if (bondingCurveAddress) {
-							// Solana initial buy
-							const buySignature = await solanaBuyTokens({
-								bondingCurveAddress,
-								solAmount: initialBuyAmount,
-							});
+						const buySignature = await solanaBuyTokens({
+							bondingCurveAddress: bondingCurveAddr,
+							solAmount: initialBuyAmount,
+						});
 
-							if (buySignature) {
-								toast.success("Initial purchase successful!", {
-									id: "initial-buy",
-									description: `You now own ${symbol.toUpperCase()} tokens!`,
-								});
-							}
+						if (buySignature) {
+							toast.success("Initial purchase successful!", {
+								id: "initial-buy",
+								description: `You now own ${symbol.toUpperCase()} tokens!`,
+							});
 						}
 					} catch (buyErr) {
 						console.error("Initial buy failed:", buyErr);
 						toast.error(
 							"Initial purchase failed, but token was created",
-							{
-								id: "initial-buy",
-							},
+							{ id: "initial-buy" },
 						);
 					} finally {
 						setIsInitialBuying(false);
 					}
 				}
 
-				if (backendTokenId) {
-					router.push(`/token/${backendTokenId}`);
-				} else {
-					toast.warning(
-						"Token created but couldn't get ID. Check homepage.",
-					);
-					router.push("/");
-				}
+				router.push(`/token/${backendTokenId}`);
+				return;
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : "Failed to create token on Solana";
+				toast.error(msg, { id: "create-token" });
+				return;
 			}
 		} catch (error) {
 			console.error("Failed to create token:", error);
@@ -1561,8 +1546,8 @@ export function TokenCreationForm() {
 							</div>
 						</div>
 
-						{/* Gasless Creation Info (EVM only) */}
-						{isAuthenticated && !isSolana && (
+						{/* Gasless Creation Info (All chains) */}
+						{isAuthenticated && (
 							<div className="bg-muted/50 rounded-xl p-4">
 								<div className="flex items-center gap-3 mb-2">
 									<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10 border border-green-500/20">
@@ -1667,8 +1652,8 @@ export function TokenCreationForm() {
 								</>
 							) : (
 								<>
-									<Rocket className="h-5 w-5" />
-									Launch Token on Solana
+									<Zap className="h-5 w-5" />
+									Create Token on Solana (Free — No Gas!)
 								</>
 							)}
 						</Button>
@@ -1693,6 +1678,8 @@ export function TokenCreationForm() {
 							initialPriceUsd={tokenomics?.initialPriceUsd}
 							initialMcapUsd={tokenomics?.initialMcapUsd}
 							graduationThresholdUsd={tokenomics?.graduationThresholdUsd}
+							graduationMultiplier={tokenomics?.graduationMultiplier}
+							nativeSymbol={tokenomics?.nativeSymbol}
 						/>
 					</motion.div>
 				</div>

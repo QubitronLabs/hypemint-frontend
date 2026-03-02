@@ -50,8 +50,7 @@ export const useNetworkStore = create<NetworkStoreState>()(
 			activeChainType: "EVM" as ChainType,
 			_hasHydrated: false,
 
-			setNetworkData: (data) => {
-				console.log("[Network] Setting network data:", data);
+			setNetworkData: (data) => { 
 				set({
 					network: data.network,
 					chainId: data.chainId,
@@ -61,8 +60,7 @@ export const useNetworkStore = create<NetworkStoreState>()(
 				});
 			},
 
-			clearNetworkData: () => {
-				console.log("[Network] Clearing network data");
+			clearNetworkData: () => { 
 				set({
 					network: null,
 					chainId: null,
@@ -76,8 +74,7 @@ export const useNetworkStore = create<NetworkStoreState>()(
 				set({ chainLogo: logo });
 			},
 
-			setChainType: (chainType) => {
-				console.log("[Network] Setting chain type:", chainType);
+			setChainType: (chainType) => { 
 				set({ activeChainType: chainType });
 			},
 
@@ -94,12 +91,7 @@ export const useNetworkStore = create<NetworkStoreState>()(
 				activeChainType: state.activeChainType,
 			}),
 			onRehydrateStorage: () => (state) => {
-				console.log(
-					"[Network] Hydration complete, chainId:",
-					state?.chainId || "none",
-					"chainType:",
-					state?.activeChainType || "EVM",
-				);
+				 
 				state?.setHasHydrated(true);
 			},
 		},

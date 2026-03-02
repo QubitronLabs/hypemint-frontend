@@ -113,8 +113,8 @@ export async function getToken(id: string): Promise<Token | null> {
 
     // Determine chain-specific divisors
     const isSolana = token.chainType === "SOLANA";
-    // Token decimals: Solana SPL = 6, EVM ERC20 = 18
-    const tokenDecimalsDivisor = isSolana ? 1e6 : 1e18;
+    // Token decimals: Solana = 9, EVM ERC20 = 18
+    const tokenDecimalsDivisor = isSolana ? 1e9 : 1e18;
     // Native currency divisor: SOL = 1e9 (lamports), ETH/MATIC = 1e18 (wei)
     const nativeDivisor = isSolana ? 1e9 : 1e18;
 

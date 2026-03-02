@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useEffect, useCallback } from "react";
+import { use, useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -112,6 +112,15 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 
 	// Get holders from blockchain data
 	const holders = holdersData?.holders || [];
+
+	// Get user's backend CPMM token balance for sell panel (Solana on-chain SPL balance is 0)
+	const userBackendTokenBalance = useMemo(() => {
+		if (!walletAddress || holders.length === 0) return undefined;
+		const entry = holders.find(
+			(h) => h.address?.toLowerCase() === walletAddress.toLowerCase(),
+		);
+		return entry?.balance; // raw 9-decimal string
+	}, [walletAddress, holders]);
 
 	// Fetch creator profile to check if current user is following them
 	const creatorAddress = token?.creator?.walletAddress;
@@ -377,7 +386,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 
 	const handleCopy = () => {
 		if (!token) return;
-		navigator.clipboard.writeText(token.id);
+		navigator.clipboard.writeText(token.contractAddress as string);
 		setCopied(true);
 		setTimeout(() => setCopied(false), 2000);
 	};
@@ -669,7 +678,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 									) : (
 										<Copy className="h-3.5 w-3.5" />
 									)}
-									{formatAddress(token.id)}
+									{formatAddress(token.contractAddress as string)}
 								</Button>
 								<Button
 									variant="outline"
@@ -822,7 +831,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 															if (athMcapUsd >= 1_000) return (athMcapUsd / 1_000).toFixed(2) + "K";
 															return athMcapUsd.toFixed(2);
 														})()}
-													</span>
+													</span>	
 												</TooltipTrigger>
 												<TooltipContent
 													side="top"
@@ -1085,6 +1094,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							currentPrice={token.currentPrice || "0.00001"}
 							chainType={token.chainType === "SOLANA" ? "SOLANA" : "EVM"}
 							chainId={token.chainId}
+							backendTokenBalance={userBackendTokenBalance}
 						/>
 					</motion.div>
 					)}
@@ -1177,10 +1187,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 									Reserve
 								</span>
 								<span className="text-sm font-mono tabular-nums">
-									{token.chainType === "SOLANA"
-										? (Number(token.currentBondingAmount || "0") / 1e9).toFixed(4)
-										: fromWei(token.currentBondingAmount || "0").toFixed(4)
-									}{" "}
+									{Number(token.currentBondingAmount || "0").toFixed(4)}{" "}
 									{token.nativeCurrency?.symbol}
 								</span>
 							</div>

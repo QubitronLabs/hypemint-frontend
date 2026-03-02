@@ -28,6 +28,10 @@ export async function syncTrade(params: {
   txHash: string;
   tokenId: string;
   chainId?: number;
+  /** Optional fields for Solana trades */
+  type?: "buy" | "sell";
+  tokenAmount?: string;
+  nativeAmount?: string;
 }): Promise<{ synced: boolean; tradeId?: string; reason?: string }> {
   try {
     const { data } = await apiClient.post("/api/v1/trades/sync", params);
@@ -51,6 +55,30 @@ export async function getTradeQuote(
   });
   // Handle wrapped response
   return data.data ?? data;
+}
+
+/**
+ * Get a CPMM quote for buying tokens with a native amount (Solana flow).
+ * Input: how much native (SOL) to spend → output: how many tokens received.
+ */
+export async function getQuoteFromNative(
+  tokenId: string,
+  nativeAmount: string,
+  chainId?: number,
+): Promise<{ tokenAmount: string; pricePerToken: string; newPrice: string }> {
+  const { data } = await apiClient.post("/api/v1/trades/quote", {
+    tokenId,
+    type: "buy",
+    amount: "0",
+    nativeAmount,
+    chainId,
+  });
+  const result = data.data ?? data;
+  return {
+    tokenAmount: result.tokenAmount || "0",
+    pricePerToken: result.pricePerToken || "0",
+    newPrice: result.newPrice || result.pricePerToken || "0",
+  };
 }
 
 /**

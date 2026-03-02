@@ -12,8 +12,8 @@ import { useBlockNumber, useChainId } from "wagmi";
 import { Activity, Wifi, WifiOff, Database, Zap, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { useActiveChainType } from "@/lib/network";
-import { getChainDisplayName, SOLANA_DEVNET_CHAIN_ID } from "@/lib/wagmi/config";
+import { useActiveChainType, useChainId as useAppChainId } from "@/lib/network";
+import { getChainDisplayName } from "@/lib/wagmi/config";
 
 interface BlockchainStatusProps {
   className?: string;
@@ -50,6 +50,7 @@ export function BlockchainStatus({
 }: BlockchainStatusProps) {
   const chainId = useChainId();
   const activeChainType = useActiveChainType();
+  const appChainId = useAppChainId();
   const { data: blockNumber, isLoading: blockLoading } = useBlockNumber({
     watch: true,
     query: {
@@ -60,7 +61,7 @@ export function BlockchainStatus({
 
   const isSolana = activeChainType === "SOLANA";
   const chainName = isSolana
-    ? getChainDisplayName(SOLANA_DEVNET_CHAIN_ID)
+    ? getChainDisplayName(appChainId ?? 901)
     : getChainDisplayName(chainId);
 
   if (compact) {
