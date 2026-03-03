@@ -22,7 +22,7 @@ import {
 	DEFAULT_CREATION_FEE,
 	DEFAULT_SLIPPAGE_BPS,
 } from "@/lib/contracts";
-import { ACTIVE_CHAIN_ID, getActiveEvmChainId } from "@/lib/contracts/config";
+import { ACTIVE_CHAIN_ID } from "@/lib/contracts/config";
 import { useContractConfigStore } from "./useContractConfig";
 import { useChainId as useNetworkChainId } from "@/lib/network";
 import { useAuth } from "./useAuth";

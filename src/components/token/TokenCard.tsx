@@ -137,10 +137,9 @@ export function TokenCard({ token, className }: TokenCardProps) {
 	const priceChange5m = useMemo(() => {
 		const raw = token.priceChange5m;
 		if (raw === undefined || raw === null) return 0;
-		const val = typeof raw === "string" ? parseFloat(raw) : raw;
+		const val = typeof raw === "string" ? Number(raw) : raw;
 		return isNaN(val) ? 0 : val;
 	}, [token.priceChange5m]);
-
 	const priceChange5mPositive = priceChange5m >= 0;
 
 	// ATH progress bar colors
@@ -195,14 +194,16 @@ export function TokenCard({ token, className }: TokenCardProps) {
 					"flex gap-2 sm:gap-3",
 					className,
 				)}
-			> 
-
+			>
 				{/* Graduated Badge - Top Right Corner */}
 				{isGraduated && (
 					<div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 z-10">
 						<span className="inline-flex items-center gap-0.5 px-1.5 sm:px-2 py-0.5 rounded-md bg-green-500/20 text-green-400 text-[8px] sm:text-[10px] font-semibold border border-green-500/30 backdrop-blur-sm">
 							<GraduationCap className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-							<span className="sm:hidden lg:inline"> GRADUATED</span>
+							<span className="sm:hidden lg:inline">
+								{" "}
+								GRADUATED
+							</span>
 						</span>
 					</div>
 				)}
@@ -267,8 +268,8 @@ export function TokenCard({ token, className }: TokenCardProps) {
 									: "text-[#ff4444]",
 							)}
 						>
-							({priceChangePositive ? "+" : ""}
-							{priceChange.toFixed(2)}%)
+							({priceChangePositive ? "↑" : "↓"}{" "}
+							{formattedPriceChange})
 						</span>
 					</div>
 
@@ -313,7 +314,11 @@ export function TokenCard({ token, className }: TokenCardProps) {
 								className="bg-[#1a1a1a] text-white border border-[#333] px-3 py-2 rounded-lg text-[11px] max-w-50 shadow-xl"
 							>
 								<p className="font-medium text-white/90">
-									ATH Progress ({athProgress.toFixed(1)}%)
+									ATH Progress (
+									{String(athProgress).match(
+										/^-?\d+(?:\.\d{0,2})?/,
+									)?.[0] ?? athProgress.toFixed(2)}
+									%)
 								</p>
 								<p className="text-white/50 mt-0.5">
 									Current price / all-time high price
@@ -330,8 +335,8 @@ export function TokenCard({ token, className }: TokenCardProps) {
 											: "text-[#ff4444]",
 									)}
 								>
-									{priceChange5mPositive ? "+" : ""}
-									{priceChange5m.toFixed(1)}%
+									{priceChange5mPositive ? "↑" : "↓"}{" "}
+									{Math.abs(priceChange5m).toFixed(2)}%
 								</span>
 							</TooltipTrigger>
 							<TooltipContent
