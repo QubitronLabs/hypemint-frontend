@@ -48,6 +48,19 @@ export const SOLANA_RPC_PROXY_URL = `${API_URL}/api/v1/rpc/${SOLANA_DEVNET_CHAIN
 export const SOLANA_DEVNET_RPC = SOLANA_RPC_PROXY_URL;
 
 /**
+ * Public Solana WebSocket endpoints for each cluster.
+ * The backend RPC proxy only handles HTTP, but @solana/web3.js Connection
+ * needs a WebSocket endpoint for subscription-based features like
+ * confirmTransaction.  Without this it auto-derives `ws://host:PORT+1`
+ * which fails for our proxy and forces slow HTTP polling.
+ */
+const SOLANA_WS_ENDPOINTS: Record<number, string> = {
+	900: process.env.NEXT_PUBLIC_SOLANA_WS_MAINNET || "wss://api.mainnet-beta.solana.com",
+	901: process.env.NEXT_PUBLIC_SOLANA_WS_DEVNET || "wss://api.devnet.solana.com",
+	902: "wss://api.testnet.solana.com",
+};
+
+/**
  * Build the backend RPC proxy URL for any Solana chain ID.
  * 900 = mainnet, 901 = devnet, 902 = testnet.
  * Falls back to 901 (devnet) when chainId is not a Solana chain.
@@ -807,8 +820,17 @@ function createAssociatedTokenAccountInstruction(
  * Create a Solana connection.
  * When no rpcUrl is provided the backend RPC proxy is used so
  * private API keys never leave the server.
+ *
+ * The wsEndpoint is set to the public Solana WebSocket endpoint
+ * for the matching cluster so confirmTransaction uses fast
+ * WebSocket subscriptions instead of slow HTTP polling.
  */
-export function getSolanaConnection(rpcUrl?: string | null): Connection {
+export function getSolanaConnection(rpcUrl?: string | null, chainId?: number | null): Connection {
 	const url = rpcUrl || SOLANA_RPC_PROXY_URL;
-	return new Connection(url, "confirmed");
+	const solChainId = chainId && chainId >= 900 && chainId <= 999 ? chainId : 901;
+	const wsEndpoint = SOLANA_WS_ENDPOINTS[solChainId] || SOLANA_WS_ENDPOINTS[901];
+	return new Connection(url, {
+		commitment: "confirmed",
+		wsEndpoint,
+	});
 }

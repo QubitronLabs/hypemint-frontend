@@ -136,7 +136,7 @@ function AuthSync({ children }: { children: ReactNode }) {
             lastWalletRef.current = currentWallet; 
           }
         }
-      } catch (error) { 
+      } catch (error){ 
       } finally {
         setLoading(false);
         isSyncingRef.current = false;

@@ -28,11 +28,13 @@ import {
 	findATA,
 	findFactoryStatePDA,
 	findBondingCurvePDA,
+	findCurveVaultPDA,
 	type BondingCurveData,
 	type CreateTokenParams as ProgramCreateTokenParams,
 } from "@/lib/solana/program";
 import { useActiveChainType, useChainId } from "@/lib/network";
 import { syncTrade } from "@/lib/api/trades";
+import { toast } from "sonner";
 
 // ============================================
 // Robust Transaction Confirmation
@@ -79,8 +81,8 @@ async function confirmTransactionRobust(
 			confirmErr instanceof Error ? confirmErr.message : confirmErr,
 		);
 
-		const MAX_POLLS = 10;
-		const POLL_INTERVAL_MS = 3000;
+		const MAX_POLLS = 6;
+		const POLL_INTERVAL_MS = 2000;
 		for (let i = 0; i < MAX_POLLS; i++) {
 			await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
 			try {
@@ -92,7 +94,9 @@ async function confirmTransactionRobust(
 							`${label} failed on-chain: ${JSON.stringify(status.err)}`,
 						);
 					}
+					// Accept "processed" — fast enough for UI; backend verifies independently
 					if (
+						status.confirmationStatus === "processed" ||
 						status.confirmationStatus === "confirmed" ||
 						status.confirmationStatus === "finalized"
 					) {
@@ -129,6 +133,74 @@ async function confirmTransactionRobust(
 		throw new Error(
 			`${label} confirmation timed out. The transaction may still be processing — please check your wallet and try again.`,
 		);
+	}
+}
+
+// ============================================
+// Rent-Exempt Safety for Sell
+// ============================================
+
+/**
+ * Minimum lamports a system-owned PDA must retain to stay rent-exempt.
+ * A 0-data-byte system account needs 890,880 lamports.
+ * We use a slightly higher value (1_000_000 = 0.001 SOL) for safety margin.
+ */
+const RENT_EXEMPT_MIN_LAMPORTS = 1_000_000n; // ~0.001 SOL
+
+/**
+ * Replicate the on-chain LINEAR bonding curve sell formula:
+ *   grossSol = slope * N * (S - N/2) + basePrice * N
+ *
+ * This is used to predict how much SOL the vault would need to pay out,
+ * so we can cap the sell amount to keep the vault above rent-exempt.
+ */
+function estimateGrossSolForSell(
+	tokenAmount: bigint,
+	currentSupply: bigint,
+	slope: bigint,
+	basePrice: bigint,
+): bigint {
+	if (tokenAmount <= 0n) return 0n;
+	const n = tokenAmount;
+	const s = currentSupply;
+	const halfN = n / 2n;
+	const sMinusHalf = s - halfN;
+	if (sMinusHalf <= 0n) return 0n; // safety
+	const slopeComponent = slope * n * sMinusHalf;
+	const baseComponent = basePrice * n;
+	return slopeComponent + baseComponent;
+}
+
+// ============================================
+// Network Mismatch Detection
+// ============================================
+
+/**
+ * Show a one-time toast when Phantom is on mainnet but the app expects devnet.
+ * Phantom shows a scary "Not enough SOL" warning because it simulates the
+ * transaction on mainnet where devnet accounts don't exist.  The transaction
+ * still goes through our devnet proxy — clicking "Confirm anyway" is safe.
+ *
+ * There is NO programmatic API to switch Phantom's network.  The user must
+ * enable Testnet Mode manually:  Phantom → Settings → Developer Settings →
+ * Testnet Mode.
+ */
+async function warnIfNetworkMismatch(
+	connector: SolanaWalletConnector,
+	appChainId: number | null | undefined,
+): Promise<void> {
+	// Only relevant when the app is on devnet (chainId 901)
+	if (!appChainId || appChainId !== 901) return;
+	try {
+		const cluster = await connector.getNetwork();
+		if (cluster && cluster !== "devnet") {
+			toast.info(
+				'Your Phantom is on mainnet. Click "Confirm anyway" in the popup — the transaction goes to Devnet safely.\n\nTo remove this warning permanently:\nPhantom → Settings → Developer Settings → Testnet Mode',
+				{ duration: 10000, id: "phantom-network-mismatch" },
+			);
+		}
+	} catch {
+		// getNetwork() not supported by this wallet — skip silently
 	}
 }
 
@@ -188,9 +260,12 @@ function useSolanaRpcUrl(): string {
  * getWalletClient() because it returns a Connection pointing at
  * public RPCs (e.g. api.mainnet-beta.solana.com) which return
  * 403 Forbidden without an API key.
+ *
+ * The chainId is forwarded to getSolanaConnection so it can
+ * set the correct wsEndpoint for fast WebSocket confirmations.
  */
-function getProxyConnection(rpcUrl: string): Connection {
-	return getSolanaConnection(rpcUrl);
+function getProxyConnection(rpcUrl: string, chainId?: number | null): Connection {
+	return getSolanaConnection(rpcUrl, chainId);
 }
 
 // ============================================
@@ -200,6 +275,7 @@ function getProxyConnection(rpcUrl: string): Connection {
 export function useSolanaCreateToken() {
 	const { primaryWallet } = useDynamicContext();
 	const rpcUrl = useSolanaRpcUrl();
+	const chainId = useChainId();
 	const [isCreating, setIsCreating] = useState(false);
 	const [isConfirming, setIsConfirming] = useState(false);
 	const [isConfirmed, setIsConfirmed] = useState(false);
@@ -232,7 +308,7 @@ export function useSolanaCreateToken() {
 				const creatorPubkey = new PublicKey(walletAddress);
 
 				// Get connection via backend proxy (never use wallet's direct RPC)
-				const connection = getProxyConnection(rpcUrl);
+				const connection = getProxyConnection(rpcUrl, chainId);
 
 				console.log(
 					"[useSolanaCreateToken] Building create_token transaction...",
@@ -274,6 +350,7 @@ export function useSolanaCreateToken() {
 				// Get the signer from Dynamic.xyz
 				const connector =
 					primaryWallet.connector as unknown as SolanaWalletConnector;
+
 				const signer = await connector.getSigner();
 
 				if (!signer) {
@@ -396,7 +473,7 @@ export function useSolanaBuyTokens() {
 				}
 
 				const buyerPubkey = new PublicKey(walletAddress);
-				const connection = getProxyConnection(rpcUrl);
+				const connection = getProxyConnection(rpcUrl, chainId);
 
 				// Fetch the bonding curve state to get the token mint
 				const bondingCurvePubkey = new PublicKey(
@@ -447,6 +524,7 @@ export function useSolanaBuyTokens() {
 				// Sign with wallet
 				const connector =
 					primaryWallet.connector as unknown as SolanaWalletConnector;
+
 				const signer = await connector.getSigner();
 				if (!signer) {
 					throw new Error("Failed to get Solana signer.");
@@ -571,21 +649,45 @@ export function useSolanaSellTokens() {
 				}
 
 				const sellerPubkey = new PublicKey(walletAddress);
-				const connection = getProxyConnection(rpcUrl);
+				const connection = getProxyConnection(rpcUrl, chainId);
 
 				const tokenMint = new PublicKey(params.tokenAddress);
 
-				// Convert token amount (string with decimals) to smallest unit
-				// Token uses 9 decimals in the CPMM system
+				// The backend CPMM uses 9 decimals for Solana tokens, but the
+				// on-chain Anchor program uses TOKEN_DECIMALS = 6.  We convert
+				// the user's input (human-readable CPMM tokens) to BOTH formats:
+				//   - cpmmSmallest  (9-decimal) → sent to backend syncTrade
+				//   - onChainAmount (6-decimal) → sent to the on-chain program
 				const tokenFloat = parseFloat(params.tokenAmount);
-				const tokenSmallest = BigInt(
-					Math.round(tokenFloat * 1_000_000_000),
+				let cpmmSmallest = BigInt(
+					Math.round(tokenFloat * 1_000_000_000), // 9 decimals
+				);
+				let onChainAmount = BigInt(
+					Math.round(tokenFloat * 1_000_000), // 6 decimals (on-chain)
 				);
 
-				if (tokenSmallest <= 0n) {
+				if (cpmmSmallest <= 0n) {
 					throw new Error(
 						"Amount too small. Minimum is 0.000000001 tokens.",
 					);
+				}
+
+				// Read the user's ACTUAL on-chain ATA balance (6-decimal) and
+				// cap the sell amount — the on-chain program will reject any
+				// amount exceeding its tracked total_supply.
+				const sellerATA = findATA(sellerPubkey, tokenMint);
+				try {
+					const ataBalanceResp = await connection.getTokenAccountBalance(sellerATA);
+					const ataBalance = BigInt(ataBalanceResp.value.amount); // raw 6-decimal
+					if (onChainAmount > ataBalance) {
+						onChainAmount = ataBalance;
+					}
+				} catch {
+					// ATA might not exist, will fail at the sell instruction
+				}
+
+				if (onChainAmount <= 0n) {
+					throw new Error("No on-chain token balance to sell.");
 				}
 
 				// Fetch bonding curve state BEFORE the sell to calculate slippage + actual SOL received
@@ -606,29 +708,78 @@ export function useSolanaSellTokens() {
 					console.warn("[useSolanaSellTokens] Could not fetch pre-sell curve state");
 				}
 
-				// Calculate min SOL out with slippage protection
-				// If explicit minSol provided, use it; otherwise estimate from curve state
-				let minSolOut: bigint;
-				if (params.minSol) {
-					minSolOut = BigInt(Math.round(parseFloat(params.minSol) * 1_000_000_000));
-				} else if (curveStateBefore) {
-					// Calculate expected SOL from bonding curve math, apply slippage tolerance
-					const slippageBps = params.slippageBps ?? 100; // default 1%
-					const expectedSol = calculateSolForTokens(
-						tokenSmallest,
-						curveStateBefore.totalSupply,
-						curveStateBefore.slope,
-						curveStateBefore.basePrice,
-					);
-					minSolOut = expectedSol > 0n
-						? expectedSol - (expectedSol * BigInt(slippageBps) / 10_000n)
-						: 0n;
-				} else {
-					minSolOut = 0n;
+				// ── Rent-exempt guard ───────────────────────────────────
+				// The on-chain sell drains SOL from the curve_vault PDA.
+				// If the vault's remaining lamports fall below rent-exempt
+				// minimum (~890,880 lamports), Solana rejects with
+				// InsufficientFundsForRent.  We query the vault balance
+				// and, if a full sell would drain it, reduce the amount.
+				if (curveStateBefore) {
+					const [curveVaultPDA] = findCurveVaultPDA(bondingCurvePDA);
+					try {
+						const vaultBalance = BigInt(
+							await connection.getBalance(curveVaultPDA),
+						);
+						const grossSol = estimateGrossSolForSell(
+							onChainAmount,
+							curveStateBefore.totalSupply,
+							curveStateBefore.slope,
+							curveStateBefore.basePrice,
+						);
+						const maxWithdrawable =
+							vaultBalance > RENT_EXEMPT_MIN_LAMPORTS
+								? vaultBalance - RENT_EXEMPT_MIN_LAMPORTS
+								: 0n;
+
+						if (grossSol > maxWithdrawable && onChainAmount > 1n) {
+							// Binary search for the maximum safe sell amount
+							let lo = 1n;
+							let hi = onChainAmount;
+							while (lo < hi) {
+								const mid = (lo + hi + 1n) / 2n;
+								const midSol = estimateGrossSolForSell(
+									mid,
+									curveStateBefore.totalSupply,
+									curveStateBefore.slope,
+									curveStateBefore.basePrice,
+								);
+								if (midSol <= maxWithdrawable) {
+									lo = mid;
+								} else {
+									hi = mid - 1n;
+								}
+							}
+							const safeSellAmount = lo;
+							console.warn(
+								`[useSolanaSellTokens] Capping sell from ${onChainAmount} to ${safeSellAmount} to keep vault rent-exempt (vault: ${vaultBalance} lamports, grossSol: ${grossSol})`,
+							);
+							const originalOnChain = onChainAmount;
+							onChainAmount = safeSellAmount;
+							// Adjust CPMM amount proportionally (9-decimal)
+							cpmmSmallest = (cpmmSmallest * safeSellAmount) / originalOnChain;
+							const ratio = Number(safeSellAmount) / (tokenFloat * 1_000_000);
+							if (ratio < 1) {
+								toast.info(
+									`Selling ~${(ratio * 100).toFixed(1)}% of tokens to keep the vault rent-exempt.`,
+									{ duration: 6000, id: "rent-exempt-cap" },
+								);
+							}
+						}
+					} catch (vaultErr) {
+						console.warn(
+							"[useSolanaSellTokens] Could not check vault balance for rent guard:",
+							vaultErr,
+						);
+					}
 				}
 
+				// Use minSolOut=0 because the on-chain LINEAR curve gives
+				// different SOL amounts than the backend CPMM predicts.
+				// The backend syncTrade will compute the authoritative CPMM amounts.
+				const minSolOut = 0n;
+
 				console.log(
-					`[useSolanaSellTokens] Selling ${params.tokenAmount} tokens`,
+					`[useSolanaSellTokens] Selling ${params.tokenAmount} tokens (on-chain: ${onChainAmount})`,
 				);
 
 				const transaction = await buildSellTransaction(
@@ -636,7 +787,7 @@ export function useSolanaSellTokens() {
 					sellerPubkey,
 					{
 						tokenMint,
-						tokenAmount: tokenSmallest,
+						tokenAmount: onChainAmount,
 						minSolOut,
 					},
 				);
@@ -649,6 +800,11 @@ export function useSolanaSellTokens() {
 				// Sign with wallet
 				const connector =
 					primaryWallet.connector as unknown as SolanaWalletConnector;
+
+				// Warn if Phantom is on mainnet — sell simulation will fail on mainnet
+				// because devnet token accounts don't exist there.  The tx still works.
+				await warnIfNetworkMismatch(connector, chainId);
+
 				const signer = await connector.getSigner();
 				if (!signer) {
 					throw new Error("Failed to get Solana signer.");
@@ -692,6 +848,7 @@ export function useSolanaSellTokens() {
 				}
 
 				// Sync trade to backend for stats, chart, and WebSocket updates
+				// Pass the CPMM-format token amount so backend can compute correct CPMM sell
 				try {
 					await syncTrade({
 						txHash: signature,
@@ -699,7 +856,7 @@ export function useSolanaSellTokens() {
 					chainId: chainId ?? 901,
 						type: "sell",
 						nativeAmount: actualSolReceived,
-						tokenAmount: tokenSmallest.toString(),
+						tokenAmount: cpmmSmallest.toString(),
 					});
 				} catch (reportErr) {
 					// Non-critical: trade will be picked up by backend polling
