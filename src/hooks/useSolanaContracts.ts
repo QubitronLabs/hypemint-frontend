@@ -16,7 +16,7 @@ import {
 	isSolanaWallet,
 	type SolanaWalletConnector,
 } from "@dynamic-labs/solana";
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey, SystemProgram } from "@solana/web3.js";
 
 import {
 	buildCreateTokenTransaction,
@@ -142,10 +142,10 @@ async function confirmTransactionRobust(
 
 /**
  * Minimum lamports a system-owned PDA must retain to stay rent-exempt.
- * A 0-data-byte system account needs 890,880 lamports.
- * We use a slightly higher value (1_000_000 = 0.001 SOL) for safety margin.
+ * A 0-data-byte system account needs exactly 890,880 lamports.
+ * We add a tiny buffer (10,000 = 0.00001 SOL) to avoid edge rounding.
  */
-const RENT_EXEMPT_MIN_LAMPORTS = 1_000_000n; // ~0.001 SOL
+const RENT_EXEMPT_MIN_LAMPORTS = 900_880n;
 
 /**
  * Replicate the on-chain LINEAR bonding curve sell formula:
@@ -164,8 +164,8 @@ function estimateGrossSolForSell(
 	const n = tokenAmount;
 	const s = currentSupply;
 	const halfN = n / 2n;
+	if (s <= halfN) return 0n; // safety — shouldn't happen
 	const sMinusHalf = s - halfN;
-	if (sMinusHalf <= 0n) return 0n; // safety
 	const slopeComponent = slope * n * sMinusHalf;
 	const baseComponent = basePrice * n;
 	return slopeComponent + baseComponent;
@@ -659,7 +659,7 @@ export function useSolanaSellTokens() {
 				//   - cpmmSmallest  (9-decimal) → sent to backend syncTrade
 				//   - onChainAmount (6-decimal) → sent to the on-chain program
 				const tokenFloat = parseFloat(params.tokenAmount);
-				let cpmmSmallest = BigInt(
+				const cpmmSmallest = BigInt(
 					Math.round(tokenFloat * 1_000_000_000), // 9 decimals
 				);
 				let onChainAmount = BigInt(
@@ -708,14 +708,14 @@ export function useSolanaSellTokens() {
 					console.warn("[useSolanaSellTokens] Could not fetch pre-sell curve state");
 				}
 
-				// ── Rent-exempt guard ───────────────────────────────────
-				// The on-chain sell drains SOL from the curve_vault PDA.
-				// If the vault's remaining lamports fall below rent-exempt
-				// minimum (~890,880 lamports), Solana rejects with
-				// InsufficientFundsForRent.  We query the vault balance
-				// and, if a full sell would drain it, reduce the amount.
+				// ── Vault rent top-up: instead of capping the sell amount, we
+				// top up the vault with a tiny SOL transfer so the vault stays
+				// rent-exempt (~0.001 SOL) after the on-chain sell drains it.
+				// This is prepended as the FIRST instruction in the transaction.
+				const [curveVaultPDA] = findCurveVaultPDA(bondingCurvePDA);
+				let vaultTopUp = 0n;
+
 				if (curveStateBefore) {
-					const [curveVaultPDA] = findCurveVaultPDA(bondingCurvePDA);
 					try {
 						const vaultBalance = BigInt(
 							await connection.getBalance(curveVaultPDA),
@@ -726,49 +726,18 @@ export function useSolanaSellTokens() {
 							curveStateBefore.slope,
 							curveStateBefore.basePrice,
 						);
-						const maxWithdrawable =
-							vaultBalance > RENT_EXEMPT_MIN_LAMPORTS
-								? vaultBalance - RENT_EXEMPT_MIN_LAMPORTS
-								: 0n;
-
-						if (grossSol > maxWithdrawable && onChainAmount > 1n) {
-							// Binary search for the maximum safe sell amount
-							let lo = 1n;
-							let hi = onChainAmount;
-							while (lo < hi) {
-								const mid = (lo + hi + 1n) / 2n;
-								const midSol = estimateGrossSolForSell(
-									mid,
-									curveStateBefore.totalSupply,
-									curveStateBefore.slope,
-									curveStateBefore.basePrice,
-								);
-								if (midSol <= maxWithdrawable) {
-									lo = mid;
-								} else {
-									hi = mid - 1n;
-								}
-							}
-							const safeSellAmount = lo;
-							console.warn(
-								`[useSolanaSellTokens] Capping sell from ${onChainAmount} to ${safeSellAmount} to keep vault rent-exempt (vault: ${vaultBalance} lamports, grossSol: ${grossSol})`,
+						const needed = grossSol + RENT_EXEMPT_MIN_LAMPORTS;
+						if (vaultBalance < needed) {
+							vaultTopUp = needed - vaultBalance;
+							console.log(
+								`[useSolanaSellTokens] Vault needs top-up of ${vaultTopUp} lamports ` +
+								`(vault: ${vaultBalance}, grossSol: ${grossSol}, rent: ${RENT_EXEMPT_MIN_LAMPORTS})`,
 							);
-							const originalOnChain = onChainAmount;
-							onChainAmount = safeSellAmount;
-							// Adjust CPMM amount proportionally (9-decimal)
-							cpmmSmallest = (cpmmSmallest * safeSellAmount) / originalOnChain;
-							const ratio = Number(safeSellAmount) / (tokenFloat * 1_000_000);
-							if (ratio < 1) {
-								toast.info(
-									`Selling ~${(ratio * 100).toFixed(1)}% of tokens to keep the vault rent-exempt.`,
-									{ duration: 6000, id: "rent-exempt-cap" },
-								);
-							}
 						}
-					} catch (vaultErr) {
+					} catch (err) {
 						console.warn(
 							"[useSolanaSellTokens] Could not check vault balance for rent guard:",
-							vaultErr,
+							err,
 						);
 					}
 				}
@@ -791,6 +760,23 @@ export function useSolanaSellTokens() {
 						minSolOut,
 					},
 				);
+
+				// If the vault needs a SOL top-up for rent-exempt, prepend a
+				// SystemProgram.transfer instruction BEFORE the sell instruction.
+				// This ensures the vault has enough SOL to stay rent-exempt
+				// after the on-chain program transfers grossSol out.
+				if (vaultTopUp > 0n) {
+					const topUpIx = SystemProgram.transfer({
+						fromPubkey: sellerPubkey,
+						toPubkey: curveVaultPDA,
+						lamports: Number(vaultTopUp),
+					});
+					// Prepend so the vault is funded before sell executes
+					transaction.instructions.unshift(topUpIx);
+					console.log(
+						`[useSolanaSellTokens] Prepended vault top-up of ${vaultTopUp} lamports (~${(Number(vaultTopUp) / 1e9).toFixed(6)} SOL)`,
+					);
+				}
 
 				// Fresh blockhash right before signing (same as used for confirm)
 				const { blockhash, lastValidBlockHeight } =
