@@ -748,7 +748,33 @@ export function OnChainTradingPanel({
 						isHighImpact: false,
 						isUnreasonable: !isFinite(estimatedTokens) || estimatedTokens > 1e18,
 					};
+				} else if (solanaCurveState) {
+					// Use on-chain LINEAR bonding curve formula for accurate sell estimate.
+					// The CPMM spot price overestimates because it uses a different model.
+					// Formula: grossSol = slope * N * (S - N/2) + basePrice * N
+					const nRaw = BigInt(Math.round(parsedAmount * 1e6)); // 6-decimal raw
+					const s = solanaCurveState.totalSupply;
+					const n = nRaw > s ? s : nRaw; // cap at total supply
+					if (n > 0n) {
+						const halfN = n / 2n;
+						const sMinusHalf = s > halfN ? s - halfN : 0n;
+						const grossSolLamports =
+							solanaCurveState.slope * n * sMinusHalf +
+							solanaCurveState.basePrice * n;
+						// Show gross amount (before protocol fees) — matches Phantom's
+						// simulation display. Fees (2%) are deducted on-chain separately.
+						const grossSol = Number(grossSolLamports) / 1e9;
+						return {
+							outputAmount: grossSol,
+							fees: grossSol * feePct,
+							effectivePrice: parsedAmount > 0 ? grossSol / parsedAmount : 0,
+							priceImpact: 0,
+							isHighImpact: false,
+							isUnreasonable: !isFinite(grossSol) || grossSol > 1e9,
+						};
+					}
 				} else {
+					// Fallback: CPMM spot price (less accurate)
 					const grossSol = parsedAmount * price;
 					const netSol = grossSol * (1 - feePct);
 					return {
