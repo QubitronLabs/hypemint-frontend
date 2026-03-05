@@ -735,6 +735,9 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 									<p className="text-xs text-muted-foreground">
 										ATH Progress
 									</p>
+									{(token.tradesCount ?? 0) === 0 ? (
+										<span className="text-sm font-semibold text-muted-foreground/60">N/A</span>
+									) : (
 									<div className="flex items-center gap-2">
 										<TooltipProvider>
 											<Tooltip>
@@ -843,6 +846,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 											</Tooltip>
 										</TooltipProvider>
 									</div>
+									)}
 								</div>
 							</div>
 						</div>

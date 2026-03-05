@@ -52,7 +52,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { formatEther, parseEther, formatUnits, parseUnits as viemParseUnits, type Address } from "viem";
 import {
 	Upload,
@@ -101,7 +101,7 @@ import {
 	type ChainTokenomics,
 } from "@/lib/api/tokens";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
-import { useActiveChainType, useChainId as useDynamicChainId, useNetworkHasHydrated } from "@/lib/network";
+import { useActiveChainType, useChainId as useDynamicChainId, useNetworkHasHydrated, useChainLogo } from "@/lib/network";
 import { useNetwork as useDynamicNetwork } from "@/lib/network";
 import type { ChainType } from "@/lib/network";
 
@@ -377,6 +377,7 @@ export function TokenCreationForm() {
 	const dynamicChainId = useDynamicChainId();
 	const dynamicNetwork = useDynamicNetwork();
 	const networkHasHydrated = useNetworkHasHydrated();
+	const chainLogo = useChainLogo();
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	// ========================================================================
@@ -470,8 +471,11 @@ export function TokenCreationForm() {
 	 */
 	const [initialBuyAmount, setInitialBuyAmount] = useState<string>("");
 
-	/** Whether user wants to make an initial purchase */
-	const [wantInitialBuy, setWantInitialBuy] = useState(false);
+	/** Input mode for initial purchase: enter native currency amount or token amount */
+	const [inputMode, setInputMode] = useState<"native" | "token">("native");
+
+	/** Token amount input (when inputMode === "token") */
+	const [tokenInputValue, setTokenInputValue] = useState("");
 
 	/**
 	 * Preview data showing estimated tokens to receive for initial buy.
@@ -615,7 +619,6 @@ export function TokenCreationForm() {
 
 		async function fetchSupplyPreview() {
 			if (
-				!wantInitialBuy ||
 				!debouncedBuyAmount ||
 				parseFloat(debouncedBuyAmount) <= 0
 			) {
@@ -646,18 +649,28 @@ export function TokenCreationForm() {
 		fetchSupplyPreview();
 
 		return () => { cancelled = true; };
-	}, [debouncedBuyAmount, wantInitialBuy, dynamicChainId, walletChainId, networkHasHydrated]);
+	}, [debouncedBuyAmount, dynamicChainId, walletChainId, networkHasHydrated]);
 
 	// ========================================================================
 	// COMPUTED VALUES
 	// ========================================================================
+
+	/** Derived: whether user wants an initial purchase (non-empty amount > 0) */
+	const wantInitialBuy = !!initialBuyAmount && parseFloat(initialBuyAmount) > 0;
+
+	/** Max mintable token validation */
+	const exceedsMaxMintable = !!(
+		supplyPreview &&
+		supplyPreview.estimatedTokens > 793_100_000
+	);
 
 	/** Form is valid when required fields are filled and symbol is available */
 	const isFormValid =
 		name.length >= 2 &&
 		symbol.length >= 2 &&
 		symbol.length <= 10 &&
-		symbolAvailable !== false;
+		symbolAvailable !== false &&
+		!exceedsMaxMintable;
 
 	/**
 	 * Total cost calculation:
@@ -778,6 +791,43 @@ export function TokenCreationForm() {
 			setIsUploading(false);
 		}
 	}, [imageFile, imageUrl]);
+
+	// ========================================================================
+	// INITIAL PURCHASE HANDLERS
+	// ========================================================================
+
+	/** Toggle between SOL and token input modes */
+	const toggleInputMode = useCallback(() => {
+		setInputMode((prev) => (prev === "native" ? "token" : "native"));
+		setInitialBuyAmount("");
+		setTokenInputValue("");
+		setSupplyPreview(null);
+	}, []);
+
+	/** Handle amount change in either SOL or token input mode */
+	const handleBuyAmountChange = useCallback(
+		(e: React.ChangeEvent<HTMLInputElement>) => {
+			const val = e.target.value;
+			if (inputMode === "native") {
+				setInitialBuyAmount(val);
+				setTokenInputValue("");
+			} else {
+				setTokenInputValue(val);
+				const tokenAmt = parseFloat(val);
+				if (
+					!isNaN(tokenAmt) &&
+					tokenAmt > 0 &&
+					tokenomics?.initialPriceNative
+				) {
+					const solNeeded = tokenAmt * tokenomics.initialPriceNative;
+					setInitialBuyAmount(solNeeded.toFixed(9));
+				} else {
+					setInitialBuyAmount("");
+				}
+			}
+		},
+		[inputMode, tokenomics?.initialPriceNative],
+	);
 
 	// ========================================================================
 	// FORM SUBMISSION
@@ -939,18 +989,17 @@ export function TokenCreationForm() {
 						const buySignature = await solanaBuyTokens({
 							bondingCurveAddress: bondingCurveAddr,
 							solAmount: initialBuyAmount,
+							tokenId: backendTokenId,
 						});
 
-						if (buySignature) {
-							toast.success("Initial purchase successful!", {
-								id: "initial-buy",
-								description: `You now own ${symbol.toUpperCase()} tokens!`,
-							});
-						}
+						toast.success("Initial purchase successful!", {
+							id: "initial-buy",
+							description: `You now own ${symbol.toUpperCase()} tokens!`,
+						});
 					} catch (buyErr) {
 						console.error("Initial buy failed:", buyErr);
 						toast.error(
-							"Initial purchase failed, but token was created",
+							`Initial purchase failed: ${buyErr instanceof Error ? buyErr.message : "Unknown error"}. Token was created successfully.`,
 							{ id: "initial-buy" },
 						);
 					} finally {
@@ -1282,268 +1331,132 @@ export function TokenCreationForm() {
 									</span>
 								</button>
 
-								{/* Initial Buy (Dev Buy) Section */}
-								<div className="border border-border rounded-lg overflow-hidden">
-									<button
-										type="button"
-										disabled={!isAuthenticated}
-										onClick={() =>
-											setWantInitialBuy(!wantInitialBuy)
-										}
-										className={cn(
-											"w-full p-4 flex flex-col items-start gap-3 transition-colors",
-											"disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-muted/10",
-											!isAuthenticated
-												? "bg-muted/10"
-												: wantInitialBuy
-													? "bg-primary/5"
-													: "bg-muted/30 hover:bg-muted/50",
-										)}
-									>
-										<div className="flex-1 space-y-3 text-left">
-											<div className="flex items-start gap-3">
-												{" "}
-												<div
-													className={cn(
-														"w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
-														!isAuthenticated
-															? "bg-muted/50 text-muted-foreground/50"
-															: wantInitialBuy
-																? "bg-primary text-white"
-																: "bg-muted",
-													)}
-												>
-													<Coins className="h-5 w-5" />
-												</div>
-												{/*  */}
-												<div className="space-y-2">
-													<p className="flex items-center gap-3">
-														<span
-															className={cn(
-																"font-medium transition-colors",
-																!isAuthenticated &&
-																	"text-muted-foreground/70",
-															)}
-														>
-															Initial Purchase
-															(Dev Buy)
-														</span>
-														<span
-															className={cn(
-																"text-xs px-3 py-1.5 rounded-full font-medium transition-colors",
-																!isAuthenticated
-																	? "bg-muted/30 text-muted-foreground/50"
-																	: wantInitialBuy
-																		? "bg-primary text-white"
-																		: "bg-muted text-muted-foreground",
-															)}
-														>
-															{!isAuthenticated
-																? "Connect Wallet"
-																: wantInitialBuy
-																	? "Enabled"
-																	: "Optional"}
-														</span>
-													</p>
-													<p
-														className={cn(
-															"text-xs transition-colors",
-															!isAuthenticated
-																? "text-muted-foreground/50"
-																: "text-muted-foreground",
-														)}
-													>
-														Buy tokens immediately
-														after creation to seed
-														liquidity
-													</p>
-												</div>
-											</div>
-										</div>
-									</button>
+							</div>
+						</div>
 
-									<AnimatePresence>
-										{wantInitialBuy && (
-											<motion.div
-												initial={{
-													height: 0,
-													opacity: 0,
-												}}
-												animate={{
-													height: "auto",
-													opacity: 1,
-												}}
-												exit={{ height: 0, opacity: 0 }}
-												className="overflow-hidden"
-											>
-												<div className="p-4 border-t border-border space-y-4">
-													<div>
-														<label className="text-sm font-medium mb-1.5 block">
-															Amount to Buy (
-															{nativeSymbol})
-														</label>
-														<div className="relative">
-															<Input
-																type="number"
-																step="0.1"
-																min="0.01"
-																placeholder="0.5"
-																value={
-																	initialBuyAmount
-																}
-																onChange={(e) =>
-																	setInitialBuyAmount(
-																		e.target
-																			.value,
-																	)
-																}
-																className="h-11 pr-16 bg-background text-lg font-mono"
-															/>
-															<div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-																{nativeSymbol}
-															</div>
-														</div>
-													</div>
+						{/* Initial Purchase — pump.fun style (always visible, optional) */}
+						<div className="rounded-xl border border-border p-5 space-y-4">
+							<div>
+								<h3 className="text-sm font-semibold">
+									Choose how many{" "}
+									<span className="text-primary">
+										{symbol || "tokens"}
+									</span>{" "}
+									you want to buy{" "}
+									<span className="text-muted-foreground font-normal">
+										(optional)
+									</span>
+								</h3>
+								<p className="text-xs text-muted-foreground mt-1">
+									It&apos;s optional but buying a small
+									amount of coins helps protect your coin
+									from snipers
+								</p>
+							</div>
 
-													{/* Quick amount buttons */}
-													<div className="flex gap-2">
-														{[
-															"0.1",
-															"0.5",
-															"1",
-															"5",
-															"10",
-														].map((amt) => (
-															<button
-																key={amt}
-																type="button"
-																onClick={() =>
-																	setInitialBuyAmount(
-																		amt,
-																	)
-																}
-																className={cn(
-																	"flex-1 py-2 text-sm font-medium rounded-lg border transition-colors",
-																	initialBuyAmount ===
-																		amt
-																		? "bg-primary text-white border-primary"
-																		: "bg-muted/50 border-border hover:border-primary/50",
-																)}
-															>
-																{amt}{" "}
-																{nativeSymbol}
-															</button>
-														))}
-													</div>
+							{/* Switch input mode */}
+							<button
+								type="button"
+								onClick={toggleInputMode}
+								disabled={!isAuthenticated}
+								className="text-xs text-primary hover:underline font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+							>
+								Switch to{" "}
+								{inputMode === "native"
+									? symbol || "tokens"
+									: nativeSymbol}
+							</button>
 
-													{/* Initial Supply Preview */}
-													{wantInitialBuy &&
-														initialBuyAmount &&
-														parseFloat(
-															initialBuyAmount,
-														) > 0 && (
-															<motion.div
-																initial={{
-																	opacity: 0,
-																	y: -10,
-																}}
-																animate={{
-																	opacity: 1,
-																	y: 0,
-																}}
-																className="p-4 bg-linear-to-br from-primary/10 to-purple-500/10 border border-primary/20 rounded-xl"
-															>
-																<div className="flex items-center gap-2 mb-3">
-																	<TrendingUp className="h-4 w-4 text-primary" />
-																	<span className="text-sm font-medium">
-																		Estimated
-																		Token
-																		Allocation
-																	</span>
-																</div>
-
-																{isLoadingPreview ? (
-																	<div className="flex items-center gap-2 text-muted-foreground">
-																		<div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-																		<span className="text-sm">
-																			Calculating...
-																		</span>
-																	</div>
-																) : supplyPreview ? (
-																	<div className="space-y-2">
-																		<div className="flex justify-between items-center">
-																			<span className="text-sm text-muted-foreground">
-																				You
-																				will
-																				receive:
-																			</span>
-																			<span className="text-lg font-bold text-primary">
-																				{
-																					supplyPreview.estimatedTokensFormatted
-																				}
-																			</span>
-																		</div>
-																		<div className="flex justify-between items-center text-xs text-muted-foreground">
-																			<span>
-																				Starting
-																				Price:
-																			</span>
-																			<span className="font-mono">
-																				{
-																					supplyPreview.startingPriceFormatted
-																				}
-																			</span>
-																		</div>
-																		<div className="flex justify-between items-center text-xs text-muted-foreground">
-																			<span>
-																				Platform
-																				Fees:
-																			</span>
-																			<span className="font-mono">
-																				{
-																					supplyPreview.feesFormatted
-																				}
-																			</span>
-																		</div>
-																		<p className="text-xs text-muted-foreground/70 pt-1 border-t border-border/50">
-																			{
-																				supplyPreview.note
-																			}
-																		</p>
-																	</div>
-																) : (
-																	<p className="text-sm text-muted-foreground">
-																		Enter an
-																		amount
-																		to see
-																		estimated
-																		tokens
-																	</p>
-																)}
-															</motion.div>
-														)}
-
-													<div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-														<p className="text-xs text-blue-400">
-															<strong>
-																Pro tip:
-															</strong>{" "}
-															Initial purchases
-															help establish the
-															bonding curve and
-															show other traders
-															that you believe in
-															your token. This
-															amount will be added
-															to the creation fee.
-														</p>
-													</div>
-												</div>
-											</motion.div>
-										)}
-									</AnimatePresence>
+							{/* Amount input */}
+							<div className="relative">
+								<Input
+									type="number"
+									step={
+										inputMode === "native" ? "0.01" : "1"
+									}
+									min="0"
+									placeholder={
+										inputMode === "native" ? "0.0" : "0"
+									}
+									value={
+										inputMode === "native"
+											? initialBuyAmount
+											: tokenInputValue
+									}
+									onChange={handleBuyAmountChange}
+									disabled={!isAuthenticated}
+									className="h-12 pr-24 text-lg font-mono bg-background"
+								/>
+								<div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+									<span className="text-sm text-muted-foreground font-medium">
+										{inputMode === "native"
+											? nativeSymbol
+											: symbol || "TOKEN"}
+									</span>
+									{chainLogo && inputMode === "native" && (
+										<img
+											src={chainLogo}
+											alt=""
+											className="w-5 h-5 rounded-full"
+										/>
+									)}
 								</div>
 							</div>
+
+							{/* Preview: You receive / Cost */}
+							{isLoadingPreview ? (
+								<div className="flex items-center gap-2 text-muted-foreground">
+									<Loader2 className="w-3 h-3 animate-spin" />
+									<span className="text-sm">
+										Calculating...
+									</span>
+								</div>
+							) : supplyPreview && wantInitialBuy ? (
+								<p className="text-sm text-muted-foreground">
+									{inputMode === "native" ? (
+										<>
+											You receive:{" "}
+											<span className="font-semibold text-foreground">
+												{
+													supplyPreview.estimatedTokensFormatted
+												}
+											</span>{" "}
+											{symbol || "tokens"}
+										</>
+									) : (
+										<>
+											Cost:{" "}
+											<span className="font-semibold text-foreground">
+												~{initialBuyAmount}
+											</span>{" "}
+											{nativeSymbol}
+										</>
+									)}
+								</p>
+							) : null}
+
+							{/* Balance error */}
+							{isAuthenticated &&
+								wantInitialBuy &&
+								chainBalance &&
+								!hasEnoughBalance && (
+									<p className="text-sm text-red-500 font-medium">
+										Insufficient {nativeSymbol}: current
+										balance{" "}
+										{parseFloat(
+											chainBalance.formatted,
+										).toFixed(6)}
+									</p>
+								)}
+
+							{/* Max mintable error */}
+							{exceedsMaxMintable && (
+								<p className="text-sm text-red-500 font-medium">
+									Exceeds maximum mintable tokens
+									(793,100,000). Please reduce your
+									purchase amount.
+								</p>
+							)}
 						</div>
 
 						{/* Gasless Creation Info (All chains) */}

@@ -275,6 +275,9 @@ export function TokenCard({ token, className }: TokenCardProps) {
 
 					{/* Row 4: ATH Progress Bar + 5m Change */}
 					<div className="flex items-center gap-1.5 sm:gap-2 mt-1 sm:mt-1.5">
+						{(token.tradesCount ?? 0) === 0 ? (
+							<span className="text-[9px] sm:text-[10px] font-medium text-[#555] shrink-0">ATH: N/A</span>
+						) : (
 						<Tooltip>
 							<TooltipTrigger asChild>
 								<div className="relative flex-1 max-w-44 h-1.5 sm:h-2 bg-[#222] rounded-full  shrink-0 cursor-help">
@@ -325,6 +328,7 @@ export function TokenCard({ token, className }: TokenCardProps) {
 								</p>
 							</TooltipContent>
 						</Tooltip>
+						)}
 						<Tooltip>
 							<TooltipTrigger asChild>
 								<span

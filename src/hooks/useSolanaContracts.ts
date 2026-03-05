@@ -35,6 +35,104 @@ import { useActiveChainType, useChainId } from "@/lib/network";
 import { syncTrade } from "@/lib/api/trades";
 
 // ============================================
+// Robust Transaction Confirmation
+// ============================================
+
+/**
+ * Confirm a Solana transaction with a robust fallback strategy.
+ *
+ * Layer 1: Try `confirmTransaction` (fast, WebSocket-based).
+ * Layer 2: On timeout, poll `getSignatureStatuses` (reliable).
+ * Layer 3: Last resort — `getTransaction` to check if it landed.
+ *
+ * Solana devnet often has slow block times causing confirmTransaction
+ * to throw TransactionExpiredBlockheightExceededError even though
+ * the tx eventually lands on-chain.
+ */
+async function confirmTransactionRobust(
+	connection: Connection,
+	signature: string,
+	blockhash: string,
+	lastValidBlockHeight: number,
+	label: string = "Transaction",
+): Promise<void> {
+	try {
+		const result = await connection.confirmTransaction(
+			{ signature, blockhash, lastValidBlockHeight },
+			"confirmed",
+		);
+		if (result.value.err) {
+			throw new Error(
+				`${label} failed on-chain: ${JSON.stringify(result.value.err)}`,
+			);
+		}
+		return; // Confirmed successfully
+	} catch (confirmErr: unknown) {
+		// If it's our own "failed on-chain" error, re-throw immediately
+		if (confirmErr instanceof Error && confirmErr.message.includes("failed on-chain")) {
+			throw confirmErr;
+		}
+
+		// Timeout / block height exceeded — tx may still have landed.
+		console.warn(
+			`[${label}] confirmTransaction failed, polling status:`,
+			confirmErr instanceof Error ? confirmErr.message : confirmErr,
+		);
+
+		const MAX_POLLS = 10;
+		const POLL_INTERVAL_MS = 3000;
+		for (let i = 0; i < MAX_POLLS; i++) {
+			await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+			try {
+				const statusResp = await connection.getSignatureStatuses([signature]);
+				const status = statusResp?.value?.[0];
+				if (status) {
+					if (status.err) {
+						throw new Error(
+							`${label} failed on-chain: ${JSON.stringify(status.err)}`,
+						);
+					}
+					if (
+						status.confirmationStatus === "confirmed" ||
+						status.confirmationStatus === "finalized"
+					) {
+						return; // Confirmed via polling
+					}
+				}
+			} catch (pollErr: unknown) {
+				if (pollErr instanceof Error && pollErr.message.includes("failed on-chain")) {
+					throw pollErr;
+				}
+			}
+		}
+
+		// Last resort: getTransaction
+		try {
+			const txInfo = await connection.getTransaction(signature, {
+				commitment: "confirmed",
+				maxSupportedTransactionVersion: 0,
+			});
+			if (txInfo) {
+				if (txInfo.meta?.err) {
+					throw new Error(
+						`${label} failed on-chain: ${JSON.stringify(txInfo.meta.err)}`,
+					);
+				}
+				return; // Confirmed via getTransaction
+			}
+		} catch (getTxErr: unknown) {
+			if (getTxErr instanceof Error && getTxErr.message.includes("failed on-chain")) {
+				throw getTxErr;
+			}
+		}
+
+		throw new Error(
+			`${label} confirmation timed out. The transaction may still be processing — please check your wallet and try again.`,
+		);
+	}
+}
+
+// ============================================
 // Types (matching EVM hook signatures)
 // ============================================
 
@@ -56,6 +154,9 @@ export interface SolanaBuyParams {
 	bondingCurveAddress: string;
 	solAmount: string; // in SOL (not lamports)
 	slippageBps?: number;
+	/** Optional backend token ID (nanoid) for direct DB lookup in syncTrade.
+	 *  Used during initial purchase to avoid contractAddress lookup timing issues. */
+	tokenId?: string;
 }
 
 export interface SolanaSellParams {
@@ -212,13 +313,8 @@ export function useSolanaCreateToken() {
 				);
 
 				// Confirm using the SAME blockhash used in the transaction
-				await connection.confirmTransaction(
-					{
-						signature,
-						blockhash,
-						lastValidBlockHeight,
-					},
-					"confirmed",
+				await confirmTransactionRobust(
+					connection, signature, blockhash, lastValidBlockHeight, "Solana create",
 				);
 
 				console.log(
@@ -370,14 +466,9 @@ export function useSolanaBuyTokens() {
 				);
 				setTxSignature(signature);
 
-				// Confirm using the SAME blockhash used in the transaction
-				await connection.confirmTransaction(
-					{
-						signature,
-						blockhash,
-						lastValidBlockHeight,
-					},
-					"confirmed",
+				// Robust confirmation with polling fallback for devnet reliability
+				await confirmTransactionRobust(
+					connection, signature, blockhash, lastValidBlockHeight, "Solana buy",
 				);
 
 				setIsConfirming(false);
@@ -385,17 +476,23 @@ export function useSolanaBuyTokens() {
 				// Sync trade to backend for stats, chart, and WebSocket updates.
 				// The backend computes the CPMM token amount (on-chain gives wrong/0 tokens).
 				// We pass nativeAmount so the backend can use simulateBuyWithNative().
+				// Use params.tokenId (backend DB ID) if provided for direct lookup,
+				// otherwise fall back to the on-chain tokenMint address.
+				const syncTokenId = params.tokenId || curveState.tokenMint.toBase58();
 				try {
-					await syncTrade({
+					const syncResult = await syncTrade({
 						txHash: signature,
-						tokenId: curveState.tokenMint.toBase58(),
+						tokenId: syncTokenId,
 					chainId: chainId ?? 901,
 						type: "buy",
 						nativeAmount: lamports.toString(),
 						tokenAmount: "0", // Backend will compute via CPMM
 					});
+					if (!syncResult.synced) {
+						console.warn("[useSolanaBuyTokens] syncTrade not synced:", syncResult.reason);
+					}
 				} catch (reportErr) {
-					// Non-critical: trade will be picked up by backend polling
+					console.error("[useSolanaBuyTokens] syncTrade failed:", reportErr);
 				}
 
 				// Set confirmed AFTER syncTrade completes to prevent useEffect race condition
@@ -405,15 +502,16 @@ export function useSolanaBuyTokens() {
 				return signature;
 			} catch (err) {
 				console.error("[useSolanaBuyTokens] Error:", err);
-				setError(
+				const wrappedError =
 					err instanceof Error
 						? err
-						: new Error("Failed to buy Solana tokens"),
-				);
+						: new Error("Failed to buy Solana tokens");
+				setError(wrappedError);
 				setIsBuying(false);
 				setIsConfirming(false);
 				setIsFailed(true);
-				return null;
+				// Re-throw so callers can display the specific error message
+				throw wrappedError;
 			}
 		},
 		[primaryWallet, rpcUrl, chainId],
@@ -571,13 +669,8 @@ export function useSolanaSellTokens() {
 				setTxSignature(signature);
 
 				// Confirm using the SAME blockhash used in the transaction
-				await connection.confirmTransaction(
-					{
-						signature,
-						blockhash,
-						lastValidBlockHeight,
-					},
-					"confirmed",
+				await confirmTransactionRobust(
+					connection, signature, blockhash, lastValidBlockHeight, "Solana sell",
 				);
 
 				setIsConfirming(false);
