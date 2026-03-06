@@ -8,7 +8,6 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-// import { formatEther, type Address } from "viem";
 import {
 	Coins,
 	TrendingUp,
@@ -16,20 +15,16 @@ import {
 	Users,
 	BarChart3,
 	DollarSign,
-	Plus,
-	ExternalLink,
 	Sparkles,
 	Rocket,
 	Clock,
-	Zap,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { TokenImage } from "@/components/ui/token-image";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/hooks";
 import { useMyTokens } from "@/hooks/useTokens";
 import type { Token } from "@/types";
@@ -46,20 +41,12 @@ interface TokenStats {
 }
 
 // Format large numbers
-function formatNumber(num: number): string {
-	if (num >= 1e9) return (num / 1e9).toFixed(2) + "B";
-	if (num >= 1e6) return (num / 1e6).toFixed(2) + "M";
-	if (num >= 1e3) return (num / 1e3).toFixed(2) + "K";
-	return num.toFixed(2);
-}
+
 
 // Format currency
-function formatCurrency(num: number): string {
-	return "$" + formatNumber(num);
-}
 
 export function CreatorDashboard({ className }: CreatorDashboardProps) {
-	const { isAuthenticated, walletAddress } = useAuth();
+	const { isAuthenticated } = useAuth();
 	const [activeTab, setActiveTab] = useState("overview");
 
 	// Fetch user's created tokens directly from API

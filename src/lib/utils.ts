@@ -31,23 +31,44 @@ export function fromWei(weiStr: string | number | undefined | null): number {
   }
 }
 
+
+/**
+ * Truncates a number to the specified decimal places without rounding.
+ * @param n - The number to truncate.
+ * @param decimals - The number of decimal places to keep.
+ * @returns The truncated number as a string.
+ * @example
+ * truncateToDecimals(3234.98798789, 3) // "3234.987"
+ * truncateToDecimals(3234.98798789, 0) // "3234"
+ */
+export function truncateToDecimals(n: number, decimals: number): string {
+	if (decimals <= 0) return Math.trunc(n).toString();
+	const factor = Math.pow(10, decimals);
+	return (Math.trunc(n * factor) / factor).toString();
+}
+
 /**
  * Format large numbers with K, M, B, T suffixes
  * @param num - The number to format
  * @param decimals - Number of decimal places (default 2)
  */
-export function formatNumber(num: number, decimals: number = 2): string {
-  if (isNaN(num) || num === 0) return "0";
-  const absNum = Math.abs(num);
-  const sign = num < 0 ? "-" : "";
+export function formatNumber(num: number | string, decimals: number = 2): string {
+	const n = typeof num === "string" ? parseFloat(num) : num;
+	if (isNaN(n) || !isFinite(n)) return "0";
 
-  if (absNum >= 1e12) return `${sign}${(absNum / 1e12).toFixed(decimals)}T`;
-  if (absNum >= 1e9) return `${sign}${(absNum / 1e9).toFixed(decimals)}B`;
-  if (absNum >= 1e6) return `${sign}${(absNum / 1e6).toFixed(decimals)}M`;
-  if (absNum >= 1e3) return `${sign}${(absNum / 1e3).toFixed(decimals)}K`;
-  if (absNum < 0.0001 && absNum > 0) return `${sign}<0.0001`;
+	if (n >= 1e15) return truncateToDecimals(n / 1e15, decimals) + "Q";
+	if (n >= 1e12) return truncateToDecimals(n / 1e12, decimals) + "T";
+	if (n >= 1e9) return truncateToDecimals(n / 1e9, decimals) + "B";
+	if (n >= 1e6) return truncateToDecimals(n / 1e6, decimals) + "M";
+	if (n >= 1e3) return truncateToDecimals(n / 1e3, decimals) + "K";
 
-  return num.toFixed(decimals > 4 ? decimals : 4);
+	if (n < 0.00000001 && n > 0) return "<0.00000001";
+	if (n < 1 && n > 0) {
+		const truncated = truncateToDecimals(n, decimals < 8 ? 8 : decimals);
+		return truncated.replace(/0+$/, "").replace(/\.$/, ".0");
+	}
+
+	return truncateToDecimals(n, decimals);
 }
 
 /**
@@ -92,9 +113,10 @@ export function formatPrice(price: number | string | undefined | null): string {
  */
 export function formatMarketCap(
   value: string | number | undefined | null,
+  decimal?: number,
 ): string {
   const converted = fromWei(value);
-  return formatCurrency(converted);
+  return formatCurrency(converted,decimal);
 }
 
 /**

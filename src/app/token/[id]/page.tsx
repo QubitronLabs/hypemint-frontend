@@ -42,17 +42,14 @@ import {
 	BubbleMapDialog,
 	PostGraduationWidget,
 } from "@/components/token";
-import {
-	TradeTape,
-	OnChainTradingPanel,
-} from "@/components/trade";
+import { TradeTape, OnChainTradingPanel } from "@/components/trade";
 
 import { useToken, tokenKeys, useTokenHolders } from "@/hooks/useTokens";
 import { useTokenTrades, tradeKeys } from "@/hooks/useTrades";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useManualSync } from "@/hooks/useBlockchainSync";
 import { usePersistedTabs } from "@/hooks/usePersistedTabs";
-import {  useAuth } from "@/hooks";
+import { useAuth } from "@/hooks";
 import {
 	useFollowUser,
 	useUnfollowUser,
@@ -66,6 +63,7 @@ import {
 	formatVolume,
 	formatPrice,
 	fromWei,
+	truncateToDecimals,
 } from "@/lib/utils";
 import { getChainDisplayName } from "@/lib/wagmi/config";
 import type { Address } from "viem";
@@ -94,6 +92,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 
 	const { data: token, isLoading, error } = useToken(id);
 	const { data: tradesData } = useTokenTrades(id);
+	console.log("token", token);
 
 	// Ensure trades is always an array, even if data is undefined
 	const trades = tradesData || [];
@@ -265,17 +264,33 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						return {
 							...oldData,
 							currentPrice: message.data.price,
-							currentPriceUsd: message.data.priceUsd || (() => {
-								const np = parseFloat(oldData.nativePriceAtCreation || "0");
-								const p = message.data.price || oldData.currentPrice;
-								return np > 0 ? (parseFloat(p) * np).toFixed(18) : oldData.currentPriceUsd;
-							})(),
+							currentPriceUsd:
+								message.data.priceUsd ||
+								(() => {
+									const np = parseFloat(
+										oldData.nativePriceAtCreation || "0",
+									);
+									const p =
+										message.data.price ||
+										oldData.currentPrice;
+									return np > 0
+										? (parseFloat(p) * np).toFixed(18)
+										: oldData.currentPriceUsd;
+								})(),
 							marketCap: message.data.marketCap,
-							marketCapUsd: message.data.marketCapUsd || (() => {
-								const np = parseFloat(oldData.nativePriceAtCreation || "0");
-								const mc = message.data.marketCap || oldData.marketCap;
-								return np > 0 ? (parseFloat(mc) * np).toFixed(2) : oldData.marketCapUsd;
-							})(),
+							marketCapUsd:
+								message.data.marketCapUsd ||
+								(() => {
+									const np = parseFloat(
+										oldData.nativePriceAtCreation || "0",
+									);
+									const mc =
+										message.data.marketCap ||
+										oldData.marketCap;
+									return np > 0
+										? (parseFloat(mc) * np).toFixed(2)
+										: oldData.marketCapUsd;
+								})(),
 							holdersCount:
 								message.data.holdersCount ??
 								oldData.holdersCount,
@@ -341,13 +356,20 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						if (!oldData) return oldData;
 						const chainId = Number(oldData.chainId);
 						const nativePriceUsd = message.data.prices?.[chainId];
-						if (!nativePriceUsd || nativePriceUsd <= 0) return oldData;
+						if (!nativePriceUsd || nativePriceUsd <= 0)
+							return oldData;
 						const mcapNative = parseFloat(oldData.marketCap || "0");
-						const priceNative = parseFloat(oldData.currentPrice || "0");
+						const priceNative = parseFloat(
+							oldData.currentPrice || "0",
+						);
 						return {
 							...oldData,
-							marketCapUsd: (mcapNative * nativePriceUsd).toFixed(2),
-							currentPriceUsd: (priceNative * nativePriceUsd).toFixed(18),
+							marketCapUsd: (mcapNative * nativePriceUsd).toFixed(
+								2,
+							),
+							currentPriceUsd: (
+								priceNative * nativePriceUsd
+							).toFixed(18),
 							nativePriceUsd: nativePriceUsd.toString(),
 						};
 					},
@@ -570,7 +592,11 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 																	{bondingAmount.toFixed(
 																		4,
 																	)}{" "}
-																	{token.nativeCurrency?.symbol }{" "}
+																	{
+																		token
+																			.nativeCurrency
+																			?.symbol
+																	}{" "}
 																	in the
 																	bonding
 																	curve
@@ -604,9 +630,20 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 											className="hover:text-primary flex items-center gap-1"
 										>
 											<UserAvatar
-												userId={token.creator?.id || token.creatorId || ''}
-												avatarUrl={token.creator?.avatarUrl}
-												username={token.creator?.username || token.creator?.displayName || undefined}
+												userId={
+													token.creator?.id ||
+													token.creatorId ||
+													""
+												}
+												avatarUrl={
+													token.creator?.avatarUrl
+												}
+												username={
+													token.creator?.username ||
+													token.creator
+														?.displayName ||
+													undefined
+												}
 												sizeClassName="size-4"
 											/>
 											{token.creator?.displayName ||
@@ -678,7 +715,9 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 									) : (
 										<Copy className="h-3.5 w-3.5" />
 									)}
-									{formatAddress(token.contractAddress as string)}
+									{formatAddress(
+										token.contractAddress as string,
+									)}
 								</Button>
 								<Button
 									variant="outline"
@@ -715,7 +754,11 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 										Market Cap
 									</p>
 									<p className="text-2xl sm:text-3xl font-bold">
-										{formatMarketCap(token.marketCapUsd || token.marketCap)}
+										{formatMarketCap(
+											token.marketCapUsd ||
+												token.marketCap,
+											2,
+										)}
 									</p>
 									<p
 										className={cn(
@@ -736,116 +779,157 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 										ATH Progress
 									</p>
 									{(token.tradesCount ?? 0) === 0 ? (
-										<span className="text-sm font-semibold text-muted-foreground/60">N/A</span>
+										<span className="text-sm font-semibold text-muted-foreground/60">
+											N/A
+										</span>
 									) : (
-									<div className="flex items-center gap-2">
-										<TooltipProvider>
-											<Tooltip>
-												<TooltipTrigger asChild>
-													<div className="relative w-48 sm:w-68 h-2 bg-[#222] rounded-full cursor-help">
-														<div
-															className="h-full rounded-full transition-[width] duration-800 ease-out"
-															style={{
-																width: `${Math.min(100, Math.max(0, token.athProgress ?? 0))}%`,
-																background:
-																	(() => {
-																		const p =
-																			token.athProgress ??
-																			0;
-																		if (
-																			p >=
-																			85
-																		)
-																			return "linear-gradient(to right, #ff6b00, #ff2d00)";
-																		if (
-																			p >=
-																			60
-																		)
-																			return "linear-gradient(to right, #ffd200, #ff8c00)";
-																		return "linear-gradient(to right, #00ff88, #00cc6a)";
-																	})(),
-																boxShadow:
-																	(token.athProgress ??
-																		0) > 0
-																		? (() => {
-																				const p =
-																					token.athProgress ??
-																					0;
-																				if (
-																					p >=
-																					85
-																				)
-																					return "0 0 8px rgba(255, 107, 0, 0.5)";
-																				if (
-																					p >=
-																					60
-																				)
-																					return "0 0 8px rgba(255, 210, 0, 0.4)";
-																				return "0 0 8px rgba(0, 255, 136, 0.4)";
-																			})()
-																		: "none",
-															}}
-														/>
-														{(token.athProgress ??
-															0) >= 100 && (
-															<motion.img
-																initial={{
-																	opacity: 0,
+										<div className="flex items-center gap-2">
+											<TooltipProvider>
+												<Tooltip>
+													<TooltipTrigger asChild>
+														<div className="relative w-48 sm:w-68 h-2 bg-[#222] rounded-full cursor-help">
+															<div
+																className="h-full rounded-full transition-[width] duration-800 ease-out"
+																style={{
+																	width: `${Math.min(100, Math.max(0, token.athProgress ?? 0))}%`,
+																	background:
+																		(() => {
+																			const p =
+																				token.athProgress ??
+																				0;
+																			if (
+																				p >=
+																				85
+																			)
+																				return "linear-gradient(to right, #ff6b00, #ff2d00)";
+																			if (
+																				p >=
+																				60
+																			)
+																				return "linear-gradient(to right, #ffd200, #ff8c00)";
+																			return "linear-gradient(to right, #00ff88, #00cc6a)";
+																		})(),
+																	boxShadow:
+																		(token.athProgress ??
+																			0) >
+																		0
+																			? (() => {
+																					const p =
+																						token.athProgress ??
+																						0;
+																					if (
+																						p >=
+																						85
+																					)
+																						return "0 0 8px rgba(255, 107, 0, 0.5)";
+																					if (
+																						p >=
+																						60
+																					)
+																						return "0 0 8px rgba(255, 210, 0, 0.4)";
+																					return "0 0 8px rgba(0, 255, 136, 0.4)";
+																				})()
+																			: "none",
 																}}
-																animate={{
-																	opacity: 1,
-																}}
-																transition={{
-																	delay: 0.8,
-																	duration: 0.5,
-																	ease: "easeOut",
-																}}
-																src="/spark.gif"
-																alt="ATH"
-																className="absolute -right-3.5 top-1/2 -translate-y-1/2 size-9 pointer-events-none"
 															/>
-														)}
-													</div>
-												</TooltipTrigger>
+															{(token.athProgress ??
+																0) >= 100 && (
+																<motion.img
+																	initial={{
+																		opacity: 0,
+																	}}
+																	animate={{
+																		opacity: 1,
+																	}}
+																	transition={{
+																		delay: 0.8,
+																		duration: 0.5,
+																		ease: "easeOut",
+																	}}
+																	src="/spark.gif"
+																	alt="ATH"
+																	className="absolute -right-3.5 top-1/2 -translate-y-1/2 size-9 pointer-events-none"
+																/>
+															)}
+														</div>
+													</TooltipTrigger>
 
-												<TooltipContent
-													side="top"
-													className="bg-zinc-900 border-zinc-700 text-white text-xs"
-													arrowClassName="bg-zinc-900 fill-zinc-900"
-												>
-													<p>
-														Current market cap
-														relative to ATH
-													</p>
-												</TooltipContent>
-											</Tooltip>
-										</TooltipProvider>
-										<TooltipProvider>
-											<Tooltip>
-												<TooltipTrigger asChild>
-													<span
-														className="text-sm font-semibold tabular-nums cursor-help text-amber-400"
+													<TooltipContent
+														side="top"
+														className="bg-zinc-900 border-zinc-700 text-white text-xs"
+														arrowClassName="bg-zinc-900 fill-zinc-900"
 													>
-														${(() => {
-															const athP = parseFloat(token.athPrice || "0");
-															const nativeP = token.nativePriceAtCreation ? Number(token.nativePriceAtCreation) : 0;
-															const athMcapUsd = athP * 1_000_000_000 * nativeP;
-															if (athMcapUsd >= 1_000_000) return (athMcapUsd / 1_000_000).toFixed(2) + "M";
-															if (athMcapUsd >= 1_000) return (athMcapUsd / 1_000).toFixed(2) + "K";
-															return athMcapUsd.toFixed(2);
-														})()}
-													</span>	
-												</TooltipTrigger>
-												<TooltipContent
-													side="top"
-													className="bg-zinc-900 border-zinc-700 text-white text-xs"
-													arrowClassName="bg-zinc-900 fill-zinc-900"
-												>
-													<p>All-Time High Market Cap (USD)</p>
-												</TooltipContent>
-											</Tooltip>
-										</TooltipProvider>
-									</div>
+														<p>
+															Current market cap
+															relative to ATH
+														</p>
+													</TooltipContent>
+												</Tooltip>
+											</TooltipProvider>
+											<TooltipProvider>
+												<Tooltip>
+													<TooltipTrigger asChild>
+														<span className="text-sm font-semibold tabular-nums cursor-help text-amber-400">
+															$
+															{(() => {
+																const athP =
+																	parseFloat(
+																		token.athPrice ||
+																			"0",
+																	);
+																const nativeP =
+																	token.nativePriceAtCreation
+																		? Number(
+																				token.nativePriceAtCreation,
+																			)
+																		: 0;
+																const athMcapUsd =
+																	athP *
+																	1_000_000_000 *
+																	nativeP;
+																if (
+																	athMcapUsd >=
+																	1_000_000
+																)
+																	return (
+																		(
+																			athMcapUsd /
+																			1_000_000
+																		).toFixed(
+																			2,
+																		) + "M"
+																	);
+																if (
+																	athMcapUsd >=
+																	1_000
+																)
+																	return (
+																		(
+																			athMcapUsd /
+																			1_000
+																		).toFixed(
+																			2,
+																		) + "K"
+																	);
+																return athMcapUsd.toFixed(
+																	2,
+																);
+															})()}
+														</span>
+													</TooltipTrigger>
+													<TooltipContent
+														side="top"
+														className="bg-zinc-900 border-zinc-700 text-white text-xs"
+														arrowClassName="bg-zinc-900 fill-zinc-900"
+													>
+														<p>
+															All-Time High Market
+															Cap (USD)
+														</p>
+													</TooltipContent>
+												</Tooltip>
+											</TooltipProvider>
+										</div>
 									)}
 								</div>
 							</div>
@@ -881,7 +965,9 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 								Price
 							</p>
 							<p className="font-semibold tabular-nums">
-								{formatPrice(token.currentPriceUsd || token.currentPrice)}
+								{formatPrice(
+									token.currentPriceUsd || token.currentPrice,
+								)}
 							</p>
 						</div>
 						<div className="bg-card border border-border rounded-lg p-3 text-center">
@@ -1068,57 +1154,82 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 					{/* login button to trade */}
 					{!primaryWallet && (
 						<motion.div
-						initial={{ opacity: 0, x: 20 }}
-						animate={{ opacity: 1, x: 0 }}
-						transition={{ delay: 0.1 }}
+							initial={{ opacity: 0, x: 20 }}
+							animate={{ opacity: 1, x: 0 }}
+							transition={{ delay: 0.1 }}
 						>
-						<div className="bg-card border border-border rounded-xl p-4 flex flex-col items-center gap-4">
-							<p className="text-sm text-muted-foreground">
-								Please log in to access trading features.
-							</p>
-							<Button onClick={() => setShowAuthFlow(true)} className="w-full cursor-pointer">
-								Log In
-							</Button>
-						</div>
+							<div className="bg-card border border-border rounded-xl p-4 flex flex-col items-center gap-4">
+								<p className="text-sm text-muted-foreground">
+									Please log in to access trading features.
+								</p>
+								<Button
+									onClick={() => setShowAuthFlow(true)}
+									className="w-full cursor-pointer"
+								>
+									Log In
+								</Button>
+							</div>
 						</motion.div>
 					)}
 					{/* Trading Panel - On-Chain Only (user pays gas for buy/sell) */}
-					{primaryWallet && token.bondingCurveAddress && token.contractAddress && (
-					<motion.div
-					initial={{ opacity: 0, x: 20 }}
-					animate={{ opacity: 1, x: 0 }}
-					>
-						<OnChainTradingPanel
-							tokenId={id}
-							tokenAddress={token.contractAddress as Address}
-							bondingCurveAddress={token.bondingCurveAddress as Address}
-							nativeSymbol={(token.nativeCurrency?.symbol as string) }
-							tokenSymbol={token.symbol || "TOKEN"}
-							tokenName={token.name || "Unknown Token"}
-							currentPrice={token.currentPrice || "0.00001"}
-							chainType={token.chainType === "SOLANA" ? "SOLANA" : "EVM"}
-							chainId={token.chainId}
-							backendTokenBalance={userBackendTokenBalance}
-						/>
-					</motion.div>
-					)}
+					{primaryWallet &&
+						token.bondingCurveAddress &&
+						token.contractAddress && (
+							<motion.div
+								initial={{ opacity: 0, x: 20 }}
+								animate={{ opacity: 1, x: 0 }}
+							>
+								<OnChainTradingPanel
+									tokenId={id}
+									tokenAddress={
+										token.contractAddress as Address
+									}
+									bondingCurveAddress={
+										token.bondingCurveAddress as Address
+									}
+									nativeSymbol={
+										token.nativeCurrency?.symbol as string
+									}
+									tokenSymbol={token.symbol || "TOKEN"}
+									tokenName={token.name || "Unknown Token"}
+									currentPrice={
+										token.currentPrice || "0.00001"
+									}
+									chainType={
+										token.chainType === "SOLANA"
+											? "SOLANA"
+											: "EVM"
+									}
+									chainId={token.chainId}
+									backendTokenBalance={
+										userBackendTokenBalance
+									}
+								/>
+							</motion.div>
+						)}
 
 					{/* Token creation pending - no contract address yet */}
-					{primaryWallet && (!token.contractAddress || !token.bondingCurveAddress) && (
-					<motion.div
-						initial={{ opacity: 0, x: 20 }}
-						animate={{ opacity: 1, x: 0 }}
-					>
-						<div className="bg-card border border-border rounded-xl p-6 text-center">
-							<Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
-							<h3 className="font-semibold text-sm mb-1">Token Creation Pending</h3>
-							<p className="text-xs text-muted-foreground">
-								This token is being deployed on-chain. Trading will be available once the contract is confirmed.
-							</p>
-						</div>
-					</motion.div>
-					)}
-					
+					{primaryWallet &&
+						(!token.contractAddress ||
+							!token.bondingCurveAddress) && (
+							<motion.div
+								initial={{ opacity: 0, x: 20 }}
+								animate={{ opacity: 1, x: 0 }}
+							>
+								<div className="bg-card border border-border rounded-xl p-6 text-center">
+									<Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
+									<h3 className="font-semibold text-sm mb-1">
+										Token Creation Pending
+									</h3>
+									<p className="text-xs text-muted-foreground">
+										This token is being deployed on-chain.
+										Trading will be available once the
+										contract is confirmed.
+									</p>
+								</div>
+							</motion.div>
+						)}
+
 					{/* Bonding Curve */}
 					<motion.div
 						initial={{ opacity: 0, x: 20 }}
@@ -1127,17 +1238,26 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						className="bg-card border border-border rounded-xl p-4"
 					>
 						<BondingCurveProgress
-						nativeSymbol={token.nativeCurrency?.symbol as string}
+							nativeSymbol={
+								token.nativeCurrency?.symbol as string
+							}
 							progress={token.bondingCurveProgress ?? 0}
 							currentAmount={token.currentBondingAmount || "0"}
 							targetAmount={token.graduationTarget || "100"}
-							nativePriceUsd={token.nativePriceAtCreation ? Number(token.nativePriceAtCreation) : null}
-							graduationThresholdUsd={token.graduationThresholdUsd ?? null}
+							nativePriceUsd={
+								token.nativePriceAtCreation
+									? Number(token.nativePriceAtCreation)
+									: null
+							}
+							graduationThresholdUsd={
+								token.graduationThresholdUsd ?? null
+							}
 						/>
 					</motion.div>
 
 					{/* Post-Graduation DEX Widget — only show when token is explicitly graduated */}
-					{(token.status === "graduated" || token.isGraduated === true) && (
+					{(token.status === "graduated" ||
+						token.isGraduated === true) && (
 						<motion.div
 							initial={{ opacity: 0, x: 20 }}
 							animate={{ opacity: 1, x: 0 }}
@@ -1181,8 +1301,13 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 									Circulating
 								</span>
 								<span className="text-sm font-mono tabular-nums">
-									{parseFloat(
-										token.circulatingSupply || "0",
+									{Number(
+										truncateToDecimals(
+											parseFloat(
+												token.circulatingSupply as string,
+											),
+											3,
+										),
 									).toLocaleString()}
 								</span>
 							</div>
@@ -1191,7 +1316,10 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 									Reserve
 								</span>
 								<span className="text-sm font-mono tabular-nums">
-									{Number(token.currentBondingAmount || "0").toFixed(4)}{" "}
+									{truncateToDecimals(
+										parseFloat(token.currentBondingAmount),
+										4,
+									)}{" "}
 									{token.nativeCurrency?.symbol}
 								</span>
 							</div>
@@ -1274,48 +1402,49 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 										holder.address.toLowerCase() ===
 											creatorAddress.toLowerCase();
 									return (
-									<div
-										key={holder.address}
-										className="flex items-center justify-between py-1"
-									>
-										<Link
-											href={`/user/${holder.address}`}
-											className="font-mono text-sm hover:text-primary text-muted-foreground"
+										<div
+											key={holder.address}
+											className="flex items-center justify-between py-1"
 										>
-											{index === 0 && !isCreator ? (
-												<span className="flex items-center gap-1.5">
-													Liquidity pool{" "}
-													<span className="text-blue-400">
-														💧
+											<Link
+												href={`/user/${holder.address}`}
+												className="font-mono text-sm hover:text-primary text-muted-foreground"
+											>
+												{index === 0 && !isCreator ? (
+													<span className="flex items-center gap-1.5">
+														Liquidity pool{" "}
+														<span className="text-blue-400">
+															💧
+														</span>
 													</span>
-												</span>
-											) : (
-												<span className="flex items-center gap-1.5">
-													{`${holder.address.slice(0, 4)}...${holder.address.slice(-4)}`}
-													{isCreator && (
-														// <span
-														// 	className="text-base"
-														// 	title="Developer (initial purchase)"
-														// >
-														// 	🎩
-														// </span>
-														<div className="text-foreground flex text-xs gap-2 items-center">
-															(
-																<span>
-
-														DEV
-															</span>
-														 <img src="/hacker.png" alt="" className="w-4 h-4 bg-white rounded-full" />
-														 )
-														</div>
-													)}
-												</span>
-											)}
-										</Link>
-										<span className="text-sm tabular-nums">
-											{holder.percentage.toFixed(2)}%
-										</span>
-									</div>
+												) : (
+													<span className="flex items-center gap-1.5">
+														{`${holder.address.slice(0, 4)}...${holder.address.slice(-4)}`}
+														{isCreator && (
+															// <span
+															// 	className="text-base"
+															// 	title="Developer (initial purchase)"
+															// >
+															// 	🎩
+															// </span>
+															<div className="text-foreground flex text-xs gap-2 items-center">
+																(
+																<span>DEV</span>
+																<img
+																	src="/hacker.png"
+																	alt=""
+																	className="w-4 h-4 bg-white rounded-full"
+																/>
+																)
+															</div>
+														)}
+													</span>
+												)}
+											</Link>
+											<span className="text-sm tabular-nums">
+												{holder.percentage.toFixed(2)}%
+											</span>
+										</div>
 									);
 								})}
 							</div>
