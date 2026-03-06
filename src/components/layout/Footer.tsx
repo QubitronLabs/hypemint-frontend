@@ -38,19 +38,15 @@ export function Footer() {
 
 				{/* Page links */}
 				{pages.length > 0 && (
-					<nav className="flex flex-wrap items-center gap-1 text-xs">
-						{pages.map((page, i) => (
-							<span key={page.slug} className="flex items-center">
-								{i > 0 && (
-									<span className="text-muted-foreground/40 mx-1.5">|</span>
-								)}
-								<Link
-									href={`/docs/${page.slug}`}
-									className="text-primary/80 hover:text-primary transition-colors"
-								>
-									{page.title}
-								</Link>
-							</span>
+					<nav className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs">
+						{pages.map((page) => (
+							<Link
+								key={page.slug}
+								href={`/docs/${page.slug}`}
+								className="text-primary/80 hover:text-primary transition-colors whitespace-nowrap"
+							>
+								{page.title}
+							</Link>
 						))}
 					</nav>
 				)}

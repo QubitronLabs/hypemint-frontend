@@ -1371,7 +1371,7 @@ export function OnChainTradingPanel({
 	return (
 		<div
 			className={cn(
-				"bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl overflow-hidden w-full max-w-full",
+				"bg-card backdrop-blur-sm border border-border/50 rounded-xl overflow-hidden w-full max-w-full",
 				className,
 			)}
 		>

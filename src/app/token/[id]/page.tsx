@@ -472,14 +472,13 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 	return (
 		<div className="w-full mx-auto p-2 xs:p-3 sm:p-4 lg:p-6 relative overflow-x-clip">
 			<div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] relative gap-3 sm:gap-4 lg:gap-6">
-				{/* Main Content */}
-				{/* removed: lg:max-h-[calc(100vh-6.5rem)]  */}
-				<div className="min-w-0 space-y-3 sm:space-y-4 lg:space-y-6 w-full lg:sticky lg:top-22 lg:self-start overflow-y-auto scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-					{/* Section 1: Token Header Card - Simplified as per screenshot 1 */}
+				{/* Main Content — on mobile, `contents` makes children direct grid items so we can reorder them */}
+				<div className="contents lg:block lg:min-w-0 lg:space-y-6 lg:w-full lg:sticky lg:top-22 lg:self-start lg:overflow-y-auto lg:scroll-smooth lg:[&::-webkit-scrollbar]:hidden lg:[-ms-overflow-style:none] lg:[scrollbar-width:none]">
+					{/* Section 1: Token Header Card */}
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
-						className="bg-card border border-border rounded-xl p-3 sm:p-4"
+						className="bg-card border border-border rounded-xl p-3 sm:p-4 order-1 lg:order-none"
 					>
 						<div className="flex flex-col gap-2 xs:gap-3 sm:gap-4 lg:flex-row lg:items-start lg:justify-between">
 							{/* Left side: Image, Name, Symbol, Creator, Time */}
@@ -615,7 +614,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 								})()}
 								<div>
 									<div className="flex items-center gap-2 flex-wrap">
-										<h1 className="text-sm xs:text-base sm:text-lg font-bold truncate max-w-[180px] xs:max-w-[220px] sm:max-w-none">
+										<h1 className="text-sm xs:text-base sm:text-lg font-bold wrap-break-words">
 											{token.name}
 										</h1>
 										<span className="text-xs sm:text-sm text-muted-foreground">
@@ -719,9 +718,11 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 									) : (
 										<Copy className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
 									)}
-									<span className="hidden xs:inline text-xs">{formatAddress(
-										token.contractAddress as string,
-									)}</span>
+									<span className="hidden xs:inline text-xs">
+										{formatAddress(
+											token.contractAddress as string,
+										)}
+									</span>
 								</Button>
 								<Button
 									variant="outline"
@@ -743,16 +744,16 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						</div>
 					</motion.div>
 
-					{/* Section 2: Price Chart with Market Cap Header - as per screenshot 2 */}
+					{/* Section 2: Price Chart */}
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ delay: 0.1 }}
-						className="bg-card border border-border rounded-xl overflow-hidden"
+						className="bg-card border border-border rounded-xl overflow-hidden order-2 lg:order-0"
 					>
 						{/* Market Cap Header */}
 						<div className="p-3 sm:p-4 border-b border-border">
-							<div className="flex flex-col lg:flex-row lg:items-start justify-between gap-2 lg:gap-0">
+							<div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2 lg:gap-0">
 								<div>
 									<p className="text-[10px] sm:text-xs text-muted-foreground mb-1">
 										Market Cap
@@ -778,7 +779,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 									</p>
 								</div>
 								{/* ATH Progress */}
-								<div className="xs:text-right flex flex-col xs:items-end gap-1 sm:gap-1.5">
+								<div className="lg:text-right flex flex-col lg:items-end gap-1 sm:gap-1.5">
 									<p className="text-xs text-muted-foreground">
 										ATH Progress
 									</p>
@@ -949,12 +950,12 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						</div>
 					</motion.div>
 
-					{/* Section 3: Metrics Row - 5 cards as per screenshot 2 bottom */}
+					{/* Section 3: Metrics Row */}
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ delay: 0.15 }}
-						className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-5 gap-1.5 sm:gap-2"
+						className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-5 gap-1.5 sm:gap-2 order-3 lg:order-0"
 					>
 						<div className="bg-card border border-border rounded-lg p-2 sm:p-3 text-center">
 							<p className="text-[10px] sm:text-xs text-muted-foreground mb-0.5 sm:mb-1">
@@ -1040,19 +1041,30 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 					</motion.div>
 
 					{/* Section 3.5: Token Description with Social Links */}
-					{(token.description || token.websiteUrl || token.twitterUrl || token.telegramUrl || token.discordUrl) && (
+					{(token.description ||
+						token.websiteUrl ||
+						token.twitterUrl ||
+						token.telegramUrl ||
+						token.discordUrl) && (
 						<motion.div
 							initial={{ opacity: 0, y: 20 }}
 							animate={{ opacity: 1, y: 0 }}
 							transition={{ delay: 0.18 }}
-							className="bg-card border border-border rounded-xl p-3 sm:p-4"
+							className="bg-card border border-border rounded-xl p-3 sm:p-4 order-8 lg:order-none"
 						>
 							{/* Social Link Badges */}
-							{(token.websiteUrl || token.twitterUrl || token.telegramUrl || token.discordUrl) && (
+							{(token.websiteUrl ||
+								token.twitterUrl ||
+								token.telegramUrl ||
+								token.discordUrl) && (
 								<div className="flex flex-wrap gap-1.5 sm:gap-2 mb-2 sm:mb-3">
 									{token.websiteUrl && (
 										<button
-											onClick={() => setSocialLinkUrl(token.websiteUrl!)}
+											onClick={() =>
+												setSocialLinkUrl(
+													token.websiteUrl!,
+												)
+											}
 											className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 hover:bg-muted border border-border/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
 										>
 											<Globe className="h-3.5 w-3.5" />
@@ -1061,16 +1073,30 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 									)}
 									{token.twitterUrl && (
 										<button
-											onClick={() => setSocialLinkUrl(token.twitterUrl!)}
+											onClick={() =>
+												setSocialLinkUrl(
+													token.twitterUrl!,
+												)
+											}
 											className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 hover:bg-muted border border-border/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
 										>
-											<svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+											<svg
+												className="h-3.5 w-3.5"
+												viewBox="0 0 24 24"
+												fill="currentColor"
+											>
+												<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+											</svg>
 											Twitter
 										</button>
 									)}
 									{token.telegramUrl && (
 										<button
-											onClick={() => setSocialLinkUrl(token.telegramUrl!)}
+											onClick={() =>
+												setSocialLinkUrl(
+													token.telegramUrl!,
+												)
+											}
 											className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 hover:bg-muted border border-border/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
 										>
 											<MessageCircle className="h-3.5 w-3.5" />
@@ -1079,7 +1105,11 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 									)}
 									{token.discordUrl && (
 										<button
-											onClick={() => setSocialLinkUrl(token.discordUrl!)}
+											onClick={() =>
+												setSocialLinkUrl(
+													token.discordUrl!,
+												)
+											}
 											className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 hover:bg-muted border border-border/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
 										>
 											<MessageCircle className="h-3.5 w-3.5" />
@@ -1095,6 +1125,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 										<h3 className="text-sm font-semibold">
 											About {token.symbol}
 										</h3>
+										{/* Accordion toggle — visible only below lg */}
 										{token.description.length > 80 && (
 											<button
 												onClick={() =>
@@ -1102,42 +1133,55 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 														!isDescriptionExpanded,
 													)
 												}
-												className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+												className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors lg:hidden"
 											>
 												{isDescriptionExpanded ? (
 													<>
-														<span className="hidden xs:inline">Show less</span>
+														<span className="hidden xs:inline">
+															Show less
+														</span>
 														<ChevronUp className="h-4 w-4" />
 													</>
 												) : (
 													<>
-														<span className="hidden xs:inline">Show more</span>
+														<span className="hidden xs:inline">
+															Show more
+														</span>
 														<ChevronDown className="h-4 w-4" />
 													</>
 												)}
 											</button>
 										)}
 									</div>
-									<p
-										className={cn(
-											"text-sm text-muted-foreground whitespace-pre-wrap break-words",
-											!isDescriptionExpanded &&
-												"line-clamp-2",
-										)}
+									{/* Description — smooth framer-motion accordion on mobile, always visible on lg+ */}
+									<motion.div
+										className="overflow-hidden lg:overflow-visible! lg:h-auto!"
+										initial={false}
+										animate={{
+											height: isDescriptionExpanded
+												? "auto"
+												: "2.8em",
+										}}
+										transition={{
+											duration: 0.4,
+											ease: [0.25, 0.1, 0.25, 1],
+										}}
 									>
-										{token.description}
-									</p>
+										<p className="text-sm text-muted-foreground whitespace-pre-wrap wrap-break-word">
+											{token.description}
+										</p>
+									</motion.div>
 								</>
 							)}
 						</motion.div>
 					)}
 
-					{/* Section 4 & 5: Comments / Trades Tabs - matching screenshot exactly */}
+					{/* Section 4 & 5: Comments / Trades Tabs */}
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ delay: 0.2 }}
-						className="bg-card border border-border rounded-xl overflow-hidden"
+						className="bg-card border border-border rounded-xl overflow-hidden order-9 lg:order-none"
 					>
 						<Tabs
 							value={activeTab}
@@ -1175,7 +1219,9 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 								<TradeTape
 									tokenId={id}
 									tokenSymbol={token.symbol}
-									nativeTokenSymbol={token?.nativeCurrency?.symbol}
+									nativeTokenSymbol={
+										token?.nativeCurrency?.symbol
+									}
 									initialTrades={trades}
 									chainId={token.chainId}
 									className="border-0 rounded-none"
@@ -1185,13 +1231,14 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 					</motion.div>
 				</div>
 
-				{/* Sidebar */}
-				<div className="min-w-0 w-full lg:sticky lg:top-22 lg:self-start space-y-3 sm:space-y-4 lg:space-y-6 overflow-y-auto scroll-smooth lg:max-h-[calc(100vh-6.5rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+				{/* Sidebar — on mobile, `contents` lets children participate in the grid for reordering */}
+				<div className="contents lg:block lg:min-w-0 lg:w-full lg:sticky lg:top-22 lg:self-start lg:space-y-6 lg:overflow-y-auto lg:scroll-smooth lg:max-h-[calc(100vh-6.5rem)] lg:[&::-webkit-scrollbar]:hidden lg:[-ms-overflow-style:none] lg:[scrollbar-width:none]">
 					{/* Vesting Panel (Only if HypeBoost is enabled) */}
 					{token.hypeBoostEnabled && token.bondingCurveAddress && (
 						<motion.div
 							initial={{ opacity: 0, x: 20 }}
 							animate={{ opacity: 1, x: 0 }}
+							className="order-4 lg:order-none"
 						>
 							<VestingCard
 								bondingCurveAddress={
@@ -1208,6 +1255,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							initial={{ opacity: 0, x: 20 }}
 							animate={{ opacity: 1, x: 0 }}
 							transition={{ delay: 0.1 }}
+							className="order-4 lg:order-none"
 						>
 							<div className="bg-card border border-border rounded-xl p-4 flex flex-col items-center gap-4">
 								<p className="text-sm text-muted-foreground">
@@ -1229,6 +1277,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							<motion.div
 								initial={{ opacity: 0, x: 20 }}
 								animate={{ opacity: 1, x: 0 }}
+								className="order-4 lg:order-none"
 							>
 								<OnChainTradingPanel
 									tokenId={id}
@@ -1267,6 +1316,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							<motion.div
 								initial={{ opacity: 0, x: 20 }}
 								animate={{ opacity: 1, x: 0 }}
+								className="order-4 lg:order-none"
 							>
 								<div className="bg-card border border-border rounded-xl p-6 text-center">
 									<Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
@@ -1287,7 +1337,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						initial={{ opacity: 0, x: 20 }}
 						animate={{ opacity: 1, x: 0 }}
 						transition={{ delay: 0.1 }}
-						className="bg-card border border-border rounded-xl p-3 sm:p-4"
+						className="bg-card border border-border rounded-xl p-3 sm:p-4 order-5 lg:order-none"
 					>
 						<BondingCurveProgress
 							nativeSymbol={
@@ -1314,6 +1364,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							initial={{ opacity: 0, x: 20 }}
 							animate={{ opacity: 1, x: 0 }}
 							transition={{ delay: 0.15 }}
+							className="order-5 lg:order-none"
 						>
 							<PostGraduationWidget
 								tokenAddress={token.contractAddress || ""}
@@ -1329,7 +1380,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						initial={{ opacity: 0, x: 20 }}
 						animate={{ opacity: 1, x: 0 }}
 						transition={{ delay: 0.2 }}
-						className="bg-card border border-border rounded-xl p-3 sm:p-4"
+						className="bg-card border border-border rounded-xl p-3 sm:p-4 order-6 lg:order-none"
 					>
 						<div className="flex items-center gap-2 mb-3 sm:mb-4">
 							<Info className="h-4 w-4 text-muted-foreground" />
@@ -1379,7 +1430,10 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 								<span className="text-[10px] sm:text-xs text-muted-foreground shrink-0">
 									Network
 								</span>
-								<Badge variant="outline" className="text-[10px] sm:text-xs">
+								<Badge
+									variant="outline"
+									className="text-[10px] sm:text-xs"
+								>
 									{getChainDisplayName(token.chainId)}
 								</Badge>
 							</div>
@@ -1414,12 +1468,12 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 						</div>
 					</motion.div>
 
-					{/* Section 4: Top Holders - as per screenshot 3 */}
+					{/* Top Holders */}
 					<motion.div
 						initial={{ opacity: 0, x: 20 }}
 						animate={{ opacity: 1, x: 0 }}
 						transition={{ delay: 0.3 }}
-						className="bg-card border border-border rounded-xl p-3 sm:p-4"
+						className="bg-card border border-border rounded-xl p-3 sm:p-4 order-7 lg:order-none"
 					>
 						<div className="flex items-center justify-between mb-3 sm:mb-4">
 							<span className="font-semibold text-sm">
@@ -1492,7 +1546,7 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 														)}
 													</span>
 												)}
-											</Link>xs sm:text-
+											</Link>
 											<span className="text-sm tabular-nums">
 												{holder.percentage.toFixed(2)}%
 											</span>
@@ -1559,17 +1613,23 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 			/>
 
 			{/* Social Link Confirmation Dialog */}
-			<Dialog open={!!socialLinkUrl} onOpenChange={(open) => !open && setSocialLinkUrl(null)}>
+			<Dialog
+				open={!!socialLinkUrl}
+				onOpenChange={(open) => !open && setSocialLinkUrl(null)}
+			>
 				<DialogContent className="sm:max-w-md bg-card border-border">
 					<DialogTitle className="text-base font-semibold">
 						External Link
 					</DialogTitle>
 					<div className="space-y-4">
 						<p className="text-sm text-muted-foreground">
-							You are about to visit an external website. Please make sure you trust this link before proceeding.
+							You are about to visit an external website. Please
+							make sure you trust this link before proceeding.
 						</p>
 						<div className="p-3 bg-muted/50 rounded-lg border border-border break-all">
-							<p className="text-sm font-mono text-foreground">{socialLinkUrl}</p>
+							<p className="text-sm font-mono text-foreground">
+								{socialLinkUrl}
+							</p>
 						</div>
 						<div className="flex gap-3 justify-end">
 							<Button
@@ -1582,7 +1642,11 @@ export default function TokenDetailPage({ params }: TokenDetailPageProps) {
 							<Button
 								size="sm"
 								onClick={() => {
-									window.open(socialLinkUrl!, "_blank", "noopener,noreferrer");
+									window.open(
+										socialLinkUrl!,
+										"_blank",
+										"noopener,noreferrer",
+									);
 									setSocialLinkUrl(null);
 								}}
 								className="gap-1.5"
