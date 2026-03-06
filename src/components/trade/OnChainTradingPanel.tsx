@@ -1567,7 +1567,7 @@ export function OnChainTradingPanel({
 								: false
 						}
 						className={cn(
-							"w-full h-12 text-base font-semibold transition-all duration-200 disabled:cursor-not-allowed cursor-pointer disabled:pointer-events-auto",
+							"w-full h-11 sm:h-12 text-sm sm:text-base font-semibold transition-all duration-200 disabled:cursor-not-allowed cursor-pointer disabled:pointer-events-auto",
 							walletPlatformMismatch
 								? "bg-amber-600/30 hover:bg-amber-600/40 text-amber-400/70 cursor-help"
 								: tradeType === "buy"
@@ -1578,75 +1578,94 @@ export function OnChainTradingPanel({
 						)}
 					>
 						{!isAuthenticated ? (
-							<>Connect Wallet to Trade</>
+							<span className="text-xs sm:text-base">
+								Connect Wallet to Trade
+							</span>
 						) : walletPlatformMismatch ? (
-							<>
-								<AlertTriangle className="h-5 w-5 mr-2" />
-								Switch to {isSolana ? "Solana" : "EVM"} Wallet
-							</>
+							<span className="flex items-center justify-center text-xs sm:text-sm">
+								<AlertTriangle className="h-4 w-4 mr-1.5 shrink-0" />
+								<span className="inline">
+									Switch to {isSolana ? "Solana" : "EVM"}{" "}
+									Wallet
+								</span>
+							</span>
 						) : appChainId !== normalizedChainId ? (
-							<>Switch To {nativeSymbol}</>
+							<span className="text-xs sm:text-base">
+								Switch To {nativeSymbol}
+							</span>
 						) : tradeType === "buy" &&
 						  exceedsBalance &&
 						  parseFloat(amount) > 0 ? (
-							<span className="flex items-center justify-center w-full truncate text-xs sm:text-sm">
-								<AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 shrink-0" />
+							<span className="flex items-center justify-center w-full text-xs sm:text-sm">
+								<AlertTriangle className="h-4 w-4 mr-1.5 shrink-0" />
 								<span className="truncate">
-									{balanceErrorMessage}
+									<span className="sm:hidden">
+										Insufficient balance
+									</span>
+									<span className="hidden sm:inline">
+										{balanceErrorMessage}
+									</span>
 								</span>
 							</span>
 						) : tradeType === "sell" && needsApproval ? (
 							exceedsBalance ? (
-								<span className="flex items-center justify-center w-full truncate text-xs sm:text-sm">
-									<AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 shrink-0" />
+								<span className="flex items-center justify-center w-full text-xs sm:text-sm">
+									<AlertTriangle className="h-4 w-4 mr-1.5 shrink-0" />
 									<span className="truncate">
-										{balanceErrorMessage}
+										<span className="sm:hidden">
+											Insufficient balance
+										</span>
+										<span className="hidden sm:inline">
+											{balanceErrorMessage}
+										</span>
 									</span>
 								</span>
 							) : // Approval state for sell
 							isApproving || isApproveConfirming ? (
-								<>
-									<Loader2 className="h-5 w-5 mr-2 animate-spin" />
+								<span className="flex items-center justify-center text-xs sm:text-sm">
+									<Loader2 className="h-4 w-4 mr-1.5 animate-spin shrink-0" />
 									Approving...
-								</>
+								</span>
 							) : (
-								<>Approve {tokenSymbol}</>
+								<span className="text-xs sm:text-base">
+									Approve {tokenSymbol}
+								</span>
 							)
 						) : isLoading ? (
-							<>
-								<Loader2 className="h-5 w-5 mr-2 animate-spin" />
+							<span className="flex items-center justify-center text-xs sm:text-sm">
+								<Loader2 className="h-4 w-4 mr-1.5 animate-spin shrink-0" />
 								Confirm in Wallet...
-							</>
+							</span>
 						) : isConfirming ? (
-							<>
-								<Loader2 className="h-5 w-5 mr-2 animate-spin" />
+							<span className="flex items-center justify-center text-xs sm:text-sm">
+								<Loader2 className="h-4 w-4 mr-1.5 animate-spin shrink-0" />
 								Confirming...
-							</>
+							</span>
 						) : isConfirmed && txHash ? (
-							<>
-								<CheckCircle2 className="h-5 w-5 mr-2 text-white" />
+							<span className="flex items-center justify-center text-xs sm:text-sm">
+								<CheckCircle2 className="h-4 w-4 mr-1.5 text-white shrink-0" />
 								Transaction Confirmed!
-							</>
+							</span>
 						) : isFailed && txHash ? (
-							<>
-								<XCircle className="h-5 w-5 mr-2 text-white" />
+							<span className="flex items-center justify-center text-xs sm:text-sm">
+								<XCircle className="h-4 w-4 mr-1.5 text-white shrink-0" />
 								Transaction Failed
-							</>
+							</span>
 						) : belowMinimum ? (
-							<>
-								<AlertTriangle className="h-5 w-5 mr-2" />
+							<span className="flex items-center justify-center text-xs sm:text-sm">
+								<AlertTriangle className="h-4 w-4 mr-1.5 shrink-0" />
 								Amount Too Small
-							</>
+							</span>
 						) : (
-							<>
+							<span className="flex items-center justify-center text-xs sm:text-sm">
 								{tradeType === "buy" ? (
-									<TrendingUp className="h-5 w-5 mr-2" />
+									<TrendingUp className="h-4 w-4 mr-1.5 shrink-0" />
 								) : (
-									<TrendingDown className="h-5 w-5 mr-2" />
+									<TrendingDown className="h-4 w-4 mr-1.5 shrink-0" />
 								)}
 								{tradeType === "buy" ? "Buy" : "Sell"}{" "}
 								{tokenSymbol}
-							</>
+							</span>
 						)}
 					</Button>
 				</>

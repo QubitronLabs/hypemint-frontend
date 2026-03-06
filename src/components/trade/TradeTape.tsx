@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { ExternalLink, Filter } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,13 +15,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn, fromWei, formatNumber } from "@/lib/utils";
 import { wsService } from "@/lib/websocket";
-import { useNativeCurrencySymbol } from "@/hooks";
 import { getTxUrl, isSolanaChain } from "@/lib/wagmi/config";
 import type { Trade, TradeEvent } from "@/types";
 
 interface TradeTapeProps {
 	tokenId: string;
 	tokenSymbol?: string;
+	nativeTokenSymbol?: string;
 	initialTrades?: Trade[];
 	chainId?: number;
 	className?: string;
@@ -40,12 +39,12 @@ type FilterOption = "all" | "0.05" | "0.1" | "0.5" | "1";
  */
 export function TradeTape({
 	tokenId,
+	nativeTokenSymbol,
 	tokenSymbol = "TOKEN",
 	initialTrades = [],
 	chainId,
 	className,
 }: TradeTapeProps) {
-	const nativeSymbol = useNativeCurrencySymbol();
 	const [filter, setFilter] = useState<FilterOption>("all");
 
 	// Ensure initialTrades is always an array
@@ -76,7 +75,6 @@ export function TradeTape({
 	const [wsTrades, setWsTrades] = useState<typeof normalizedInitialTrades>(
 		[],
 	);
-	const scrollRef = useRef<HTMLDivElement>(null);
 
 	// Combine WebSocket trades with initial trades
 	const trades = useMemo(() => {
@@ -125,7 +123,10 @@ export function TradeTape({
 	const isSolana = chainId ? isSolanaChain(chainId) : false;
 
 	// Format amount — chain-aware for Solana vs EVM
-	const formatAmount = (amount: string | undefined | null, isTokenAmount = false) => {
+	const formatAmount = (
+		amount: string | undefined | null,
+		isTokenAmount = false,
+	) => {
 		if (!amount) return "0";
 		if (isSolana) {
 			// Solana: native (SOL) = 9 decimals (lamports), tokens = 9 decimals
@@ -156,20 +157,22 @@ export function TradeTape({
 	return (
 		<div className={cn("", className)}>
 			{/* Header with Filter */}
-			<div className="flex items-center justify-between px-4 py-3 border-b border-border">
-				<div className="flex items-center gap-3">
-					<span className="text-sm font-medium">Filter by size</span>
+			<div className="flex flex-col sm:flex-row sm:items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 border-b border-border gap-2">
+				<div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+					<span className="text-xs sm:text-sm font-medium">
+						Filter by size
+					</span>
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
 							<Button
 								variant="outline"
 								size="sm"
-								className="gap-2 h-7"
+								className="gap-1.5 sm:gap-2 h-7 text-xs sm:text-sm"
 							>
 								<Filter className="h-3 w-3" />
 								{filter === "all"
 									? "All trades"
-									: `≥ ${filter} ${nativeSymbol}`}
+									: `≥ ${filter} ${nativeTokenSymbol}`}
 							</Button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="start">
@@ -177,40 +180,45 @@ export function TradeTape({
 								All trades
 							</DropdownMenuItem>
 							<DropdownMenuItem onClick={() => setFilter("0.05")}>
-								≥ 0.05 {nativeSymbol}
+								≥ 0.05 {nativeTokenSymbol}
 							</DropdownMenuItem>
 							<DropdownMenuItem onClick={() => setFilter("0.1")}>
-								≥ 0.1 {nativeSymbol}
+								≥ 0.1 {nativeTokenSymbol}
 							</DropdownMenuItem>
 							<DropdownMenuItem onClick={() => setFilter("0.5")}>
-								≥ 0.5 {nativeSymbol}
+								≥ 0.5 {nativeTokenSymbol}
 							</DropdownMenuItem>
 							<DropdownMenuItem onClick={() => setFilter("1")}>
-								≥ 1 {nativeSymbol}
+								≥ 1 {nativeTokenSymbol}
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
 					{filter !== "all" && (
-						<span className="text-xs text-muted-foreground">
-							Showing trades greater than {filter} {nativeSymbol}
+						<span className="text-xs text-muted-foreground hidden sm:inline">
+							Showing trades greater than {filter}{" "}
+							{nativeTokenSymbol}
 						</span>
 					)}
 				</div>
 			</div>
 
 			{/* Table Header */}
-			<div className="grid grid-cols-6 gap-2 px-4 py-2 text-xs text-muted-foreground border-b border-border bg-muted/30">
-				<span>Account</span>
-				<span>Type</span>
-				<span>{nativeSymbol}</span>
-				<span>{tokenSymbol}</span>
-				<span>Time</span>
-				<span>Txn</span>
+			<div className="overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+				<div className="min-w-[600px]">
+					<div className="grid grid-cols-[1.2fr_0.6fr_0.8fr_0.8fr_0.7fr_0.6fr] gap-2 px-3 sm:px-4 py-2 text-[10px] sm:text-xs text-muted-foreground border-b border-border bg-muted/30">
+						<span>Account</span>
+						<span>Type</span>
+						<span>{nativeTokenSymbol}</span>
+						<span>{tokenSymbol}</span>
+						<span>Time</span>
+						<span>Txn</span>
+					</div>
+				</div>
 			</div>
 
-			{/* Table Body */}
-			<ScrollArea ref={scrollRef} className="h-[500px]">
-				<div className="divide-y divide-border/50">
+			{/* Table Body - native scrolling for both axes */}
+			<div className="overflow-x-auto overflow-y-auto h-[400px] sm:h-[500px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+				<div className="divide-y divide-border/50 min-w-[600px]">
 					<AnimatePresence mode="popLayout">
 						{filteredTrades.length === 0 ? (
 							<div className="text-center text-muted-foreground text-sm py-12">
@@ -224,18 +232,22 @@ export function TradeTape({
 									animate={{ opacity: 1, y: 0 }}
 									exit={{ opacity: 0 }}
 									transition={{ duration: 0.15 }}
-									className="grid grid-cols-6 gap-2 px-4 py-2.5 items-center hover:bg-muted/30 transition-colors"
+									className="grid grid-cols-[1.2fr_0.6fr_0.8fr_0.8fr_0.7fr_0.6fr] gap-2 px-3 sm:px-4 py-2 sm:py-2.5 items-center hover:bg-muted/30 transition-colors"
 								>
 									{/* Account - Avatar + Username */}
-									<div className="flex items-center gap-2 min-w-0">
+									<div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
 										<UserAvatar
-											userId={trade.user?.id || trade.userId || trade.id}
+											userId={
+												trade.user?.id ||
+												trade.userId ||
+												trade.id
+											}
 											avatarUrl={trade.user?.avatarUrl}
 											username={trade.username}
-											sizeClassName="size-6"
+											sizeClassName="size-5 sm:size-6"
 											className="shrink-0"
 										/>
-										<span className="text-sm truncate">
+										<span className="text-xs sm:text-sm truncate">
 											{trade.username || "Unknown"}
 										</span>
 									</div>
@@ -258,7 +270,7 @@ export function TradeTape({
 									</div>
 
 									{/* Amount (Native) */}
-									<span className="text-sm tabular-nums">
+									<span className="text-xs sm:text-sm tabular-nums truncate">
 										{formatAmount(
 											trade.totalValue || trade.price,
 											false, // native amount
@@ -268,28 +280,57 @@ export function TradeTape({
 									{/* Amount (Token) */}
 									<span
 										className={cn(
-											"text-sm tabular-nums font-medium",
+											"text-xs sm:text-sm tabular-nums font-medium truncate",
 											trade.type === "buy"
 												? "text-[#00ff88]"
 												: "text-destructive",
 										)}
 									>
 										{formatAmount(
-										// @ts-expect-error - tokenAmount field added dynamically
-										trade.tokenAmount || trade.amount,
-										true, // token amount
-									)}
+											// @ts-expect-error - tokenAmount field added dynamically
+											trade.tokenAmount || trade.amount,
+											true, // token amount
+										)}
 									</span>
 
 									{/* Time */}
-									<span className="text-xs text-muted-foreground">
+									<span className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
 										{trade.createdAt
-											? formatDistanceToNow(
-													new Date(trade.createdAt),
-													{
-														addSuffix: false,
-													},
-												)
+											? (() => {
+													const dist =
+														formatDistanceToNow(
+															new Date(
+																trade.createdAt,
+															),
+															{
+																addSuffix: false,
+															},
+														);
+													// Shorten "less than a minute" → "<1m", "about X hours" → "Xh" etc.
+													return dist
+														.replace(
+															/less than a minute/i,
+															"<1m",
+														)
+														.replace(/about /i, "")
+														.replace(
+															/ minutes?/i,
+															"m",
+														)
+														.replace(
+															/ hours?/i,
+															"h",
+														)
+														.replace(/ days?/i, "d")
+														.replace(
+															/ months?/i,
+															"mo",
+														)
+														.replace(
+															/ years?/i,
+															"y",
+														);
+												})()
 											: "now"}
 									</span>
 
@@ -297,7 +338,10 @@ export function TradeTape({
 									<div>
 										{trade.txHash ? (
 											<a
-												href={getTxUrl(trade.txHash, chainId)}
+												href={getTxUrl(
+													trade.txHash,
+													chainId,
+												)}
 												target="_blank"
 												rel="noopener noreferrer"
 												className="text-xs text-primary hover:underline flex items-center gap-1"
@@ -316,7 +360,7 @@ export function TradeTape({
 						)}
 					</AnimatePresence>
 				</div>
-			</ScrollArea>
+			</div>
 		</div>
 	);
 }

@@ -11,6 +11,8 @@
  */
 
 @theme inline {
+	/* Custom xs breakpoint for small mobile devices */
+	--breakpoint-xs: 480px;
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	/* Font Configuration - Change fonts globally by modifying layout.tsx */

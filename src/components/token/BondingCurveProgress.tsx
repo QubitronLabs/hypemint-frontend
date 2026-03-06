@@ -42,11 +42,13 @@ export function BondingCurveProgress({
 	const targetNative = formatNativeAmount(targetAmount);
 	const hasUsdPrice = nativePriceUsd && nativePriceUsd > 0;
 	const currentUsd = hasUsdPrice ? currentNative * nativePriceUsd : 0;
-	const targetUsd = graduationThresholdUsd || (hasUsdPrice ? targetNative * nativePriceUsd : 0);
+	const targetUsd =
+		graduationThresholdUsd ||
+		(hasUsdPrice ? targetNative * nativePriceUsd : 0);
 
 	return (
-		<div className={cn("space-y-2", className)}>
-			<div className="flex items-center justify-between text-sm">
+		<div className={cn("space-y-1.5 sm:space-y-2", className)}>
+			<div className="flex items-center justify-between text-xs sm:text-sm">
 				<span className="text-muted-foreground">
 					Bonding Curve Progress
 				</span>
@@ -75,15 +77,14 @@ export function BondingCurveProgress({
 			</div>
 
 			{/* Amount labels — native amount in curve + USD graduation target */}
-			<div className="flex items-center justify-between text-xs text-muted-foreground">
-				<span className="tabular-nums">
+			<div className="flex items-center justify-between text-[10px] sm:text-xs text-muted-foreground">
+				<span className="tabular-nums truncate mr-2">
 					{formatNumber(currentNative)} {nativeSymbol} in curve
 				</span>
-				<span className="tabular-nums">
+				<span className="tabular-nums shrink-0">
 					{targetUsd > 0
 						? `$${formatNumber(targetUsd)} to graduate`
-						: `${formatNumber(targetNative)} ${nativeSymbol} to graduate`
-					}
+						: `${formatNumber(targetNative)} ${nativeSymbol} to graduate`}
 				</span>
 			</div>
 

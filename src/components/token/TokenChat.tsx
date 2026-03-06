@@ -362,7 +362,7 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			initial={{ opacity: 0, y: 10 }}
 			animate={{ opacity: 1, y: 0 }}
 			exit={{ opacity: 0, scale: 0.95 }}
-			className={cn("flex gap-3", isReply && "ml-10")}
+			className={cn("flex gap-2 sm:gap-3", isReply && "ml-6 sm:ml-10")}
 		>
 			<UserAvatar
 				userId={comment.user.id}
@@ -372,25 +372,27 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 					comment.user.displayName ||
 					undefined
 				}
-				sizeClassName={isReply ? "size-7" : "size-8"}
+				sizeClassName={
+					isReply ? "size-5 sm:size-7" : "size-6 sm:size-8"
+				}
 				className="shrink-0"
 			/>
 
 			<div className="flex-1 min-w-0">
-				<div className="flex items-baseline gap-2 mb-0.5">
-					<span className="font-medium text-sm">
+				<div className="flex items-baseline gap-1.5 sm:gap-2 mb-0.5">
+					<span className="font-medium text-xs sm:text-sm truncate">
 						{comment.user.displayName ||
 							comment.user.username ||
 							"Anonymous"}
 					</span>
-					<span className="text-xs text-muted-foreground">
+					<span className="text-[10px] sm:text-xs text-muted-foreground shrink-0">
 						{formatTime(comment.createdAt)}
 					</span>
 				</div>
 
 				{/* Comment content with @mention for replies - hide if only space (image-only comment) */}
 				{comment.content.trim() && (
-					<p className="text-sm text-foreground/90 break-words">
+					<p className="text-xs sm:text-sm text-foreground/90 break-words">
 						{isReply && parentUsername && (
 							<span className="text-primary font-medium">
 								@{parentUsername}{" "}
@@ -402,7 +404,7 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 
 				{/* Image if present */}
 				{comment.imageUrl && (
-					<div className="mt-2 rounded-lg overflow-hidden max-w-[200px]">
+					<div className="mt-1.5 sm:mt-2 rounded-lg overflow-hidden max-w-[150px] sm:max-w-[200px]">
 						<img
 							src={comment.imageUrl}
 							alt="Comment attachment"
@@ -445,12 +447,12 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			<div ref={topRef} />
 
 			{/* Top Input Row: Avatar + Input + Newest Dropdown */}
-			<div className="flex items-center gap-3 p-4 border-b border-border">
+			<div className="flex items-center gap-1.5 xs:gap-2 sm:gap-3 p-2 xs:p-3 sm:p-4 border-b border-border">
 				<UserAvatar
 					userId={user?.id || ""}
 					avatarUrl={user?.avatarUrl}
 					username={user?.username || user?.displayName || undefined}
-					sizeClassName="size-8"
+					sizeClassName="size-6 xs:size-7 sm:size-8"
 					className="shrink-0"
 				/>
 
@@ -462,7 +464,7 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 					onKeyDown={handleKeyDown}
 					onFocus={handleInputFocus}
 					disabled={sending}
-					className="flex-1 bg-transparent border-0 focus-visible:ring-0 text-sm placeholder:text-muted-foreground"
+					className="flex-1 min-w-0 bg-transparent border-0 focus-visible:ring-0 text-xs sm:text-sm placeholder:text-muted-foreground h-7 sm:h-9"
 					maxLength={500}
 				/>
 
@@ -473,24 +475,24 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 					size="icon"
 					onClick={() => setShowImageDialog(true)}
 					disabled={sending || !isAuthenticated}
-					className="shrink-0 h-8 w-8 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed"
+					className="shrink-0 h-6 w-6 xs:h-7 xs:w-7 sm:h-8 sm:w-8 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed"
 				>
-					<Plus className="h-4 w-4" />
+					<Plus className="h-3 w-3 xs:h-3.5 xs:w-3.5 sm:h-4 sm:w-4" />
 				</Button>
 
-				{/* Send button - only show when there's text */}
+				{/* Send button */}
 				<Button
 					type="button"
 					size="sm"
 					onClick={handleSendComment}
 					disabled={sending || !isAuthenticated}
 					className={cn(
-						"shrink-0 h-8 px-3",
+						"shrink-0 h-6 xs:h-7 sm:h-8 px-2 xs:px-2.5 sm:px-3 text-[10px] xs:text-xs sm:text-sm",
 						"disabled:cursor-not-allowed",
 					)}
 				>
 					{sending ? (
-						<Loader2 className="h-4 w-4 animate-spin" />
+						<Loader2 className="h-3 w-3 xs:h-3.5 xs:w-3.5 sm:h-4 sm:w-4 animate-spin" />
 					) : (
 						"Post"
 					)}
@@ -501,11 +503,11 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 						<Button
 							variant="secondary"
 							size="sm"
-							className="shrink-0 gap-1.5 text-muted-foreground"
+							className="shrink-0 gap-1 text-muted-foreground h-6 xs:h-7 sm:h-8 px-1.5 xs:px-2 sm:px-3"
 						>
-							<FilterIcon className="h-4 w-4" />
-							<span className="text-sm">
-								{sortBy === "newest" ? "Newest" : "Oldest"}
+							<FilterIcon className="h-3 w-3 xs:h-3.5 xs:w-3.5 sm:h-4 sm:w-4" />
+							<span className="text-[10px] xs:text-xs sm:text-sm hidden xs:inline">
+								{sortBy === "newest" ? "New" : "Old"}
 							</span>
 						</Button>
 					</DropdownMenuTrigger>
@@ -577,7 +579,7 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 			{/* Comments List */}
 			<div
 				data-comments-container
-				className="flex-1 overflow-y-auto p-4 space-y-5 max-h-[500px] min-h-[300px]"
+				className="flex-1 overflow-y-auto p-2 xs:p-3 sm:p-4 space-y-3 xs:space-y-4 sm:space-y-5 max-h-[350px] xs:max-h-[400px] sm:max-h-[500px] min-h-[200px] xs:min-h-[250px] sm:min-h-[300px]"
 			>
 				{loading ? (
 					<div className="flex items-center justify-center h-full">
@@ -626,7 +628,7 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 																comment.id,
 															)
 														}
-														className="flex items-center gap-2 ml-10 text-xs text-muted-foreground hover:text-foreground"
+														className="flex items-center gap-2 ml-6 sm:ml-10 text-[10px] sm:text-xs text-muted-foreground hover:text-foreground"
 													>
 														<span className="w-6 h-px bg-muted-foreground/30" />
 														hide replies
@@ -640,7 +642,7 @@ export function TokenChat({ tokenId, className }: TokenChatProps) {
 															comment.id,
 														)
 													}
-													className="flex items-center gap-2 ml-10 text-xs text-muted-foreground hover:text-foreground"
+													className="flex items-center gap-2 ml-6 sm:ml-10 text-[10px] sm:text-xs text-muted-foreground hover:text-foreground"
 												>
 													<span className="w-6 h-px bg-muted-foreground/30" />
 													view {replyCount} more{" "}
