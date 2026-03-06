@@ -66,6 +66,8 @@ interface OnChainTradingPanelProps {
 	chainId: number;
 	/** Backend CPMM balance for sell display (raw 6-decimal string). Solana on-chain SPL balance is always 0 for CPMM tokens. */
 	backendTokenBalance?: string;
+	/** Circulating supply already minted/sold. Max buyable = totalSupply - circulatingSupply. */
+	circulatingSupply?: string;
 }
 
 type TradeType = "buy" | "sell";
@@ -93,6 +95,7 @@ export function OnChainTradingPanel({
 	chainId,
 	className,
 	backendTokenBalance,
+	circulatingSupply,
 }: OnChainTradingPanelProps) {
 	const { isAuthenticated, setShowAuthFlow, primaryWallet } = useAuth();
 	const [tradeType, setTradeType] = useState<TradeType>("buy");
@@ -730,6 +733,12 @@ export function OnChainTradingPanel({
 		return false; // EVM handles precision internally
 	}, [amount, tradeType, isSolana]);
 
+	// Maximum tokens available for purchase
+	const maxBuyableTokens = useMemo(() => {
+		const circulating = parseFloat(circulatingSupply || "0");
+		return circulating;
+	}, [circulatingSupply]);
+
 	// Calculate trade metrics with safety checks
 	const tradeMetrics = useMemo(() => {
 		const parsedAmount = parseFloat(amount) || 0;
@@ -870,6 +879,46 @@ export function OnChainTradingPanel({
 		evmOnChainPrice,
 		nativeBalance,
 		tokenBalance,
+	]);
+
+	// Check if calculated buy output exceeds max buyable tokens
+	const exceedsMaxSupply = useMemo(() => {
+		if (tradeType !== "buy") return false;
+		if (maxBuyableTokens === null) return false;
+		if (!amount || parseFloat(amount) <= 0) return false;
+
+		// Get the raw (uncapped) output
+		const rawOutput =
+			isSolana && cpmmEstimate !== null
+				? cpmmEstimate
+				: tradeMetrics.outputAmount;
+		return rawOutput > maxBuyableTokens;
+	}, [
+		tradeType,
+		maxBuyableTokens,
+		amount,
+		isSolana,
+		cpmmEstimate,
+		tradeMetrics.outputAmount,
+	]);
+
+	// Capped output amount for buy display — never show more than maxBuyableTokens
+	const cappedBuyOutput = useMemo(() => {
+		if (tradeType !== "buy") return tradeMetrics.outputAmount;
+		const rawOutput =
+			isSolana && cpmmEstimate !== null
+				? cpmmEstimate
+				: tradeMetrics.outputAmount;
+		if (maxBuyableTokens !== null && rawOutput > maxBuyableTokens) {
+			return maxBuyableTokens;
+		}
+		return rawOutput;
+	}, [
+		tradeType,
+		tradeMetrics.outputAmount,
+		isSolana,
+		cpmmEstimate,
+		maxBuyableTokens,
 	]);
 
 	// Trade recording is handled by backend blockchain event listener + instant sync API.
@@ -1134,6 +1183,13 @@ export function OnChainTradingPanel({
 		// Prevent trading with zero balance
 		if (hasZeroBalance) {
 			toast.error(zeroBalanceMessage);
+			return;
+		}
+		// Prevent purchasing more tokens than available supply
+		if (tradeType === "buy" && exceedsMaxSupply) {
+			toast.error(
+				`Cannot buy more than ${formatNumber(maxBuyableTokens)} ${tokenSymbol} (max available)`,
+			);
 			return;
 		}
 
@@ -1402,16 +1458,6 @@ export function OnChainTradingPanel({
 					))}
 				</div>
 
-				{/* Zero Balance Warning */}
-				{/* {hasZeroBalance && (
-					<div className="mb-3 p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-center gap-2">
-						<AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
-						<span className="text-sm text-destructive font-medium">
-							{zeroBalanceMessage}
-						</span>
-					</div>
-				)} */}
-
 				{/* Output Estimate */}
 				<AnimatePresence mode="wait">
 					{parseFloat(amount) > 0 && !hasZeroBalance && (
@@ -1449,10 +1495,8 @@ export function OnChainTradingPanel({
 										) : (
 											<>
 												{formatNumber(
-													isSolana &&
-														tradeType === "buy" &&
-														cpmmEstimate !== null
-														? cpmmEstimate
+													tradeType === "buy"
+														? cappedBuyOutput
 														: tradeMetrics.outputAmount,
 												)}{" "}
 												{tradeType === "buy"
@@ -1493,7 +1537,6 @@ export function OnChainTradingPanel({
 				</div>
 
 				{/* Execute Button */}
-
 				<>
 					{/* Trade Button - Merged with Approval functionality for sell */}
 					<Button
@@ -1516,6 +1559,7 @@ export function OnChainTradingPanel({
 											parseFloat(amount) <= 0 ||
 											exceedsBalance ||
 											belowMinimum ||
+											exceedsMaxSupply ||
 											isLoading ||
 											isConfirming ||
 											isApproving ||
@@ -1523,14 +1567,14 @@ export function OnChainTradingPanel({
 								: false
 						}
 						className={cn(
-							"w-full h-12 text-base font-semibold transition-all duration-200",
+							"w-full h-12 text-base font-semibold transition-all duration-200 disabled:cursor-not-allowed cursor-pointer disabled:pointer-events-auto",
 							walletPlatformMismatch
 								? "bg-amber-600/30 hover:bg-amber-600/40 text-amber-400/70 cursor-help"
 								: tradeType === "buy"
-									? "bg-linear-to-r from-green-500 to-emerald-500 hover:opacity-90 cursor-pointer"
+									? "bg-linear-to-r from-green-500 to-emerald-500 hover:opacity-90 "
 									: tradeType === "sell" && needsApproval
-										? "bg-red-600/30 hover:bg-red-600/40 text-red-400 cursor-pointer"
-										: "bg-linear-to-r from-red-500 to-rose-500 hover:opacity-90 text-gray-100 cursor-pointer",
+										? "bg-red-600/30 hover:bg-red-600/40 text-red-400"
+										: "bg-linear-to-r from-red-500 to-rose-500 hover:opacity-90 text-gray-100",
 						)}
 					>
 						{!isAuthenticated ? (
@@ -1542,6 +1586,15 @@ export function OnChainTradingPanel({
 							</>
 						) : appChainId !== normalizedChainId ? (
 							<>Switch To {nativeSymbol}</>
+						) : tradeType === "buy" &&
+						  exceedsBalance &&
+						  parseFloat(amount) > 0 ? (
+							<span className="flex items-center justify-center w-full truncate text-xs sm:text-sm">
+								<AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 shrink-0" />
+								<span className="truncate">
+									{balanceErrorMessage}
+								</span>
+							</span>
 						) : tradeType === "sell" && needsApproval ? (
 							exceedsBalance ? (
 								<span className="flex items-center justify-center w-full truncate text-xs sm:text-sm">
