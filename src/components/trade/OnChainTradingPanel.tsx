@@ -724,12 +724,8 @@ export function OnChainTradingPanel({
 			};
 		}
 
-		// Solana: use backend CPMM price for trade estimation.
-		// The on-chain Solana program uses a linear bonding curve (P = slope*S + base_price),
-		// but the backend pricing is based on the CPMM (x·y=k) model with virtual reserves.
-		// The on-chain curve parameters are not calibrated for CPMM pricing, so using them
-		// for estimation would produce wildly incorrect results (e.g. 0 tokens).
-		// Instead, we use the backend spot price (currentPrice prop) for accurate estimates.
+		// Solana: use CPMM (constant product x·y=k) for trade estimation.
+		// The on-chain Solana program uses a CPMM bonding curve with virtual reserves.
 		if (isSolana) {
 			// Use on-chain fee percentages when available, otherwise assume 2%
 			const feePct = solanaCurveState
@@ -738,6 +734,25 @@ export function OnChainTradingPanel({
 
 			if (parsedAmount > 0 && price > 0) {
 				if (tradeType === "buy") {
+					if (solanaCurveState) {
+						// CPMM buy: tokens_out = virtualTokens * netSol / (virtualSol + netSol)
+						const netLamports = BigInt(Math.round(parsedAmount * (1 - feePct) * 1e9));
+						const vSol = solanaCurveState.virtualSolReserves;
+						const vTok = solanaCurveState.virtualTokenReserves;
+						if (vSol > 0n && vTok > 0n && netLamports > 0n) {
+							const tokensRaw = (vTok * netLamports) / (vSol + netLamports);
+							const estimatedTokens = Number(tokensRaw) / 1e9; // 9-decimal tokens
+							return {
+								outputAmount: estimatedTokens,
+								fees: parsedAmount * feePct,
+								effectivePrice: parsedAmount > 0 ? parsedAmount / estimatedTokens : 0,
+								priceImpact: 0,
+								isHighImpact: false,
+								isUnreasonable: !isFinite(estimatedTokens) || estimatedTokens > 1e18,
+							};
+						}
+					}
+					// Fallback: use backend spot price
 					const netAmount = parsedAmount * (1 - feePct);
 					const estimatedTokens = netAmount / price;
 					return {
@@ -749,18 +764,14 @@ export function OnChainTradingPanel({
 						isUnreasonable: !isFinite(estimatedTokens) || estimatedTokens > 1e18,
 					};
 				} else if (solanaCurveState) {
-					// Use on-chain LINEAR bonding curve formula for accurate sell estimate.
-					// The CPMM spot price overestimates because it uses a different model.
-					// Formula: grossSol = slope * N * (S - N/2) + basePrice * N
-					const nRaw = BigInt(Math.round(parsedAmount * 1e6)); // 6-decimal raw
+					// CPMM sell: sol_out = virtualSol * tokens / (virtualTokens + tokens)
+					const nRaw = BigInt(Math.round(parsedAmount * 1e9)); // 9-decimal raw
 					const s = solanaCurveState.totalSupply;
 					const n = nRaw > s ? s : nRaw; // cap at total supply
 					if (n > 0n) {
-						const halfN = n / 2n;
-						const sMinusHalf = s > halfN ? s - halfN : 0n;
-						const grossSolLamports =
-							solanaCurveState.slope * n * sMinusHalf +
-							solanaCurveState.basePrice * n;
+						const vSol = solanaCurveState.virtualSolReserves;
+						const vTok = solanaCurveState.virtualTokenReserves;
+						const grossSolLamports = (vSol * n) / (vTok + n);
 						// Show gross amount (before protocol fees) — matches Phantom's
 						// simulation display. Fees (2%) are deducted on-chain separately.
 						const grossSol = Number(grossSolLamports) / 1e9;
@@ -1155,6 +1166,7 @@ export function OnChainTradingPanel({
 						bondingCurveAddress: bondingCurveAddress as string,
 						solAmount: amount,
 					});
+
 					if (sig) {
 						toast.info("Buy order submitted!", {
 							id: "trade",

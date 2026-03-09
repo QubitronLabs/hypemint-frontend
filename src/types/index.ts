@@ -120,7 +120,7 @@ export interface Token {
 export interface BondingCurve {
 	id: string;
 	tokenId: string;
-	contractAddress: `0xe${string}`;
+	contractAddress: string;
 	curveType: "linear" | "exponential" | "sigmoid" | "cpmm";
 	initialPrice: string;
 	slope: string;

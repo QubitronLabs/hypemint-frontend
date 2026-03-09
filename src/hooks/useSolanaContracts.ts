@@ -148,27 +148,20 @@ async function confirmTransactionRobust(
 const RENT_EXEMPT_MIN_LAMPORTS = 900_880n;
 
 /**
- * Replicate the on-chain LINEAR bonding curve sell formula:
- *   grossSol = slope * N * (S - N/2) + basePrice * N
+ * Replicate the on-chain CPMM sell formula:
+ *   sol_out = virtualSol × tokens / (virtualTokens + tokens)
  *
  * This is used to predict how much SOL the vault would need to pay out,
  * so we can cap the sell amount to keep the vault above rent-exempt.
  */
 function estimateGrossSolForSell(
 	tokenAmount: bigint,
-	currentSupply: bigint,
-	slope: bigint,
-	basePrice: bigint,
+	virtualSol: bigint,
+	virtualTokens: bigint,
 ): bigint {
-	if (tokenAmount <= 0n) return 0n;
-	const n = tokenAmount;
-	const s = currentSupply;
-	const halfN = n / 2n;
-	if (s <= halfN) return 0n; // safety — shouldn't happen
-	const sMinusHalf = s - halfN;
-	const slopeComponent = slope * n * sMinusHalf;
-	const baseComponent = basePrice * n;
-	return slopeComponent + baseComponent;
+	if (tokenAmount <= 0n || virtualSol <= 0n) return 0n;
+	// sol_out = S × N / (T + N)
+	return (virtualSol * tokenAmount) / (virtualTokens + tokenAmount);
 }
 
 // ============================================
@@ -653,17 +646,14 @@ export function useSolanaSellTokens() {
 
 				const tokenMint = new PublicKey(params.tokenAddress);
 
-				// The backend CPMM uses 9 decimals for Solana tokens, but the
-				// on-chain Anchor program uses TOKEN_DECIMALS = 6.  We convert
-				// the user's input (human-readable CPMM tokens) to BOTH formats:
-				//   - cpmmSmallest  (9-decimal) → sent to backend syncTrade
-				//   - onChainAmount (6-decimal) → sent to the on-chain program
+				// Both backend CPMM and on-chain program use 9 decimals (TOKEN_DECIMALS=9).
+				// Convert user's human-readable input to smallest unit (9-decimal).
 				const tokenFloat = parseFloat(params.tokenAmount);
 				const cpmmSmallest = BigInt(
 					Math.round(tokenFloat * 1_000_000_000), // 9 decimals
 				);
 				let onChainAmount = BigInt(
-					Math.round(tokenFloat * 1_000_000), // 6 decimals (on-chain)
+					Math.round(tokenFloat * 1_000_000_000), // 9 decimals (on-chain TOKEN_DECIMALS=9)
 				);
 
 				if (cpmmSmallest <= 0n) {
@@ -672,13 +662,13 @@ export function useSolanaSellTokens() {
 					);
 				}
 
-				// Read the user's ACTUAL on-chain ATA balance (6-decimal) and
+				// Read the user's ACTUAL on-chain ATA balance (9-decimal) and
 				// cap the sell amount — the on-chain program will reject any
 				// amount exceeding its tracked total_supply.
 				const sellerATA = findATA(sellerPubkey, tokenMint);
 				try {
 					const ataBalanceResp = await connection.getTokenAccountBalance(sellerATA);
-					const ataBalance = BigInt(ataBalanceResp.value.amount); // raw 6-decimal
+					const ataBalance = BigInt(ataBalanceResp.value.amount); // raw 9-decimal
 					if (onChainAmount > ataBalance) {
 						onChainAmount = ataBalance;
 					}
@@ -722,9 +712,8 @@ export function useSolanaSellTokens() {
 						);
 						const grossSol = estimateGrossSolForSell(
 							onChainAmount,
-							curveStateBefore.totalSupply,
-							curveStateBefore.slope,
-							curveStateBefore.basePrice,
+							curveStateBefore.virtualSolReserves,
+							curveStateBefore.virtualTokenReserves,
 						);
 						const needed = grossSol + RENT_EXEMPT_MIN_LAMPORTS;
 						if (vaultBalance < needed) {
@@ -1122,69 +1111,40 @@ export function useSolanaBondingCurveState(tokenAddress?: string) {
 // ============================================
 
 /**
- * Integer square root using Newton's method (matching on-chain implementation)
- */
-function integerSqrt(n: bigint): bigint {
-	if (n <= 0n) return 0n;
-	let x = n;
-	let y = (x + 1n) / 2n;
-	while (y < x) {
-		x = y;
-		y = (x + n / x) / 2n;
-	}
-	return x;
-}
-
-/**
  * Calculate tokens received for a given SOL amount (lamports)
- * Matches on-chain: calculate_tokens_for_sol
+ * Matches on-chain CPMM: tokens_out = virtualTokens * solAmount / (virtualSol + solAmount)
  */
 export function calculateTokensForSol(
 	solAmount: bigint,
-	currentSupply: bigint,
-	slope: bigint,
-	basePrice: bigint,
+	virtualSolReserves: bigint,
+	virtualTokenReserves: bigint,
 ): bigint {
-	if (solAmount <= 0n) return 0n;
-
-	const bCoeff = slope * currentSupply + basePrice;
-	const bSq = bCoeff * bCoeff;
-	const twoMC = 2n * slope * solAmount;
-	const discriminant = bSq + twoMC;
-
-	const sqrtDisc = integerSqrt(discriminant);
-	if (sqrtDisc <= bCoeff) return 0n;
-
-	return (sqrtDisc - bCoeff) / slope;
+	if (solAmount <= 0n || virtualSolReserves === 0n || virtualTokenReserves === 0n) return 0n;
+	return (virtualTokenReserves * solAmount) / (virtualSolReserves + solAmount);
 }
 
 /**
  * Calculate SOL returned for selling tokens
- * Matches on-chain: calculate_sol_for_tokens
+ * Matches on-chain CPMM: sol_out = virtualSol * tokenAmount / (virtualTokens + tokenAmount)
  */
 export function calculateSolForTokens(
 	tokenAmount: bigint,
-	currentSupply: bigint,
-	slope: bigint,
-	basePrice: bigint,
+	virtualSolReserves: bigint,
+	virtualTokenReserves: bigint,
 ): bigint {
-	if (tokenAmount <= 0n) return 0n;
-
-	const halfN = tokenAmount / 2n;
-	const sMinus = currentSupply - halfN;
-	const slopeComponent = slope * tokenAmount * sMinus;
-	const baseComponent = basePrice * tokenAmount;
-
-	return slopeComponent + baseComponent;
+	if (tokenAmount <= 0n || virtualSolReserves === 0n || virtualTokenReserves === 0n) return 0n;
+	return (virtualSolReserves * tokenAmount) / (virtualTokenReserves + tokenAmount);
 }
 
 /**
- * Calculate current price: P = slope * supply + base_price (in lamports)
+ * Calculate current price: price = virtualSol * 10^9 / virtualTokens (in lamports per human token)
+ * Matches on-chain: calculate_current_price
  */
 export function calculateCurrentPrice(
-	supply: bigint,
-	slope: bigint,
-	basePrice: bigint,
+	virtualSolReserves: bigint,
+	virtualTokenReserves: bigint,
 ): bigint {
-	return slope * supply + basePrice;
+	if (virtualTokenReserves === 0n) return 0n;
+	const TOKEN_DECIMALS_FACTOR = BigInt("1000000000"); // 10^9
+	return (virtualSolReserves * TOKEN_DECIMALS_FACTOR) / virtualTokenReserves;
 }
