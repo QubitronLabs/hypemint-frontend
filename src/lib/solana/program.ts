@@ -30,10 +30,10 @@ export const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
 	"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 );
 
-/** Default slope for bonding curve (matches on-chain DEFAULT_SLOPE) */
-export const DEFAULT_SLOPE = BigInt(10_000);
-/** Default base price in lamports (matches on-chain DEFAULT_BASE_PRICE) */
-export const DEFAULT_BASE_PRICE = BigInt(1_000_000);
+/** Default virtual SOL reserves for CPMM (30 SOL in lamports — matches pump.fun) */
+export const DEFAULT_VIRTUAL_SOL = BigInt("30000000000");
+/** Default virtual token reserves for CPMM (~1.073B tokens × 10^9 — matches pump.fun) */
+export const DEFAULT_VIRTUAL_TOKENS = BigInt("1073000191000000000");
 /** Token decimals */
 export const TOKEN_DECIMALS = 9;
 
@@ -216,8 +216,10 @@ export interface BondingCurveData {
 	creator: PublicKey;
 	totalSupply: bigint;
 	reserveBalance: bigint;
-	slope: bigint;
-	basePrice: bigint;
+	/** Virtual SOL reserves for CPMM pricing (lamports) */
+	virtualSolReserves: bigint;
+	/** Virtual token reserves for CPMM pricing (raw tokens, 9 decimals) */
+	virtualTokenReserves: bigint;
 	protocolFeeBps: number;
 	creatorFeeBps: number;
 	protocolFeeRecipient: PublicKey;
@@ -297,10 +299,10 @@ export function deserializeBondingCurveState(
 	const reserveBalance = readU64LE(data, offset);
 	offset += 8;
 
-	const slope = readU64LE(data, offset);
+	const virtualSolReserves = readU64LE(data, offset);
 	offset += 8;
 
-	const basePrice = readU64LE(data, offset);
+	const virtualTokenReserves = readU64LE(data, offset);
 	offset += 8;
 
 	const protocolFeeBps = readU16LE(data, offset);
@@ -331,8 +333,8 @@ export function deserializeBondingCurveState(
 		creator,
 		totalSupply,
 		reserveBalance,
-		slope,
-		basePrice,
+		virtualSolReserves,
+		virtualTokenReserves,
 		protocolFeeBps,
 		creatorFeeBps,
 		protocolFeeRecipient,
@@ -389,15 +391,15 @@ export async function fetchBondingCurveState(
  *
  * Layout: [8 discriminator][borsh string name][borsh string symbol]
  *         [borsh string image_uri][borsh string description]
- *         [u64 slope][u64 base_price]
+ *         [u64 virtual_sol][u64 virtual_tokens]
  */
 function buildCreateTokenData(
 	name: string,
 	symbol: string,
 	imageUri: string,
 	description: string,
-	slope: bigint = DEFAULT_SLOPE,
-	basePrice: bigint = DEFAULT_BASE_PRICE,
+	virtualSol: bigint = DEFAULT_VIRTUAL_SOL,
+	virtualTokens: bigint = DEFAULT_VIRTUAL_TOKENS,
 ): Uint8Array {
 	return concatBytes(
 		DISCRIMINATORS.create_token,
@@ -405,8 +407,8 @@ function buildCreateTokenData(
 		serializeBorshString(symbol),
 		serializeBorshString(imageUri),
 		serializeBorshString(description),
-		serializeBorshU64(slope),
-		serializeBorshU64(basePrice),
+		serializeBorshU64(virtualSol),
+		serializeBorshU64(virtualTokens),
 	);
 }
 
@@ -453,10 +455,10 @@ export interface CreateTokenParams {
 	imageUri: string;
 	/** Token description */
 	description: string;
-	/** Bonding curve slope (defaults to DEFAULT_SLOPE) */
-	slope?: bigint;
-	/** Base price in lamports (defaults to DEFAULT_BASE_PRICE) */
-	basePrice?: bigint;
+	/** Virtual SOL reserves for CPMM (defaults to DEFAULT_VIRTUAL_SOL) */
+	virtualSol?: bigint;
+	/** Virtual token reserves for CPMM (defaults to DEFAULT_VIRTUAL_TOKENS) */
+	virtualTokens?: bigint;
 }
 
 export interface CreateTokenResult {
@@ -505,8 +507,8 @@ export async function buildCreateTokenTransaction(
 		params.symbol,
 		params.imageUri,
 		params.description,
-		params.slope ?? DEFAULT_SLOPE,
-		params.basePrice ?? DEFAULT_BASE_PRICE,
+		params.virtualSol ?? DEFAULT_VIRTUAL_SOL,
+		params.virtualTokens ?? DEFAULT_VIRTUAL_TOKENS,
 	);
 
 	// Build the instruction

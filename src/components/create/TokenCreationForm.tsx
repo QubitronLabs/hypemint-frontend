@@ -53,7 +53,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { parseUnits as viemParseUnits, type Address } from "viem";
+import { parseEther, parseUnits as viemParseUnits, type Address } from "viem";
 import {
 	Upload,
 	Globe,
@@ -95,6 +95,7 @@ import {
 import { useChainId as useWagmiChainId } from "wagmi";
 import { DEFAULT_CHAIN_ID } from "@/lib/wagmi/config";
 import { toast } from "sonner";
+import { syncTrade } from "@/lib/api/trades";
 import {
 	getInitialSupplyPreview,
 	getChainTokenomics,
@@ -102,12 +103,10 @@ import {
 	type ChainTokenomics,
 } from "@/lib/api/tokens";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
-import {
-	useActiveChainType,
-	useChainId as useDynamicChainId,
-	useNetworkHasHydrated,
-	useChainLogo,
-} from "@/lib/network";
+import { isEthereumWallet } from "@dynamic-labs/ethereum";
+import { parseGwei } from "viem";
+import { HYPE_BONDING_CURVE_ABI } from "@/lib/contracts";
+import { useActiveChainType, useChainId as useDynamicChainId, useNetworkHasHydrated, useChainLogo } from "@/lib/network";
 import { useNetwork as useDynamicNetwork } from "@/lib/network";
 
 // ============================================================================
@@ -375,7 +374,7 @@ function useDebounce<T>(value: T, delay: number): T {
 export function TokenCreationForm() {
 	const router = useRouter();
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
-	const { setShowAuthFlow } = useDynamicContext();
+	const { setShowAuthFlow, primaryWallet } = useDynamicContext();
 	const activeChainType = useActiveChainType();
 	const walletChainId = useWagmiChainId();
 	const dynamicChainId = useDynamicChainId();
@@ -916,20 +915,107 @@ export function TokenCreationForm() {
 						});
 
 						try {
-							await buyTokens({
-								bondingCurveAddress:
-									bondingCurveAddr as Address,
-								maticAmount: initialBuyAmount,
+							// Use DynamicSDK wallet client directly for the initial buy.
+							// wagmi's writeContractAsync cannot work because
+							// @dynamic-labs/wagmi-connector is not installed — wagmi
+							// has no connector to talk to MetaMask.  DynamicSDK's
+							// EthereumWallet.getWalletClient() gives us a viem
+							// WalletClient that IS connected to the user's wallet.
+							if (!primaryWallet || !isEthereumWallet(primaryWallet)) {
+								throw new Error("No EVM wallet connected — please connect MetaMask");
+							}
+
+							// Get viem clients from DynamicSDK
+							const walletClient = await primaryWallet.getWalletClient();
+							const evmPublicClient = await primaryWallet.getPublicClient();
+
+							// Poll until the bonding curve contract is visible on-chain.
+							// The backend just deployed it — the frontend's RPC node
+							// may need a few seconds to index the new contract.
+							const bcAddr = bondingCurveAddr as `0x${string}`;
+							const maxWaitMs = 30_000;
+							const pollMs = 2_000;
+							const t0 = Date.now();
+							let contractReady = false;
+
+							while (Date.now() - t0 < maxWaitMs) {
+								try {
+									const code = await evmPublicClient.getCode({ address: bcAddr });
+									if (code && code !== "0x" && code.length > 2) {
+										contractReady = true;
+										break;
+									}
+								} catch { /* RPC hiccup — keep polling */ }
+								toast.info("Waiting for contract deployment...", {
+									id: "initial-buy",
+								});
+								await new Promise((r) => setTimeout(r, pollMs));
+							}
+
+							if (!contractReady) {
+								throw new Error(
+									"Contract not yet visible on RPC — please buy from the token page",
+								);
+							}
+
+							// Polygon / Amoy RPCs need a higher priority fee
+							const isPolygon = [137, 80002].includes(activeChainId);
+							const gasOpts = isPolygon
+								? { maxPriorityFeePerGas: parseGwei("30"), maxFeePerGas: parseGwei("150") }
+								: {};
+
+							// Send buy tx via DynamicSDK wallet (MetaMask will open)
+							const buyHash = await walletClient.writeContract({
+								address: bcAddr,
+								abi: HYPE_BONDING_CURVE_ABI,
+								functionName: "buy",
+								args: [0n], // minTokens — no slippage guard for initial dev buy
+								value: parseEther(initialBuyAmount),
+								...gasOpts,
 							});
 
-							toast.success("Initial purchase successful!", {
-								id: "initial-buy",
-								description: `You now own ${symbol.toUpperCase()} tokens!`,
-							});
+							if (buyHash) {
+								toast.info("Transaction submitted — waiting for confirmation...", {
+									id: "initial-buy",
+								});
+
+								// Wait for the tx to be mined before syncing
+								const receipt = await evmPublicClient.waitForTransactionReceipt({
+									hash: buyHash,
+									confirmations: 1,
+									timeout: 60_000, // 60s max wait
+								});
+
+								if (receipt.status === "reverted") {
+									throw new Error("Buy transaction reverted on-chain");
+								}
+
+								toast.success("Initial purchase confirmed!", {
+									id: "initial-buy",
+									description: `You now own ${symbol.toUpperCase()} tokens!`,
+								});
+
+								// Sync the initial buy trade to the backend immediately
+								// (tx is already mined, backend can verify the receipt).
+								try {
+									await syncTrade({
+										txHash: buyHash,
+										tokenId: backendTokenId,
+										chainId: activeChainId,
+									});
+								} catch {
+									// Non-critical — event listener picks up trades as backup
+								}
+							} else {
+								toast.error(
+									"Initial purchase failed — please buy from the token page",
+									{ id: "initial-buy" },
+								);
+							}
 						} catch (buyErr) {
 							console.error("Initial buy failed:", buyErr);
 							toast.error(
-								"Initial purchase failed, but token was created",
+								`Initial purchase failed: ${buyErr instanceof Error ? buyErr.message : "Unknown error"}`,
 								{ id: "initial-buy" },
 							);
 						} finally {

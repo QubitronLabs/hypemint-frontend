@@ -1206,6 +1206,7 @@ export function OnChainTradingPanel({
 						bondingCurveAddress: bondingCurveAddress as string,
 						solAmount: amount,
 					});
+
 					if (sig) {
 						toast.info("Buy order submitted!", {
 							id: "trade",

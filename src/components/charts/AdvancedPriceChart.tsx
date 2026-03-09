@@ -298,7 +298,7 @@ export function AdvancedPriceChart({
 
 	// State
 	const [candles, setCandles] = useState<Candle[]>([]);
-	const [timeRange, setTimeRange] = useState<TimeRange>("1h");
+	const [timeRange, setTimeRange] = useState<TimeRange>("5m");
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [activeTool, setActiveTool] = useState<DrawingTool>("crosshair");

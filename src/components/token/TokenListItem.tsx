@@ -20,12 +20,16 @@ interface TokenListItemProps {
  * Mini Sparkline Chart for list view
  */
 function MiniSparkline({ data }: { data?: Array<{ timestamp: number; price: number }> }) {
-	if (!data || data.length < 2) {
+	if (!data || data.length === 0) {
 		return <div className="w-full h-8 bg-[#1a1a1a] rounded" />;
 	}
 	
-	const chartData = data.map(d => ({ value: d.price }));
-	const isPositive = data[data.length - 1].price >= data[0].price;
+	// If only 1 data point, duplicate it to draw a flat line
+	const chartInput = data.length === 1
+		? [data[0], { ...data[0], timestamp: data[0].timestamp + 3600 }]
+		: data;
+	const chartData = chartInput.map(d => ({ value: d.price }));
+	const isPositive = chartInput[chartInput.length - 1].price >= chartInput[0].price;
 	const gradientId = `sparkline-${isPositive ? 'green' : 'red'}-${Math.random().toString(36).substr(2, 9)}`;
 	const strokeColor = isPositive ? "#00ff88" : "#ff4444";
 	const fillColor = isPositive ? "#00ff88" : "#ff4444";
