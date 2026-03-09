@@ -1,7 +1,11 @@
-'use client';
+"use client";
 
-import { TokenCreationForm } from '@/components/create';
+import { TokenCreationForm } from "@/components/create";
 
 export default function CreateTokenPage() {
-  return <TokenCreationForm />;
+	return (
+		<div className="max-w-7xl mx-auto">
+			<TokenCreationForm />
+		</div>
+	);
 }

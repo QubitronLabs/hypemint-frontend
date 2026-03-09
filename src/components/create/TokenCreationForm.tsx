@@ -53,7 +53,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { formatEther, parseEther, formatUnits, parseUnits as viemParseUnits, type Address } from "viem";
+import { parseUnits as viemParseUnits, type Address } from "viem";
 import {
 	Upload,
 	Globe,
@@ -61,11 +61,9 @@ import {
 	MessageCircle,
 	Loader2,
 	AlertCircle,
-	Rocket,
 	X,
 	CheckCircle2,
 	XCircle,
-	ExternalLink,
 	Zap,
 	TrendingUp,
 	Users,
@@ -76,21 +74,24 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+	Accordion,
+	AccordionContent,
+	AccordionItem,
+	AccordionTrigger,
+} from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 import {
 	useAuth,
 	useCreateTokenOnChain,
 	useCreateTokenRequest,
 	useCreationFee,
-	useNativeBalance,
 	useBuyTokens,
 	useNativeCurrencySymbol,
 	useChainNativeBalance,
 	useSolanaCreateToken,
 	useSolanaBuyTokens,
-	useContractConfig,
 } from "@/hooks";
-import { getTxUrl } from "@/lib/wagmi";
 import { useChainId as useWagmiChainId } from "wagmi";
 import { DEFAULT_CHAIN_ID } from "@/lib/wagmi/config";
 import { toast } from "sonner";
@@ -101,9 +102,13 @@ import {
 	type ChainTokenomics,
 } from "@/lib/api/tokens";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
-import { useActiveChainType, useChainId as useDynamicChainId, useNetworkHasHydrated, useChainLogo } from "@/lib/network";
+import {
+	useActiveChainType,
+	useChainId as useDynamicChainId,
+	useNetworkHasHydrated,
+	useChainLogo,
+} from "@/lib/network";
 import { useNetwork as useDynamicNetwork } from "@/lib/network";
-import type { ChainType } from "@/lib/network";
 
 // ============================================================================
 // COMPONENTS
@@ -144,8 +149,6 @@ function TokenPreviewCard({
 	initialPriceUsd,
 	initialMcapUsd,
 	graduationThresholdUsd,
-	graduationMultiplier,
-	nativeSymbol,
 }: TokenPreviewProps) {
 	const hasSocialLinks = websiteUrl || twitterUrl || telegramUrl;
 
@@ -182,7 +185,7 @@ function TokenPreviewCard({
 
 			{/* Token Card Preview */}
 			<div className="p-4">
-				<div className="bg-background border border-border rounded-xl p-4 hover:border-primary/50 transition-all">
+				<div className="bg-background border border-border rounded-xl p-4 ">
 					{/* Token Header */}
 					<div className="flex items-start gap-3 mb-3">
 						<div className="relative">
@@ -256,7 +259,8 @@ function TokenPreviewCard({
 						</div>
 						{graduationThresholdUsd ? (
 							<p className="text-[10px] text-muted-foreground mt-1 text-right">
-								Graduation at {formatMcap(graduationThresholdUsd)}
+								Graduation at{" "}
+								{formatMcap(graduationThresholdUsd)}
 								{/* {graduationMultiplier ? ` (${graduationMultiplier}× initial mcap)` : ""} */}
 							</p>
 						) : null}
@@ -389,7 +393,6 @@ export function TokenCreationForm() {
 	 * Returns the deployed token and bonding curve addresses.
 	 */
 	const {
-		createToken: createTokenOnChain,
 		isCreating, // True while waiting for user to confirm in wallet
 		isConfirming, // True while transaction is being mined
 		txHash, // Transaction hash after submission
@@ -418,8 +421,6 @@ export function TokenCreationForm() {
 		buy: buyTokens,
 		isBuying,
 		isConfirming: isBuyConfirming,
-		txHash: buyTxHash,
-		error: buyError,
 	} = useBuyTokens();
 
 	/** Backend API mutation for storing token metadata */
@@ -435,12 +436,9 @@ export function TokenCreationForm() {
 		error: solanaContractError,
 	} = useSolanaCreateToken();
 
-	const {
-		buy: solanaBuyTokens,
-	} = useSolanaBuyTokens();
+	const { buy: solanaBuyTokens } = useSolanaBuyTokens();
 
 	/** Get deployment config to find correct chainId per chain type */
-	const { getDeploymentByChainType } = useContractConfig();
 
 	// ========================================================================
 	// FORM STATE
@@ -554,7 +552,8 @@ export function TokenCreationForm() {
 			try {
 				// Use the user's actual chain ID for preview data.
 				// Prefer Dynamic SDK chain (reactive), then wagmi, then default.
-				const previewChainId = dynamicChainId ?? walletChainId ?? DEFAULT_CHAIN_ID;
+				const previewChainId =
+					dynamicChainId ?? walletChainId ?? DEFAULT_CHAIN_ID;
 				const data = await getChainTokenomics(previewChainId);
 				if (!cancelled) {
 					setTokenomics(data);
@@ -565,7 +564,9 @@ export function TokenCreationForm() {
 		}
 		fetchTokenomics();
 
-		return () => { cancelled = true; };
+		return () => {
+			cancelled = true;
+		};
 	}, [dynamicChainId, walletChainId, networkHasHydrated]);
 
 	/**
@@ -618,19 +619,19 @@ export function TokenCreationForm() {
 		let cancelled = false;
 
 		async function fetchSupplyPreview() {
-			if (
-				!debouncedBuyAmount ||
-				parseFloat(debouncedBuyAmount) <= 0
-			) {
+			if (!debouncedBuyAmount || parseFloat(debouncedBuyAmount) <= 0) {
 				setSupplyPreview(null);
 				return;
 			}
 
 			setIsLoadingPreview(true);
 			try {
-				const previewChainId = dynamicChainId ?? walletChainId ?? DEFAULT_CHAIN_ID;
-				const preview =
-					await getInitialSupplyPreview(debouncedBuyAmount, previewChainId);
+				const previewChainId =
+					dynamicChainId ?? walletChainId ?? DEFAULT_CHAIN_ID;
+				const preview = await getInitialSupplyPreview(
+					debouncedBuyAmount,
+					previewChainId,
+				);
 				if (!cancelled) {
 					setSupplyPreview(preview);
 				}
@@ -648,7 +649,9 @@ export function TokenCreationForm() {
 
 		fetchSupplyPreview();
 
-		return () => { cancelled = true; };
+		return () => {
+			cancelled = true;
+		};
 	}, [debouncedBuyAmount, dynamicChainId, walletChainId, networkHasHydrated]);
 
 	// ========================================================================
@@ -656,12 +659,12 @@ export function TokenCreationForm() {
 	// ========================================================================
 
 	/** Derived: whether user wants an initial purchase (non-empty amount > 0) */
-	const wantInitialBuy = !!initialBuyAmount && parseFloat(initialBuyAmount) > 0;
+	const wantInitialBuy =
+		!!initialBuyAmount && parseFloat(initialBuyAmount) > 0;
 
 	/** Max mintable token validation */
 	const exceedsMaxMintable = !!(
-		supplyPreview &&
-		supplyPreview.estimatedTokens > 793_100_000
+		supplyPreview && supplyPreview.estimatedTokens > 793_100_000
 	);
 
 	/** Form is valid when required fields are filled and symbol is available */
@@ -683,9 +686,9 @@ export function TokenCreationForm() {
 
 	// Default fees: 0.01 POL (EVM) or 0.01 SOL (Solana)
 	const defaultFee = isSolana
-		? BigInt("10000000")       // 0.01 SOL = 10_000_000 lamports
+		? BigInt("10000000") // 0.01 SOL = 10_000_000 lamports
 		: BigInt("10000000000000000"); // 0.01 POL = 10^16 wei
-	const fee = isSolana ? defaultFee : (creationFee || defaultFee);
+	const fee = isSolana ? defaultFee : creationFee || defaultFee;
 
 	const initialBuySmallestUnit =
 		wantInitialBuy && initialBuyAmount
@@ -875,7 +878,8 @@ export function TokenCreationForm() {
 					// fall back to wagmi chain, then DEFAULT_CHAIN_ID.
 					// Do NOT override with DEFAULT_CHAIN_ID — let the backend validate
 					// factory availability and return a clear error if unsupported.
-					const activeChainId = dynamicChainId ?? walletChainId ?? DEFAULT_CHAIN_ID;
+					const activeChainId =
+						dynamicChainId ?? walletChainId ?? DEFAULT_CHAIN_ID;
 
 					// Call gasless endpoint — backend signs & submits the tx
 					const result = await createTokenRequestApi.mutateAsync({
@@ -891,7 +895,8 @@ export function TokenCreationForm() {
 					});
 
 					const backendTokenId = result.token.id;
-					const bondingCurveAddr = result.bondingCurve?.contractAddress;
+					const bondingCurveAddr =
+						result.bondingCurve?.contractAddress;
 
 					toast.success("Token created successfully!", {
 						id: "create-token",
@@ -912,7 +917,8 @@ export function TokenCreationForm() {
 
 						try {
 							await buyTokens({
-								bondingCurveAddress: bondingCurveAddr as Address,
+								bondingCurveAddress:
+									bondingCurveAddr as Address,
 								maticAmount: initialBuyAmount,
 							});
 
@@ -934,7 +940,10 @@ export function TokenCreationForm() {
 					router.push(`/token/${backendTokenId}`);
 					return;
 				} catch (err) {
-					const msg = err instanceof Error ? err.message : "Failed to create token";
+					const msg =
+						err instanceof Error
+							? err.message
+							: "Failed to create token";
 					toast.error(msg, { id: "create-token" });
 					return;
 				}
@@ -986,11 +995,11 @@ export function TokenCreationForm() {
 					});
 
 					try {
-						const buySignature = await solanaBuyTokens({
-							bondingCurveAddress: bondingCurveAddr,
-							solAmount: initialBuyAmount,
-							tokenId: backendTokenId,
-						});
+						// const buySignature = await solanaBuyTokens({
+						// 	bondingCurveAddress: bondingCurveAddr,
+						// 	solAmount: initialBuyAmount,
+						// 	tokenId: backendTokenId,
+						// });
 
 						toast.success("Initial purchase successful!", {
 							id: "initial-buy",
@@ -1010,7 +1019,10 @@ export function TokenCreationForm() {
 				router.push(`/token/${backendTokenId}`);
 				return;
 			} catch (err) {
-				const msg = err instanceof Error ? err.message : "Failed to create token on Solana";
+				const msg =
+					err instanceof Error
+						? err.message
+						: "Failed to create token on Solana";
 				toast.error(msg, { id: "create-token" });
 				return;
 			}
@@ -1034,36 +1046,55 @@ export function TokenCreationForm() {
 	}
 
 	return (
-		<div className="py-8 px-4">
-			<div className="mx-auto">
-				{/* Header */}
-
-				{/* Two Column Layout */}
-				<div className="grid lg:grid-cols-6 gap-6">
-					{/* Left Column - Form */}
-					<motion.div
-						initial={{ opacity: 0, y: 20 }}
-						animate={{ opacity: 1, y: 0 }}
-						transition={{ delay: 0.1 }}
-						className="lg:col-span-4 bg-card border border-border rounded-2xl p-6 space-y-6"
-					>
-						<motion.div
-							initial={{ opacity: 0, y: -20 }}
-							animate={{ opacity: 1, y: 0 }}
-							className="mb-8"
-						>
-							<h1 className="text-3xl font-bold mb-2">
+		<div className="p-8 mx-auto">
+			{/* Two Column Layout */}
+			<div className="grid lg:grid-cols-6 gap-6">
+				{/* Left Column - Form */}
+				<motion.div
+					initial={{ opacity: 0, y: 20 }}
+					animate={{ opacity: 1, y: 0 }}
+					transition={{ delay: 0.1 }}
+					className="lg:col-span-4 space-y-6"
+				>
+					{/* ── Card 1: Token Details ── */}
+					<div className="bg-card border border-border rounded-2xl p-6 space-y-5">
+						{/* Header */}
+						<div className="flex gap-2 flex-col">
+							<h1 className="text-lg sm:text-2xl font-bold">
 								Create Token
 							</h1>
-							<p className="text-muted-foreground">
+
+							<p className="text-sm text-muted-foreground mt-1">
 								{isSolana
 									? "Launch on Solana in under a minute"
 									: "Launch on Polygon in under a minute"}
 							</p>
-						</motion.div>
 
-						{/* Network Selection Toggle (EVM / Solana) */}
-						<div className="flex items-center gap-3 mb-4 p-3 bg-background/40 rounded-xl border border-border/40">
+							{/* HypeBoost inline toggle */}
+							<button
+								type="button"
+								onClick={() =>
+									setHypeBoostEnabled(!hypeBoostEnabled)
+								}
+								className={cn(
+									"inline-flex w-fit items-center mt-2 gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border",
+									hypeBoostEnabled
+										? "border-primary bg-primary/10 text-primary"
+										: "border-border bg-muted text-muted-foreground hover:border-primary/50",
+								)}
+							>
+								<Zap
+									className={cn(
+										"h-3.5 w-3.5",
+										hypeBoostEnabled && "fill-primary",
+									)}
+								/>
+								HypeBoost {hypeBoostEnabled ? "ON" : "OFF"}
+							</button>
+						</div>
+
+						{/* Network Selection */}
+						<div className="flex items-center gap-3 p-3 bg-card rounded-xl border border-border">
 							<span className="text-sm font-medium text-muted-foreground mr-auto">
 								Network
 							</span>
@@ -1071,271 +1102,148 @@ export function TokenCreationForm() {
 								active={activeChainType === "EVM"}
 								icon={<Zap className="h-3.5 w-3.5" />}
 								label="EVM"
-								onClick={() => {/* Chain type is auto-detected from wallet */}}
+								onClick={() => {}}
 							/>
 							<ChainToggleButton
 								active={activeChainType === "SOLANA"}
 								icon={<Globe className="h-3.5 w-3.5" />}
 								label="Solana"
-								onClick={() => {/* Chain type is auto-detected from wallet */}}
+								onClick={() => {}}
 							/>
-							<span className="text-[10px] text-muted-foreground/60 ml-1">
+							<span className="text-[10px] text-muted-foreground/60 ml-1 hidden sm:inline">
 								Auto-detected from wallet
 							</span>
 						</div>
-						{/* Token Basics */}
-						<div className="grid md:grid-cols-2 gap-6">
-							{/* Left Column */}
-							<div className="space-y-4">
-								{/* Name */}
-								<div>
-									<label className="text-sm font-medium mb-1.5 block">
-										Token Name{" "}
-										<span className="text-red-500">*</span>
-									</label>
-									<Input
-										placeholder="e.g., Pepe Classic"
-										value={name}
-										onChange={(e) =>
-											setName(e.target.value)
-										}
-										className="h-11 bg-background"
-										maxLength={50}
-									/>
-								</div>
 
-								{/* Symbol */}
-								<div>
-									<label className="text-sm font-medium mb-1.5 block">
-										Symbol{" "}
-										<span className="text-red-500">*</span>
-									</label>
-									<div className="relative">
-										<Input
-											placeholder="e.g., PEPE"
-											value={symbol}
-											onChange={(e) =>
-												setSymbol(
-													e.target.value
-														.toUpperCase()
-														.replace(
-															/[^A-Z0-9]/g,
-															"",
-														),
-												)
-											}
-											className={cn(
-												"h-11 font-mono bg-background pr-10",
-												symbolAvailable === false &&
-													"border-red-500",
-												symbolAvailable === true &&
-													"border-green-500",
-											)}
-											maxLength={10}
-										/>
-										<div className="absolute right-3 top-1/2 -translate-y-1/2">
-											{isCheckingSymbol ? (
-												<Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-											) : symbolAvailable === true ? (
-												<CheckCircle2 className="h-4 w-4 text-green-500" />
-											) : symbolAvailable === false ? (
-												<XCircle className="h-4 w-4 text-red-500" />
-											) : null}
-										</div>
-									</div>
-									{symbolError && (
-										<p className="text-xs text-red-500 mt-1">
-											{symbolError}
-										</p>
-									)}
-								</div>
-
-								{/* Description */}
-								<div>
-									<label className="text-sm font-medium mb-1.5 block">
-										Description
-									</label>
-									<Textarea
-										placeholder="Tell the world about your token..."
-										value={description}
-										onChange={(e) =>
-											setDescription(e.target.value)
-										}
-										className="min-h-20 dark:bg-input/30 resize-none"
-										maxLength={500}
-									/>
-								</div>
-								{/* Social Links */}
-								<div>
-									<label className="text-sm font-medium mb-3 block">
-										Social Links{" "}
-										<span className="text-muted-foreground text-xs">
-											(optional)
-										</span>
-									</label>
-									<div className=" w-full space-y-3">
-										<div className="relative w-full">
-											<Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-											<Input
-												placeholder="Website"
-												value={websiteUrl}
-												onChange={(e) =>
-													setWebsiteUrl(
-														e.target.value,
-													)
-												}
-												className="pl-9 h-10 bg-background text-sm"
-											/>
-										</div>
-										<div className="relative w-full">
-											<Twitter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-											<Input
-												placeholder="Twitter"
-												value={twitterUrl}
-												onChange={(e) =>
-													setTwitterUrl(
-														e.target.value,
-													)
-												}
-												className="pl-9 h-10 bg-background text-sm"
-											/>
-										</div>
-										<div className="relative w-full">
-											<MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-											<Input
-												placeholder="Telegram"
-												value={telegramUrl}
-												onChange={(e) =>
-													setTelegramUrl(
-														e.target.value,
-													)
-												}
-												className="pl-9 h-10 bg-background text-sm"
-											/>
-										</div>
-									</div>
-								</div>
+						{/* Row 1: Token Name + Symbol side by side */}
+						<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+							<div>
+								<label className="text-sm font-medium mb-1.5 block">
+									Token Name{" "}
+									<span className="text-red-500">*</span>
+								</label>
+								<Input
+									placeholder="e.g., Pepe Classic"
+									value={name}
+									onChange={(e) => setName(e.target.value)}
+									className="h-11 bg-background"
+									maxLength={50}
+								/>
 							</div>
-
-							{/* Right Column - Image Upload */}
-							<div className="space-y-4">
-								{/* Token image uploader */}
-								<div>
-									<label className="text-sm font-medium mb-1.5 block">
-										Token Image
-									</label>
-									<div
-										onDragOver={handleDragOver}
-										onDragLeave={handleDragLeave}
-										onDrop={handleDrop}
-										onClick={() =>
-											!imagePreview &&
-											fileInputRef.current?.click()
+							<div>
+								<label className="text-sm font-medium mb-1.5 block">
+									Symbol{" "}
+									<span className="text-red-500">*</span>
+								</label>
+								<div className="relative">
+									<Input
+										placeholder="e.g., PEPE"
+										value={symbol}
+										onChange={(e) =>
+											setSymbol(
+												e.target.value
+													.toUpperCase()
+													.replace(/[^A-Z0-9]/g, ""),
+											)
 										}
 										className={cn(
-											"relative h-40 border-2 border-dashed rounded-xl transition-all flex flex-col items-center justify-center",
-											isDragging
-												? "border-primary bg-primary/10"
-												: imagePreview
-													? "border-green-500/50 cursor-default"
-													: "border-border hover:border-primary/50 cursor-pointer",
+											"h-11 font-mono bg-background pr-10",
+											symbolAvailable === false &&
+												"border-red-500",
+											symbolAvailable === true &&
+												"border-green-500",
 										)}
-									>
-										{imagePreview ? (
-											<>
-												<img
-													src={imagePreview}
-													alt="Token"
-													className="absolute inset-0 w-full h-full object-cover rounded-xl"
-												/>
-												<button
-													onClick={(e) => {
-														e.stopPropagation();
-														removeImage();
-													}}
-													className="absolute top-2 right-2 w-8 h-8 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center"
-												>
-													<X className="h-4 w-4 text-white" />
-												</button>
-											</>
-										) : (
-											<>
-												<Upload
-													className={cn(
-														"h-8 w-8 mb-2",
-														isDragging
-															? "text-primary"
-															: "text-muted-foreground",
-													)}
-												/>
-												<p className="text-sm font-medium">
-													{isDragging
-														? "Drop image here"
-														: "Click or drag to upload"}
-												</p>
-												<p className="text-xs text-muted-foreground mt-1">
-													PNG, JPG, GIF up to 5MB
-												</p>
-											</>
-										)}
-										<input
-											ref={fileInputRef}
-											type="file"
-											accept="image/*"
-											onChange={handleFileChange}
-											className="hidden"
-										/>
+										maxLength={10}
+									/>
+									<div className="absolute right-3 top-1/2 -translate-y-1/2">
+										{isCheckingSymbol ? (
+											<Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+										) : symbolAvailable === true ? (
+											<CheckCircle2 className="h-4 w-4 text-green-500" />
+										) : symbolAvailable === false ? (
+											<XCircle className="h-4 w-4 text-red-500" />
+										) : null}
 									</div>
 								</div>
-
-								{/* HypeBoost Toggle */}
-								<button
-									type="button"
-									onClick={() =>
-										setHypeBoostEnabled(!hypeBoostEnabled)
-									}
-									className={cn(
-										"w-full p-3 rounded-lg border-2 transition-all flex items-center gap-3",
-										hypeBoostEnabled
-											? "border-primary bg-primary/5"
-											: "border-border hover:border-primary/50",
-									)}
-								>
-									<div
-										className={cn(
-											"w-8 h-8 rounded-lg flex items-center justify-center",
-											hypeBoostEnabled
-												? "bg-primary text-white"
-												: "bg-muted",
-										)}
-									>
-										<Zap className="h-4 w-4" />
-									</div>
-									<div className="flex-1 text-left">
-										<span className="font-medium text-sm">
-											HypeBoost
-										</span>
-										<p className="text-xs text-muted-foreground">
-											Anti-bot protection
-										</p>
-									</div>
-									<span
-										className={cn(
-											"text-xs px-2 py-1 rounded-full font-medium",
-											hypeBoostEnabled
-												? "bg-primary text-white"
-												: "bg-muted text-muted-foreground",
-										)}
-									>
-										{hypeBoostEnabled ? "ON" : "OFF"}
-									</span>
-								</button>
-
+								{symbolError && (
+									<p className="text-xs text-red-500 mt-1">
+										{symbolError}
+									</p>
+								)}
 							</div>
 						</div>
 
-						{/* Initial Purchase — pump.fun style (always visible, optional) */}
-						<div className="rounded-xl border border-border p-5 space-y-4">
+						{/* Row 2: Description (full width) */}
+						<div>
+							<label className="text-sm font-medium mb-1.5 block">
+								Description
+							</label>
+							<Textarea
+								placeholder="Tell the world about your token..."
+								value={description}
+								onChange={(e) => setDescription(e.target.value)}
+								className="min-h-24 bg-background resize-none"
+								maxLength={500}
+							/>
+						</div>
+
+						{/* Row 3: Social Links Accordion */}
+						<Accordion type="single" collapsible className="w-full">
+							<AccordionItem
+								value="social-links"
+								className="border border-border rounded-xl px-4 border-b!"
+							>
+								<AccordionTrigger className="hover:no-underline py-3">
+									<div className="flex items-center gap-2">
+										<Globe className="h-4 w-4 text-muted-foreground" />
+										<span className="text-sm font-medium">
+											Social Links
+										</span>
+										<span className="text-xs text-muted-foreground">
+											(optional)
+										</span>
+									</div>
+								</AccordionTrigger>
+								<AccordionContent className="space-y-3 pb-4">
+									<div className="relative">
+										<Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+										<Input
+											placeholder="https://yourwebsite.com"
+											value={websiteUrl}
+											onChange={(e) =>
+												setWebsiteUrl(e.target.value)
+											}
+											className="pl-9 h-10 bg-background text-sm"
+										/>
+									</div>
+									<div className="relative">
+										<Twitter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+										<Input
+											placeholder="https://twitter.com/yourtoken"
+											value={twitterUrl}
+											onChange={(e) =>
+												setTwitterUrl(e.target.value)
+											}
+											className="pl-9 h-10 bg-background text-sm"
+										/>
+									</div>
+									<div className="relative">
+										<MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+										<Input
+											placeholder="https://t.me/yourtoken"
+											value={telegramUrl}
+											onChange={(e) =>
+												setTelegramUrl(e.target.value)
+											}
+											className="pl-9 h-10 bg-background text-sm"
+										/>
+									</div>
+								</AccordionContent>
+							</AccordionItem>
+						</Accordion>
+
+						{/* Row 4: Initial Purchase */}
+						<div className="bg-card rounded-xl border border-border p-4 sm:p-5 space-y-4">
 							<div>
 								<h3 className="text-sm font-semibold">
 									Choose how many{" "}
@@ -1348,9 +1256,9 @@ export function TokenCreationForm() {
 									</span>
 								</h3>
 								<p className="text-xs text-muted-foreground mt-1">
-									It&apos;s optional but buying a small
-									amount of coins helps protect your coin
-									from snipers
+									It&apos;s optional but buying a small amount
+									of coins helps protect your coin from
+									snipers
 								</p>
 							</div>
 
@@ -1371,9 +1279,7 @@ export function TokenCreationForm() {
 							<div className="relative">
 								<Input
 									type="number"
-									step={
-										inputMode === "native" ? "0.01" : "1"
-									}
+									step={inputMode === "native" ? "0.01" : "1"}
 									min="0"
 									placeholder={
 										inputMode === "native" ? "0.0" : "0"
@@ -1453,132 +1359,239 @@ export function TokenCreationForm() {
 							{exceedsMaxMintable && (
 								<p className="text-sm text-red-500 font-medium">
 									Exceeds maximum mintable tokens
-									(793,100,000). Please reduce your
-									purchase amount.
+									(793,100,000). Please reduce your purchase
+									amount.
 								</p>
 							)}
 						</div>
 
-						{/* Gasless Creation Info (All chains) */}
+						{/* Gasless Creation Info */}
 						{isAuthenticated && (
 							<div className="bg-muted/50 rounded-xl p-4">
-								<div className="flex items-center gap-3 mb-2">
+								<div className="flex items-center gap-3">
 									<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10 border border-green-500/20">
 										<Zap className="h-5 w-5 text-green-500" />
 									</div>
 									<div>
-										<p className="text-sm font-semibold">Gasless Token Creation</p>
+										<p className="text-sm font-semibold">
+											Gasless Token Creation
+										</p>
 										<p className="text-xs text-muted-foreground">
-											Free — No gas required! Creating on <span className="font-semibold text-primary">{dynamicNetwork?.name || `Chain ${dynamicChainId ?? walletChainId ?? DEFAULT_CHAIN_ID}`}</span>
+											Free — No gas required! Creating on{" "}
+											<span className="font-semibold text-primary">
+												{dynamicNetwork?.name ||
+													`Chain ${dynamicChainId ?? walletChainId ?? DEFAULT_CHAIN_ID}`}
+											</span>
 										</p>
 									</div>
 								</div>
 							</div>
 						)}
+					</div>
 
-						{/* Errors */}
-
-						{isAuthenticated && contractError && (
-							<div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-500">
-								<AlertCircle className="h-4 w-4 k-0" />
-								<span className="text-sm">
-									{contractError?.message}
-								</span>
-							</div>
-						)}
-
-						{isAuthenticated && solanaContractError && (
-							<div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-500">
-								<AlertCircle className="h-4 w-4 k-0" />
-								<span className="text-sm">
-									{solanaContractError?.message}
-								</span>
-							</div>
-						)}
-
-						{isAuthenticated && (txHash || solanaTxSignature) && (
-							<div className="p-3 bg-primary/10 border border-primary/20 rounded-lg flex items-center justify-between">
-								<div>
-									<p className="text-sm font-medium">
-										Transaction Submitted
+					{/* ── Card 2: Token Image ── */}
+					<div className="bg-card border border-border rounded-2xl p-6">
+						<h2 className="text-base font-semibold mb-4">
+							Token Image
+						</h2>
+						<div
+							onDragOver={handleDragOver}
+							onDragLeave={handleDragLeave}
+							onDrop={handleDrop}
+							className={cn(
+								"relative border-2 border-dashed rounded-xl transition-all",
+								isDragging
+									? "border-primary bg-primary/10"
+									: imagePreview
+										? "border-green-500/50"
+										: "border-border",
+							)}
+						>
+							{imagePreview ? (
+								<div className="relative aspect-video sm:aspect-3/1 w-full overflow-hidden rounded-xl">
+									<img
+										src={imagePreview}
+										alt="Token"
+										className="w-full h-full object-cover"
+									/>
+									<button
+										onClick={(e) => {
+											e.stopPropagation();
+											removeImage();
+										}}
+										className="absolute top-3 right-3 w-8 h-8 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center transition-colors"
+									>
+										<X className="h-4 w-4 text-white" />
+									</button>
+								</div>
+							) : (
+								<div className="flex flex-col items-center justify-center py-10 sm:py-14 px-4 text-center">
+									<div className="w-14 h-14 rounded-2xl bg-card border border-border flex items-center justify-center mb-4">
+										<Upload className="h-6 w-6 text-muted-foreground" />
+									</div>
+									<p className="text-sm font-medium mb-1">
+										Select video or image to upload
 									</p>
-									<p className="text-xs text-muted-foreground font-mono">
-										{(txHash || solanaTxSignature)?.slice(0, 20)}...
-										{(txHash || solanaTxSignature)?.slice(-8)}
+									<p className="text-xs text-muted-foreground mb-4">
+										or drag and drop it here
 									</p>
+									<Button
+										type="button"
+										onClick={() =>
+											fileInputRef.current?.click()
+										}
+										className="bg-primary hover:bg-primary/90 text-primary-foreground px-6"
+										size="sm"
+									>
+										Select file
+									</Button>
+								</div>
+							)}
+							<input
+								ref={fileInputRef}
+								type="file"
+								accept="image/*"
+								onChange={handleFileChange}
+								className="hidden"
+							/>
+						</div>
+						{/* Upload info row */}
+						{!imagePreview && (
+							<div className="grid grid-cols-2 gap-4 mt-4 text-xs text-muted-foreground">
+								<div className="space-y-1.5">
+									<div className="flex items-center justify-between">
+										<span>File size</span>
+										<span className="text-foreground font-medium">
+											Max 5 MB
+										</span>
+									</div>
+									<div className="flex items-center justify-between">
+										<span>File type</span>
+										<span className="text-foreground font-medium">
+											PNG, JPG, GIF
+										</span>
+									</div>
+								</div>
+								<div className="space-y-1.5">
+									<div className="flex items-center justify-between">
+										<span>Resolution</span>
+										<span className="text-foreground font-medium">
+											Any
+										</span>
+									</div>
+									<div className="flex items-center justify-between">
+										<span>Aspect ratio</span>
+										<span className="text-foreground font-medium">
+											1:1 recommended
+										</span>
+									</div>
 								</div>
 							</div>
 						)}
+					</div>
 
-						{/* Submit Button */}
-						<Button
-							onClick={handleSubmit}
-							disabled={
-								isAuthenticated
-									? !isFormValid ||
-										isGaslessCreating ||
-										isCreating ||
-										isConfirming ||
-										isSolanaCreating ||
-										isSolanaConfirming ||
-										isUploading ||
-										isInitialBuying ||
-										isBuying ||
-										isBuyConfirming
-									: false
-							}
-							className="w-full h-12 text-base font-semibold gap-2 bg-linear-to-r from-primary to-purple-600 hover:opacity-90"
-						>
-							{!isAuthenticated ? (
-								<>Please connect your wallet to continue</>
-							) : isUploading ? (
-								<>
-									<Loader2 className="h-5 w-5 animate-spin" />
-									Uploading Image...
-								</>
-							) : isGaslessCreating ? (
-								<>
-									<Loader2 className="h-5 w-5 animate-spin" />
-									Creating Token...
-								</>
-							) : isSolanaCreating ? (
-								<>
-									<Loader2 className="h-5 w-5 animate-spin" />
-									Confirm in Wallet
-								</>
-							) : isSolanaConfirming ? (
-								<>
-									<Loader2 className="h-5 w-5 animate-spin" />
-									Creating Token...
-								</>
-							) : isInitialBuying ||
-							  isBuying ||
-							  isBuyConfirming ? (
-								<>
-									<Loader2 className="h-5 w-5 animate-spin" />
-									Making Initial Purchase...
-								</>
-							) : !isSolana ? (
-								<>
-									<Zap className="h-5 w-5" />
-									Create Token (Free — No Gas!)
-								</>
-							) : (
-								<>
-									<Zap className="h-5 w-5" />
-									Create Token on Solana (Free — No Gas!)
-								</>
-							)}
-						</Button>
-					</motion.div>
+					{/* Errors */}
+					{isAuthenticated && contractError && (
+						<div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-500">
+							<AlertCircle className="h-4 w-4 shrink-0" />
+							<span className="text-sm">
+								{contractError?.message}
+							</span>
+						</div>
+					)}
 
-					{/* Right Column - Preview Card */}
-					<motion.div
-						initial={{ opacity: 0, x: 20 }}
-						animate={{ opacity: 1, x: 0 }}
-						transition={{ delay: 0.2 }}
-						className="lg:col-span-2 hidden lg:block"
+					{isAuthenticated && solanaContractError && (
+						<div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-500">
+							<AlertCircle className="h-4 w-4 shrink-0" />
+							<span className="text-sm">
+								{solanaContractError?.message}
+							</span>
+						</div>
+					)}
+
+					{isAuthenticated && (txHash || solanaTxSignature) && (
+						<div className="p-3 bg-primary/10 border border-primary/20 rounded-lg flex items-center justify-between">
+							<div>
+								<p className="text-sm font-medium">
+									Transaction Submitted
+								</p>
+								<p className="text-xs text-muted-foreground font-mono">
+									{(txHash || solanaTxSignature)?.slice(
+										0,
+										20,
+									)}
+									...
+									{(txHash || solanaTxSignature)?.slice(-8)}
+								</p>
+							</div>
+						</div>
+					)}
+
+					{/* ── Coin Data Warning ── */}
+					<div className="bg-card border border-border rounded-xl p-4 flex items-start gap-3">
+						<AlertCircle className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+						<p className="text-xs text-muted-foreground leading-relaxed">
+							Coin data (social links, banner, etc) can only be
+							added now, and can&apos;t be changed or edited after
+							creation.
+						</p>
+					</div>
+
+					{/* ── Create Token Button (outside cards) ── */}
+					<Button
+						onClick={handleSubmit}
+						disabled={
+							isAuthenticated
+								? !isFormValid ||
+									isGaslessCreating ||
+									isCreating ||
+									isConfirming ||
+									isSolanaCreating ||
+									isSolanaConfirming ||
+									isUploading ||
+									isInitialBuying ||
+									isBuying ||
+									isBuyConfirming
+								: false
+						}
+						className="w-fit h-12 text-base font-semibold gap-2 bg-primary/70 hover:opacity-100 rounded-sm"
 					>
+						{!isAuthenticated ? (
+							<>Please connect your wallet to continue</>
+						) : isUploading ? (
+							<>
+								<Loader2 className="h-5 w-5 animate-spin" />
+								Uploading Image...
+							</>
+						) : isGaslessCreating ? (
+							<>
+								<Loader2 className="h-5 w-5 animate-spin" />
+								Creating Token...
+							</>
+						) : isSolanaCreating ? (
+							<>
+								<Loader2 className="h-5 w-5 animate-spin" />
+								Confirm in Wallet
+							</>
+						) : isSolanaConfirming ? (
+							<>
+								<Loader2 className="h-5 w-5 animate-spin" />
+								Creating Token...
+							</>
+						) : isInitialBuying || isBuying || isBuyConfirming ? (
+							<>
+								<Loader2 className="h-5 w-5 animate-spin" />
+								Making Initial Purchase...
+							</>
+						) : !isSolana ? (
+							<>Create Coin</>
+						) : (
+							<>Create Coin on Solana</>
+						)}
+					</Button>
+
+					{/* Mobile Preview (below button, hidden on lg+) */}
+					<div className="lg:hidden">
 						<TokenPreviewCard
 							name={name}
 							symbol={symbol}
@@ -1590,12 +1603,42 @@ export function TokenCreationForm() {
 							telegramUrl={telegramUrl}
 							initialPriceUsd={tokenomics?.initialPriceUsd}
 							initialMcapUsd={tokenomics?.initialMcapUsd}
-							graduationThresholdUsd={tokenomics?.graduationThresholdUsd}
-							graduationMultiplier={tokenomics?.graduationMultiplier}
+							graduationThresholdUsd={
+								tokenomics?.graduationThresholdUsd
+							}
+							graduationMultiplier={
+								tokenomics?.graduationMultiplier
+							}
 							nativeSymbol={tokenomics?.nativeSymbol}
 						/>
-					</motion.div>
-				</div>
+					</div>
+				</motion.div>
+
+				{/* Right Column - Preview Card */}
+				<motion.div
+					initial={{ opacity: 0, x: 20 }}
+					animate={{ opacity: 1, x: 0 }}
+					transition={{ delay: 0.2 }}
+					className="lg:col-span-2 hidden lg:block"
+				>
+					<TokenPreviewCard
+						name={name}
+						symbol={symbol}
+						description={description}
+						imagePreview={imagePreview}
+						hypeBoostEnabled={hypeBoostEnabled}
+						websiteUrl={websiteUrl}
+						twitterUrl={twitterUrl}
+						telegramUrl={telegramUrl}
+						initialPriceUsd={tokenomics?.initialPriceUsd}
+						initialMcapUsd={tokenomics?.initialMcapUsd}
+						graduationThresholdUsd={
+							tokenomics?.graduationThresholdUsd
+						}
+						graduationMultiplier={tokenomics?.graduationMultiplier}
+						nativeSymbol={tokenomics?.nativeSymbol}
+					/>
+				</motion.div>
 			</div>
 		</div>
 	);
