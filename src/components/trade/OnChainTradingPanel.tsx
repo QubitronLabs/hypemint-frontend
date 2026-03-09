@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 import {
 	useBuyTokens,
 	useSellTokens,
@@ -66,6 +66,8 @@ interface OnChainTradingPanelProps {
 	chainId: number;
 	/** Backend CPMM balance for sell display (raw 6-decimal string). Solana on-chain SPL balance is always 0 for CPMM tokens. */
 	backendTokenBalance?: string;
+	/** Circulating supply already minted/sold. Max buyable = totalSupply - circulatingSupply. */
+	circulatingSupply?: string;
 }
 
 type TradeType = "buy" | "sell";
@@ -81,52 +83,6 @@ function formatSolanaToken(amount: bigint): string {
 	return (Number(amount) / 1e9).toString();
 }
 
-// Format number with commas - handles extremely large numbers
-function formatNumber(num: number | string): string {
-	const n = typeof num === "string" ? parseFloat(num) : num;
-	if (isNaN(n) || !isFinite(n)) return "0";
-	if (n >= 1e15) return (n / 1e15).toFixed(2) + "Q"; // Quadrillion
-	if (n >= 1e12) return (n / 1e12).toFixed(2) + "T"; // Trillion
-	if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
-	if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
-	if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
-	if (n < 0.00000001 && n > 0) return "<0.00000001";
-	if (n < 1 && n > 0)
-		return n.toFixed(8).replace(/0+$/, "").replace(/\.$/, ".0");
-	return n.toFixed(n < 1 ? 8 : 4);
-}
-
-// Format price with better precision for small values
-function formatPriceDisplay(num: number, symbol: string = "ETH"): string {
-	if (isNaN(num) || !isFinite(num)) return "0";
-	if (num >= 1e9) return `>999M`;
-	if (num >= 1e6) return (num / 1e6).toFixed(2) + "M";
-	if (num >= 1e3) return (num / 1e3).toFixed(2) + "K";
-	if (num >= 1) return num.toFixed(4);
-	if (num >= 0.0001) return num.toFixed(6);
-	if (num >= 0.00000001) return num.toFixed(10);
-	if (num > 0) return num.toExponential(4);
-	return "0";
-}
-
-// Validate trade amount is reasonable
-function validateTradeAmount(
-	amount: string,
-	isBuy: boolean,
-	balance: bigint | undefined,
-): { valid: boolean; error?: string } {
-	const parsed = parseFloat(amount);
-	if (isNaN(parsed) || parsed <= 0)
-		return { valid: false, error: "Enter a valid amount" };
-	if (!isFinite(parsed)) return { valid: false, error: "Amount too large" };
-
-	// Check if amount would result in astronomical values (likely calculation error)
-	if (isBuy && parsed > 1000000)
-		return { valid: false, error: "Amount exceeds reasonable limit" };
-
-	return { valid: true };
-}
-
 export function OnChainTradingPanel({
 	tokenId,
 	tokenAddress,
@@ -139,6 +95,7 @@ export function OnChainTradingPanel({
 	chainId,
 	className,
 	backendTokenBalance,
+	circulatingSupply,
 }: OnChainTradingPanelProps) {
 	const { isAuthenticated, setShowAuthFlow, primaryWallet } = useAuth();
 	const [tradeType, setTradeType] = useState<TradeType>("buy");
@@ -166,8 +123,10 @@ export function OnChainTradingPanel({
 		if (isSolana && normalizedChainId && !isSolanaChain(appChainId ?? 0)) {
 			setNetworkData({
 				network: {
-					name: normalizedChainId === 900 ? "Solana" : "Solana Devnet",
-					vanityName: normalizedChainId === 900 ? "Solana" : "Solana Devnet",
+					name:
+						normalizedChainId === 900 ? "Solana" : "Solana Devnet",
+					vanityName:
+						normalizedChainId === 900 ? "Solana" : "Solana Devnet",
 				},
 				chainId: normalizedChainId,
 				chainLogo: "/chains/solana.svg",
@@ -250,7 +209,9 @@ export function OnChainTradingPanel({
 	const nativeBalance = isSolana ? solNativeBalance : evmNativeBalance;
 	// For Solana: use backend CPMM balance instead of on-chain SPL (which is always 0 for CPMM tokens)
 	const tokenBalance = isSolana
-		? (backendTokenBalance ? BigInt(backendTokenBalance) : solTokenBalance)
+		? backendTokenBalance
+			? BigInt(backendTokenBalance)
+			: solTokenBalance
 		: evmTokenBalance;
 	const refetchNativeBalance = isSolana
 		? refetchSolNativeBalance
@@ -303,7 +264,7 @@ export function OnChainTradingPanel({
 	// 	isLoadingBalance,
 	// ]);
 
-	// Quotes (EVM only — Solana uses client-side bonding curve math)
+	// Quotes
 	const { data: buyQuote, isLoading: isBuyQuoteLoading } = useBuyQuote(
 		isSolana
 			? ("0x0000000000000000000000000000000000000000" as Address)
@@ -359,7 +320,11 @@ export function OnChainTradingPanel({
 			try {
 				// Convert SOL to lamports (9 decimals)
 				const lamports = Math.floor(parsed * 1e9).toString();
-				const quote = await getQuoteFromNative(tokenId, lamports, normalizedChainId);
+				const quote = await getQuoteFromNative(
+					tokenId,
+					lamports,
+					normalizedChainId,
+				);
 				// tokenAmount from backend is in 9-decimal raw units
 				const humanTokens = parseFloat(quote.tokenAmount) / 1e9;
 				setCpmmEstimate(humanTokens);
@@ -373,7 +338,14 @@ export function OnChainTradingPanel({
 		return () => {
 			if (cpmmDebounceRef.current) clearTimeout(cpmmDebounceRef.current);
 		};
-	}, [isSolana, tradeType, amount, tokenId, normalizedChainId, nativeBalance]);
+	}, [
+		isSolana,
+		tradeType,
+		amount,
+		tokenId,
+		normalizedChainId,
+		nativeBalance,
+	]);
 
 	// Allowance check for selling (EVM only — Solana uses SPL ATA, no allowances)
 	const { data: allowance, refetch: refetchAllowance } = useTokenAllowance(
@@ -485,8 +457,7 @@ export function OnChainTradingPanel({
 		// Map our internal chain IDs to Dynamic's Solana network IDs:
 		//   900 (mainnet) → 101, 901 (devnet) → 103
 		if (isSolana) {
-			const dynamicNetworkId =
-				normalizedChainId === 900 ? 101 : 103;
+			const dynamicNetworkId = normalizedChainId === 900 ? 101 : 103;
 
 			const connector =
 				primaryWallet?.connector as unknown as SolanaWalletConnector;
@@ -498,16 +469,29 @@ export function OnChainTradingPanel({
 						// update the store with the correct chainId and name.
 					})
 					.catch((err: unknown) => {
-						console.error("[OnChainTradingPanel] Solana network switch failed:", err);
+						console.error(
+							"[OnChainTradingPanel] Solana network switch failed:",
+							err,
+						);
 						// Fallback: manually update store if connector switch fails
 						setNetworkData({
 							network: {
-								name: normalizedChainId === 900 ? "Solana" : "Solana Devnet",
-								vanityName: normalizedChainId === 900 ? "Solana" : "Solana Devnet",
+								name:
+									normalizedChainId === 900
+										? "Solana"
+										: "Solana Devnet",
+								vanityName:
+									normalizedChainId === 900
+										? "Solana"
+										: "Solana Devnet",
 							},
 							chainId: normalizedChainId,
 							chainLogo: "/chains/solana.svg",
-							nativeCurrency: { name: "SOL", symbol: "SOL", decimals: 9 },
+							nativeCurrency: {
+								name: "SOL",
+								symbol: "SOL",
+								decimals: 9,
+							},
 							activeChainType: "SOLANA",
 						});
 					});
@@ -515,8 +499,14 @@ export function OnChainTradingPanel({
 				// No connector available — just update store directly
 				setNetworkData({
 					network: {
-						name: normalizedChainId === 900 ? "Solana" : "Solana Devnet",
-						vanityName: normalizedChainId === 900 ? "Solana" : "Solana Devnet",
+						name:
+							normalizedChainId === 900
+								? "Solana"
+								: "Solana Devnet",
+						vanityName:
+							normalizedChainId === 900
+								? "Solana"
+								: "Solana Devnet",
 					},
 					chainId: normalizedChainId,
 					chainLogo: "/chains/solana.svg",
@@ -610,20 +600,34 @@ export function OnChainTradingPanel({
 		if (tradeType === "buy") {
 			if (isSolana) {
 				// Solana: treat undefined/null as zero to prevent premature trades during network switch
-				if (nativeBalance?.value === undefined || nativeBalance?.value === null) return true;
+				if (
+					nativeBalance?.value === undefined ||
+					nativeBalance?.value === null
+				)
+					return true;
 				return nativeBalance.value === 0n;
 			}
 			// EVM: only trigger for explicit 0 (Wagmi manages loading state separately)
-			if (nativeBalance?.value !== undefined && nativeBalance.value === 0n) return true;
+			if (
+				nativeBalance?.value !== undefined &&
+				nativeBalance.value === 0n
+			)
+				return true;
 			return false;
 		}
 		// Sell: check token balance
 		if (isSolana) {
-			if (tokenBalance === undefined || tokenBalance === null) return true;
+			if (tokenBalance === undefined || tokenBalance === null)
+				return true;
 			return BigInt(tokenBalance.toString()) === 0n;
 		}
 		// EVM sell: only explicit 0
-		if (tokenBalance !== undefined && tokenBalance !== null && BigInt(tokenBalance.toString()) === 0n) return true;
+		if (
+			tokenBalance !== undefined &&
+			tokenBalance !== null &&
+			BigInt(tokenBalance.toString()) === 0n
+		)
+			return true;
 		return false;
 	}, [tradeType, nativeBalance, tokenBalance, isAuthenticated, isSolana]);
 
@@ -631,15 +635,24 @@ export function OnChainTradingPanel({
 	const zeroBalanceMessage = useMemo(() => {
 		if (!hasZeroBalance) return "";
 		// Check if balance is still loading (undefined)
-		const isBalanceLoading = tradeType === "buy"
-			? (nativeBalance?.value === undefined || nativeBalance?.value === null)
-			: (tokenBalance === undefined || tokenBalance === null);
+		const isBalanceLoading =
+			tradeType === "buy"
+				? nativeBalance?.value === undefined ||
+					nativeBalance?.value === null
+				: tokenBalance === undefined || tokenBalance === null;
 		if (isBalanceLoading) return "Checking balance...";
 		if (tradeType === "buy") {
-			return `Insufficient balance: you have 0 ${effectiveNativeSymbol}`;
+			return `Insufficient balance: you have 0 ${nativeSymbol}`;
 		}
 		return `Insufficient balance: you have 0 ${tokenSymbol}`;
-	}, [hasZeroBalance, tradeType, nativeBalance, tokenBalance, effectiveNativeSymbol, tokenSymbol]);
+	}, [
+		hasZeroBalance,
+		tradeType,
+		nativeBalance,
+		tokenBalance,
+		effectiveNativeSymbol,
+		tokenSymbol,
+	]);
 
 	// Check if amount exceeds available balance (both buy and sell)
 	const exceedsBalance = useMemo(() => {
@@ -651,7 +664,9 @@ export function OnChainTradingPanel({
 		if (tradeType === "buy") {
 			// Check native balance for buys
 			if (!nativeBalance?.value) return false;
-			const balanceHuman = parseFloat(formatNativeDisplay(nativeBalance.value));
+			const balanceHuman = parseFloat(
+				formatNativeDisplay(nativeBalance.value),
+			);
 			return parsedAmount > balanceHuman;
 		} else {
 			// Check token balance for sells
@@ -661,7 +676,15 @@ export function OnChainTradingPanel({
 			);
 			return parsedAmount > balanceDisplay;
 		}
-	}, [hasZeroBalance, tradeType, amount, nativeBalance, tokenBalance, formatNativeDisplay, formatTokenDisplay]);
+	}, [
+		hasZeroBalance,
+		tradeType,
+		amount,
+		nativeBalance,
+		tokenBalance,
+		formatNativeDisplay,
+		formatTokenDisplay,
+	]);
 
 	// Human-readable balance string for the error message
 	const balanceErrorMessage = useMemo(() => {
@@ -673,14 +696,25 @@ export function OnChainTradingPanel({
 				? formatNativeDisplay(nativeBalance.value)
 				: "0";
 			const bal = parseFloat(raw).toFixed(4);
-			return `Insufficient balance: you have ${bal} ${effectiveNativeSymbol}`;
+			return `Insufficient balance: you have ${bal} ${nativeSymbol}`;
 		}
 		const raw = tokenBalance
 			? formatTokenDisplay(tokenBalance as bigint)
 			: "0";
 		const bal = parseFloat(raw).toFixed(4);
 		return `Insufficient balance: you have ${bal} ${tokenSymbol}`;
-	}, [exceedsBalance, hasZeroBalance, zeroBalanceMessage, tradeType, nativeBalance, tokenBalance, formatNativeDisplay, formatTokenDisplay, effectiveNativeSymbol, tokenSymbol]);
+	}, [
+		exceedsBalance,
+		hasZeroBalance,
+		zeroBalanceMessage,
+		tradeType,
+		nativeBalance,
+		tokenBalance,
+		formatNativeDisplay,
+		formatTokenDisplay,
+		effectiveNativeSymbol,
+		tokenSymbol,
+	]);
 
 	// Check if amount is below the minimum representable unit
 	const belowMinimum = useMemo(() => {
@@ -699,6 +733,12 @@ export function OnChainTradingPanel({
 		return false; // EVM handles precision internally
 	}, [amount, tradeType, isSolana]);
 
+	// Maximum tokens available for purchase
+	const maxBuyableTokens = useMemo(() => {
+		const circulating = parseFloat(circulatingSupply || "0");
+		return circulating;
+	}, [circulatingSupply]);
+
 	// Calculate trade metrics with safety checks
 	const tradeMetrics = useMemo(() => {
 		const parsedAmount = parseFloat(amount) || 0;
@@ -711,94 +751,16 @@ export function OnChainTradingPanel({
 			!isSolana && evmSpotPrice > 0 ? evmSpotPrice : backendPrice;
 
 		// Skip calculations when user has zero balance for the active trade side
-		const isZeroNativeBalance = nativeBalance?.value !== undefined && nativeBalance.value === 0n;
-		const isZeroTokenBalance = tokenBalance !== undefined && tokenBalance !== null && BigInt(tokenBalance.toString()) === 0n;
-		if ((tradeType === "buy" && isZeroNativeBalance) || (tradeType === "sell" && isZeroTokenBalance)) {
-			return {
-				outputAmount: 0,
-				fees: 0,
-				effectivePrice: price,
-				priceImpact: 0,
-				isHighImpact: false,
-				isUnreasonable: false,
-			};
-		}
-
-		// Solana: use CPMM (constant product x·y=k) for trade estimation.
-		// The on-chain Solana program uses a CPMM bonding curve with virtual reserves.
-		if (isSolana) {
-			// Use on-chain fee percentages when available, otherwise assume 2%
-			const feePct = solanaCurveState
-				? (solanaCurveState.protocolFeeBps + solanaCurveState.creatorFeeBps) / 10000
-				: 0.02;
-
-			if (parsedAmount > 0 && price > 0) {
-				if (tradeType === "buy") {
-					if (solanaCurveState) {
-						// CPMM buy: tokens_out = virtualTokens * netSol / (virtualSol + netSol)
-						const netLamports = BigInt(Math.round(parsedAmount * (1 - feePct) * 1e9));
-						const vSol = solanaCurveState.virtualSolReserves;
-						const vTok = solanaCurveState.virtualTokenReserves;
-						if (vSol > 0n && vTok > 0n && netLamports > 0n) {
-							const tokensRaw = (vTok * netLamports) / (vSol + netLamports);
-							const estimatedTokens = Number(tokensRaw) / 1e9; // 9-decimal tokens
-							return {
-								outputAmount: estimatedTokens,
-								fees: parsedAmount * feePct,
-								effectivePrice: parsedAmount > 0 ? parsedAmount / estimatedTokens : 0,
-								priceImpact: 0,
-								isHighImpact: false,
-								isUnreasonable: !isFinite(estimatedTokens) || estimatedTokens > 1e18,
-							};
-						}
-					}
-					// Fallback: use backend spot price
-					const netAmount = parsedAmount * (1 - feePct);
-					const estimatedTokens = netAmount / price;
-					return {
-						outputAmount: estimatedTokens,
-						fees: parsedAmount * feePct,
-						effectivePrice: price,
-						priceImpact: 0,
-						isHighImpact: false,
-						isUnreasonable: !isFinite(estimatedTokens) || estimatedTokens > 1e18,
-					};
-				} else if (solanaCurveState) {
-					// CPMM sell: sol_out = virtualSol * tokens / (virtualTokens + tokens)
-					const nRaw = BigInt(Math.round(parsedAmount * 1e9)); // 9-decimal raw
-					const s = solanaCurveState.totalSupply;
-					const n = nRaw > s ? s : nRaw; // cap at total supply
-					if (n > 0n) {
-						const vSol = solanaCurveState.virtualSolReserves;
-						const vTok = solanaCurveState.virtualTokenReserves;
-						const grossSolLamports = (vSol * n) / (vTok + n);
-						// Show gross amount (before protocol fees) — matches Phantom's
-						// simulation display. Fees (2%) are deducted on-chain separately.
-						const grossSol = Number(grossSolLamports) / 1e9;
-						return {
-							outputAmount: grossSol,
-							fees: grossSol * feePct,
-							effectivePrice: parsedAmount > 0 ? grossSol / parsedAmount : 0,
-							priceImpact: 0,
-							isHighImpact: false,
-							isUnreasonable: !isFinite(grossSol) || grossSol > 1e9,
-						};
-					}
-				} else {
-					// Fallback: CPMM spot price (less accurate)
-					const grossSol = parsedAmount * price;
-					const netSol = grossSol * (1 - feePct);
-					return {
-						outputAmount: netSol,
-						fees: grossSol * feePct,
-						effectivePrice: price,
-						priceImpact: 0,
-						isHighImpact: false,
-						isUnreasonable: !isFinite(netSol) || netSol > 1e9,
-					};
-				}
-			}
-
+		const isZeroNativeBalance =
+			nativeBalance?.value !== undefined && nativeBalance.value === 0n;
+		const isZeroTokenBalance =
+			tokenBalance !== undefined &&
+			tokenBalance !== null &&
+			BigInt(tokenBalance.toString()) === 0n;
+		if (
+			(tradeType === "buy" && isZeroNativeBalance) ||
+			(tradeType === "sell" && isZeroTokenBalance)
+		) {
 			return {
 				outputAmount: 0,
 				fees: 0,
@@ -816,6 +778,7 @@ export function OnChainTradingPanel({
 				bigint,
 			];
 			const tokensOut = parseFloat(formatEther(tokenAmount));
+			console.log({ buyQuote, tokensOut });
 			// const totalFees = parseFloat(formatEther(protocolFee + creatorFee));
 			// const effectivePrice = tokensOut > 0 ? parsedAmount / tokensOut : 0;
 			// const priceImpact =
@@ -880,7 +843,8 @@ export function OnChainTradingPanel({
 					effectivePrice: price,
 					priceImpact: 0,
 					isHighImpact: false,
-					isUnreasonable: !isFinite(estimatedTokens) || estimatedTokens > 1e18,
+					isUnreasonable:
+						!isFinite(estimatedTokens) || estimatedTokens > 1e18,
 				};
 			} else {
 				const estimatedNative = parsedAmount * price;
@@ -890,7 +854,8 @@ export function OnChainTradingPanel({
 					effectivePrice: price,
 					priceImpact: 0,
 					isHighImpact: false,
-					isUnreasonable: !isFinite(estimatedNative) || estimatedNative > 1e9,
+					isUnreasonable:
+						!isFinite(estimatedNative) || estimatedNative > 1e9,
 				};
 			}
 		}
@@ -914,6 +879,46 @@ export function OnChainTradingPanel({
 		evmOnChainPrice,
 		nativeBalance,
 		tokenBalance,
+	]);
+
+	// Check if calculated buy output exceeds max buyable tokens
+	const exceedsMaxSupply = useMemo(() => {
+		if (tradeType !== "buy") return false;
+		if (maxBuyableTokens === null) return false;
+		if (!amount || parseFloat(amount) <= 0) return false;
+
+		// Get the raw (uncapped) output
+		const rawOutput =
+			isSolana && cpmmEstimate !== null
+				? cpmmEstimate
+				: tradeMetrics.outputAmount;
+		return rawOutput > maxBuyableTokens;
+	}, [
+		tradeType,
+		maxBuyableTokens,
+		amount,
+		isSolana,
+		cpmmEstimate,
+		tradeMetrics.outputAmount,
+	]);
+
+	// Capped output amount for buy display — never show more than maxBuyableTokens
+	const cappedBuyOutput = useMemo(() => {
+		if (tradeType !== "buy") return tradeMetrics.outputAmount;
+		const rawOutput =
+			isSolana && cpmmEstimate !== null
+				? cpmmEstimate
+				: tradeMetrics.outputAmount;
+		if (maxBuyableTokens !== null && rawOutput > maxBuyableTokens) {
+			return maxBuyableTokens;
+		}
+		return rawOutput;
+	}, [
+		tradeType,
+		tradeMetrics.outputAmount,
+		isSolana,
+		cpmmEstimate,
+		maxBuyableTokens,
 	]);
 
 	// Trade recording is handled by backend blockchain event listener + instant sync API.
@@ -944,9 +949,20 @@ export function OnChainTradingPanel({
 			// Instantly sync trade to backend for fast UI updates
 			// Skip for Solana — the buy hook handles syncTrade with correct amounts
 			if (!isSolana) {
-				syncTrade({ txHash: buyTxHash, tokenId, chainId: normalizedChainId })
-					.then((res) => console.log("[OnChainTrading] Buy sync result:", res))
-					.catch((err) => console.warn("[OnChainTrading] Buy sync failed (event listener will catch up):", err));
+				syncTrade({
+					txHash: buyTxHash,
+					tokenId,
+					chainId: normalizedChainId,
+				})
+					.then((res) =>
+						console.log("[OnChainTrading] Buy sync result:", res),
+					)
+					.catch((err) =>
+						console.warn(
+							"[OnChainTrading] Buy sync failed (event listener will catch up):",
+							err,
+						),
+					);
 			}
 			// Clear amount immediately
 			setAmount("");
@@ -1026,9 +1042,20 @@ export function OnChainTradingPanel({
 			// Instantly sync trade to backend for fast UI updates
 			// Skip for Solana — the sell hook handles syncTrade with correct amounts
 			if (!isSolana) {
-				syncTrade({ txHash: sellTxHash, tokenId, chainId: normalizedChainId })
-					.then((res) => console.log("[OnChainTrading] Sell sync result:", res))
-					.catch((err) => console.warn("[OnChainTrading] Sell sync failed (event listener will catch up):", err));
+				syncTrade({
+					txHash: sellTxHash,
+					tokenId,
+					chainId: normalizedChainId,
+				})
+					.then((res) =>
+						console.log("[OnChainTrading] Sell sync result:", res),
+					)
+					.catch((err) =>
+						console.warn(
+							"[OnChainTrading] Sell sync failed (event listener will catch up):",
+							err,
+						),
+					);
 			}
 			// Clear amount immediately
 			setAmount("");
@@ -1109,9 +1136,15 @@ export function OnChainTradingPanel({
 			const msg = error.message || "Transaction failed";
 			// Extract user-friendly message from common wagmi/viem errors
 			let friendlyMsg = msg;
-			if (msg.includes("User rejected") || msg.includes("user rejected")) {
+			if (
+				msg.includes("User rejected") ||
+				msg.includes("user rejected")
+			) {
 				friendlyMsg = "Transaction cancelled by user";
-			} else if (msg.includes("insufficient funds") || msg.includes("InsufficientFunds")) {
+			} else if (
+				msg.includes("insufficient funds") ||
+				msg.includes("InsufficientFunds")
+			) {
 				friendlyMsg = "Insufficient balance for this transaction";
 			} else if (msg.includes("exceeds the configured cap")) {
 				friendlyMsg = "Gas fee too high — try again later";
@@ -1150,6 +1183,13 @@ export function OnChainTradingPanel({
 		// Prevent trading with zero balance
 		if (hasZeroBalance) {
 			toast.error(zeroBalanceMessage);
+			return;
+		}
+		// Prevent purchasing more tokens than available supply
+		if (tradeType === "buy" && exceedsMaxSupply) {
+			toast.error(
+				`Cannot buy more than ${formatNumber(maxBuyableTokens)} ${tokenSymbol} (max available)`,
+			);
 			return;
 		}
 
@@ -1329,7 +1369,6 @@ export function OnChainTradingPanel({
 		setJustApproved(false);
 	}, [tradeType]);
 
-	
 	return (
 		<div
 			className={cn(
@@ -1373,13 +1412,13 @@ export function OnChainTradingPanel({
 					<div className="flex justify-between items-center mb-1.5 gap-2">
 						<label className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
 							{tradeType === "buy"
-								? `You Pay (${effectiveNativeSymbol})`
+								? `You Pay (${nativeSymbol})`
 								: `You Sell (${tokenSymbol})`}
 						</label>
 						<span className="text-[10px] sm:text-xs text-muted-foreground truncate">
 							Balance:{" "}
 							{tradeType === "buy"
-								? `${nativeBalance?.value ? formatNumber(formatNativeDisplay(nativeBalance.value)) : "0"} ${effectiveNativeSymbol}`
+								? `${nativeBalance?.value ? formatNumber(formatNativeDisplay(nativeBalance.value)) : "0"} ${nativeSymbol}`
 								: `${tokenBalance ? formatNumber(formatTokenDisplay(tokenBalance as bigint)) : "0"} ${tokenSymbol}`}
 						</span>
 					</div>
@@ -1397,9 +1436,7 @@ export function OnChainTradingPanel({
 							)}
 						/>
 						<div className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-muted-foreground">
-							{tradeType === "buy"
-								? effectiveNativeSymbol
-								: tokenSymbol}
+							{tradeType === "buy" ? nativeSymbol : tokenSymbol}
 						</div>
 					</div>
 				</div>
@@ -1421,16 +1458,6 @@ export function OnChainTradingPanel({
 						</button>
 					))}
 				</div>
-
-				{/* Zero Balance Warning */}
-				{/* {hasZeroBalance && (
-					<div className="mb-3 p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-center gap-2">
-						<AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
-						<span className="text-sm text-destructive font-medium">
-							{zeroBalanceMessage}
-						</span>
-					</div>
-				)} */}
 
 				{/* Output Estimate */}
 				<AnimatePresence mode="wait">
@@ -1469,13 +1496,13 @@ export function OnChainTradingPanel({
 										) : (
 											<>
 												{formatNumber(
-													isSolana && tradeType === "buy" && cpmmEstimate !== null
-														? cpmmEstimate
+													tradeType === "buy"
+														? cappedBuyOutput
 														: tradeMetrics.outputAmount,
 												)}{" "}
 												{tradeType === "buy"
 													? tokenSymbol
-													: effectiveNativeSymbol}
+													: nativeSymbol}
 											</>
 										)}
 									</span>
@@ -1511,7 +1538,6 @@ export function OnChainTradingPanel({
 				</div>
 
 				{/* Execute Button */}
-
 				<>
 					{/* Trade Button - Merged with Approval functionality for sell */}
 					<Button
@@ -1534,6 +1560,7 @@ export function OnChainTradingPanel({
 											parseFloat(amount) <= 0 ||
 											exceedsBalance ||
 											belowMinimum ||
+											exceedsMaxSupply ||
 											isLoading ||
 											isConfirming ||
 											isApproving ||
@@ -1541,14 +1568,14 @@ export function OnChainTradingPanel({
 								: false
 						}
 						className={cn(
-							"w-full h-12 text-base font-semibold transition-all duration-200",
+							"w-full h-12 text-base font-semibold transition-all duration-200 disabled:cursor-not-allowed cursor-pointer disabled:pointer-events-auto",
 							walletPlatformMismatch
 								? "bg-amber-600/30 hover:bg-amber-600/40 text-amber-400/70 cursor-help"
 								: tradeType === "buy"
-									? "bg-linear-to-r from-green-500 to-emerald-500 hover:opacity-90 cursor-pointer"
+									? "bg-linear-to-r from-green-500 to-emerald-500 hover:opacity-90 "
 									: tradeType === "sell" && needsApproval
-										? "bg-red-600/30 hover:bg-red-600/40 text-red-400 cursor-pointer"
-										: "bg-linear-to-r from-red-500 to-rose-500 hover:opacity-90 text-gray-100 cursor-pointer",
+										? "bg-red-600/30 hover:bg-red-600/40 text-red-400"
+										: "bg-linear-to-r from-red-500 to-rose-500 hover:opacity-90 text-gray-100",
 						)}
 					>
 						{!isAuthenticated ? (
@@ -1559,9 +1586,25 @@ export function OnChainTradingPanel({
 								Switch to {isSolana ? "Solana" : "EVM"} Wallet
 							</>
 						) : appChainId !== normalizedChainId ? (
-							<>Switch To {effectiveNativeSymbol}</>
+							<>Switch To {nativeSymbol}</>
+						) : tradeType === "buy" &&
+						  exceedsBalance &&
+						  parseFloat(amount) > 0 ? (
+							<span className="flex items-center justify-center w-full truncate text-xs sm:text-sm">
+								<AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 shrink-0" />
+								<span className="truncate">
+									{balanceErrorMessage}
+								</span>
+							</span>
 						) : tradeType === "sell" && needsApproval ? (
-							// Approval state for sell
+							exceedsBalance ? (
+								<span className="flex items-center justify-center w-full truncate text-xs sm:text-sm">
+									<AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 shrink-0" />
+									<span className="truncate">
+										{balanceErrorMessage}
+									</span>
+								</span>
+							) : // Approval state for sell
 							isApproving || isApproveConfirming ? (
 								<>
 									<Loader2 className="h-5 w-5 mr-2 animate-spin" />
@@ -1590,11 +1633,6 @@ export function OnChainTradingPanel({
 								<XCircle className="h-5 w-5 mr-2 text-white" />
 								Transaction Failed
 							</>
-						) : exceedsBalance ? (
-							<span className="flex items-center justify-center w-full truncate text-xs sm:text-sm">
-								<AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 shrink-0" />
-								<span className="truncate">{balanceErrorMessage}</span>
-							</span>
 						) : belowMinimum ? (
 							<>
 								<AlertTriangle className="h-5 w-5 mr-2" />
